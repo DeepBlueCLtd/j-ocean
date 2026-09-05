@@ -1,6 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const PORT = 4317;
+// Bound explicitly to the IPv4 loopback rather than left to `localhost`. On a machine
+// where `localhost` resolves to ::1 first -- a GitHub runner does -- vite preview listens
+// on the IPv6 address while Playwright polls the IPv4 one, and the wait times out with no
+// error to read. Naming the host on both sides removes the question.
+const HOST = '127.0.0.1';
 const chromium = process.env['J_OCEAN_CHROMIUM'];
 
 // SC-003: the site is loaded from a static file server, not from a dev server, so that
@@ -12,7 +17,7 @@ export default defineConfig({
   retries: 0,
   reporter: process.env.CI ? 'list' : 'line',
   use: {
-    baseURL: `http://127.0.0.1:${PORT}`,
+    baseURL: `http://${HOST}:${PORT}`,
     trace: 'off',
   },
   projects: [
@@ -29,9 +34,13 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `pnpm build && pnpm exec vite preview --port ${PORT} --strictPort`,
-    url: `http://127.0.0.1:${PORT}/`,
+    command: `pnpm build && pnpm exec vite preview --host ${HOST} --port ${String(PORT)} --strictPort`,
+    url: `http://${HOST}:${String(PORT)}/`,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
+    // So that a server which fails to start says why in the job log, instead of leaving a
+    // bare "timed out waiting for config.webServer" to be guessed at.
+    stdout: 'pipe',
+    stderr: 'pipe',
   },
 });
