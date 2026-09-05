@@ -45,6 +45,13 @@ test('the ocean after twelve hours', async ({ page }) => {
   await page.getByTestId('run-panel').screenshot({ path: `${IMAGES}003-run-panel.png` });
 });
 
+test('what the forecast was worth', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('score-run').click();
+  await expect(page.getByTestId('score-statement')).toBeVisible({ timeout: 30_000 });
+  await page.getByTestId('score-panel').screenshot({ path: `${IMAGES}006-score.png` });
+});
+
 test('where the answer came from', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('attribution-panel')).toBeVisible();

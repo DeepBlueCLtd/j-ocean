@@ -6,7 +6,7 @@ import { serialiseManifest } from '../run/manifest.js';
 import { loadClimatology, loadObservations, loadTruth } from './artefacts.js';
 import { FieldView, type Marker } from './FieldView.js';
 import { climatologyReferenceOver } from '../instruments/climatology-reference.js';
-import { interfaceFromProfile as interfaceFromClimatology } from '../instruments/observation-operator.js';
+import { interfaceFieldFromContainer, interfaceFieldFromTruth } from '../instruments/interface-field.js';
 import {
   argoObservations,
   sampleSurface,
@@ -18,12 +18,13 @@ import { isUsable, type Observation } from '../instruments/observation.js';
 import { analyse, type AnalysisRecord } from '../analysis/optimal-interpolation.js';
 import { THICKNESS } from '../model/reduced-gravity.js';
 import { initialiseFromTruth, type InitialisationReport } from '../run/initialise-from-truth.js';
-import { parametersFor, type ThermalStructure } from '../model/parameters.js';
+import { parametersFor } from '../model/parameters.js';
 import { createReducedGravityKernel } from '../model/reduced-gravity.js';
 import { publishResults, type ModelResults } from '../model/results.js';
 import { flaggedLevelCount, levelCount, type ObservationRecord } from '../truth/observations.js';
 import type { ArtefactTruthSource } from '../truth/artefact-truth-source.js';
 import type { FieldContainer } from '../truth/container.js';
+import { domainRegion, score, type Score } from '../scoring/scorer.js';
 import { drawRootSeed } from './seed-provisioning.js';
 import { measure, overBudget } from './timing.js';
 
@@ -73,6 +74,9 @@ interface RunView {
   readonly drops: readonly XbtResult[];
   readonly argo: readonly XbtResult[];
   readonly analysis: AnalysisRecord;
+  /** Computed on demand: scoring the row costs a second, and NFR-04 says not to freeze. */
+  readonly score: Score | null;
+  readonly scoringLeadHours: number;
   /** FR-18: the breakdown is an instrument of a *selected* cell, never a per-panel summary. */
   readonly selectedCell: number | null;
   readonly box: { readonly west: number; readonly east: number; readonly south: number; readonly north: number };
@@ -124,57 +128,6 @@ function flagSummary(view: RunView): [string, number][] {
     add(inferred);
   }
   return [...counts.entries()].sort(([a], [b]) => a.localeCompare(b));
-}
-
-/**
- * The climatology, expressed in the analysis's state variable.
- *
- * The climatology artefact holds temperature; the analysis works in interface depth. The
- * conversion is ADR-0005's operator applied to the climatological column, so the prior and
- * the observations are in the same units by the same relation, rather than by two.
- */
-function climatologyInterface(
-  container: FieldContainer,
-  structure: ThermalStructure,
-  box: { west: number; east: number; south: number; north: number },
-  grid: { nx: number; ny: number },
-): Float64Array {
-  const lats = container.coordinate('latDegrees');
-  const lons = container.coordinate('lonDegrees');
-  const depths = container.coordinate('depthMetres');
-  const values = container.decode('water_temperature');
-
-  const out = new Float64Array(grid.nx * grid.ny);
-  const nearest = (axis: readonly number[], target: number): number => {
-    let best = 0;
-    let bestDistance = Number.POSITIVE_INFINITY;
-    for (let i = 0; i < axis.length; i += 1) {
-      const distance = Math.abs((axis[i] as number) - target);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        best = i;
-      }
-    }
-    return best;
-  };
-
-  for (let iy = 0; iy < grid.ny; iy += 1) {
-    const latDeg = box.south + ((box.north - box.south) * (iy + 0.5)) / grid.ny;
-    const yi = nearest(lats, latDeg);
-    for (let ix = 0; ix < grid.nx; ix += 1) {
-      const lonDeg = box.west + ((box.east - box.west) * (ix + 0.5)) / grid.nx;
-      const xi = nearest(lons, lonDeg);
-      const column = depths.map((_, zi) => ({
-        depthMetres: depths[zi] as number,
-        requestedDepthMetres: depths[zi] as number,
-        value: values[zi * lats.length * lons.length + yi * lons.length + xi] as number,
-        flags: [],
-      }));
-      const estimate = interfaceFromClimatology(column, 0.5, structure);
-      out[iy * grid.nx + ix] = estimate.depthMetres ?? Number.NaN;
-    }
-  }
-  return out;
 }
 
 export function App() {
@@ -265,10 +218,12 @@ export function App() {
       // The analysis. It consumes observations, a background and a climatology, and nothing
       // else: it never sees the truth source, and gate G-02 holds that both by reading the
       // imports and, since beat 005, by running with the errors turned up.
-      const climatologyThickness = climatologyInterface(record.climatology, parameters.thermalStructure, report.box, {
-        nx: parameters.grid.nx,
-        ny: parameters.grid.ny,
-      });
+      const climatologyThickness = interfaceFieldFromContainer(
+        record.climatology,
+        parameters.thermalStructure,
+        report.box,
+        parameters.grid,
+      );
       const analysis = analyse(
         {
           config: loaded.config,
@@ -293,6 +248,8 @@ export function App() {
         drops,
         argo,
         analysis,
+        score: null,
+        scoringLeadHours: 24,
         selectedCell: null,
         box: report.box,
       };
@@ -366,6 +323,43 @@ export function App() {
     },
     [loaded, view, stepsPerAdvance, overBudget],
   );
+
+  /**
+   * Score this run at one horizon (FR-020 to FR-022).
+   *
+   * It integrates the analysis forward, samples the truth record at the valid instant through
+   * the port, and scores against both references. It happens on demand rather than on load,
+   * because it costs about a second and NFR-04 says the interface does not freeze.
+   */
+  const scoreRun = useCallback(() => {
+    if (loaded === null || record === null || view === null) return;
+    const leadHours = view.scoringLeadHours;
+    const parameters = view.results.grid;
+    const region = domainRegion(loaded.config, parameters.nx, parameters.ny);
+    const validInstantMs = Date.parse(loaded.config.truth.period.start) + leadHours * 3_600_000;
+
+    const forecastField = view.run.state.fields[THICKNESS] as Float64Array;
+    const structure = loaded.config.model.thermalStructure;
+    const truthField = interfaceFieldFromTruth(record.truth, structure, view.box, parameters, validInstantMs);
+
+    const computedScore = score({
+      config: loaded.config,
+      domain: loaded.config.domains.list.find((d) => d.id === record.domainId) as never,
+      truth: record.truth,
+      forecast: forecastField.slice(),
+      initial: view.analysis.field.slice(),
+      climatology: interfaceFieldFromContainer(record.climatology, structure, view.box, parameters),
+      truthAtValidInstant: truthField,
+      region,
+      fromInstantMs: Date.parse(loaded.config.truth.period.start),
+      validInstantMs,
+      externalObservationIds: view.argo
+        .map((r) => r.interface)
+        .filter((o) => o.flags.every((flag) => flag.usable))
+        .map((o) => o.id),
+    });
+    setView({ ...view, score: computedScore });
+  }, [loaded, record, view]);
 
   const newRun = useCallback(() => {
     // Exemption (b): entropy is drawn here, once, before the run exists.
@@ -612,6 +606,78 @@ export function App() {
                 edge, relaxed toward the initial state. Scoring will exclude it.
               </dd>
             </dl>
+          </section>
+
+          <section data-testid="score-panel">
+            <h2>What the forecast was worth</h2>
+            <p className="aside">
+              A raw error figure means nothing on its own, so there is never one here without
+              two references the harness computes itself. Zero means <em>no better than the
+              reference</em> and negative means <em>worse</em>.
+            </p>
+            {view.score === null ? (
+              <p>
+                <button type="button" onClick={scoreRun} data-testid="score-run">
+                  Score this run against truth
+                </button>{' '}
+                <span className="unmeasured">
+                  Not scored yet. It takes about a second, so it happens when you ask.
+                </span>
+              </p>
+            ) : (
+              <>
+                <p className="statement" data-testid="score-statement">
+                  {view.score.statement}
+                </p>
+                <dl>
+                  <dt>Errors</dt>
+                  <dd data-testid="score-errors">
+                    forecast <Computed>{view.score.forecastError.value.toFixed(1)} m</Computed>,
+                    persistence <Computed>{view.score.persistenceError.value.toFixed(1)} m</Computed>,
+                    climatology <Computed>{view.score.climatologyError.value.toFixed(1)} m</Computed>
+                  </dd>
+                  <dt>Skill</dt>
+                  <dd data-testid="score-skill">
+                    against persistence{' '}
+                    <Computed>
+                      {(view.score.skillAgainstPersistence?.value ?? Number.NaN).toFixed(3)}
+                    </Computed>
+                    , against climatology{' '}
+                    <Computed>
+                      {(view.score.skillAgainstClimatology?.value ?? Number.NaN).toFixed(3)}
+                    </Computed>
+                  </dd>
+                  <dt>Computed against</dt>
+                  <dd data-testid="score-provenance">
+                    {view.score.provenance.metric}, over {view.score.provenance.regionLabel} (
+                    <Computed>{view.score.provenance.cellsScored.value}</Computed> cells), from{' '}
+                    <Computed>{view.score.provenance.fromInstant}</Computed> to{' '}
+                    <Computed>{view.score.provenance.validInstant}</Computed>, against{' '}
+                    {view.score.provenance.truthSource}. It declines to resolve below the truth
+                    record&rsquo;s own{' '}
+                    <Declared>{view.score.provenance.resolutionFloorDegrees.value}&deg;</Declared>.
+                  </dd>
+                  <dt>Means removed</dt>
+                  <dd data-testid="score-offsets">
+                    forecast <Computed>{view.score.meanOffsets.forecast.value.toFixed(1)} m</Computed>,
+                    truth <Computed>{view.score.meanOffsets.truth.value.toFixed(1)} m</Computed>,
+                    climatology{' '}
+                    <Computed>{view.score.meanOffsets.climatology.value.toFixed(1)} m</Computed>.
+                    A reduced-gravity model determines departures from a mean and not the mean
+                    itself, so every field is compared as an anomaly about its own. The offsets
+                    are published rather than absorbed.
+                  </dd>
+                  {view.score.provenance.independenceCaveat !== null && (
+                    <>
+                      <dt>Caveat</dt>
+                      <dd data-testid="score-caveat">
+                        {view.score.provenance.independenceCaveat}
+                      </dd>
+                    </>
+                  )}
+                </dl>
+              </>
+            )}
           </section>
 
           <section data-testid="attribution-panel">

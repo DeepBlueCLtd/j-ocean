@@ -189,3 +189,12 @@ button[disabled]:hover { background: #fff; color: var(--ink); }
 .estimate { white-space: nowrap; }
 
 .swatch.ink { background: rgb(31, 51, 71); }
+
+/* The score's own statement, printed verbatim. FR-021 says a model that is not earning its
+   compute is told so in those words, and the surface does not get to phrase it more kindly. */
+.statement {
+  border-left: 3px solid var(--ink);
+  padding-left: 0.9rem;
+  margin: 1rem 0;
+  font-size: 1.05rem;
+}

@@ -314,6 +314,46 @@ instrument could not know, and it is a **lower bound** on what the observation i
 Using the formal error as the whole error tells the analysis to trust a measurement more than
 it deserves — and it did, until this was declared.
 
+## Scores
+
+### `Figure`
+
+A number that says what kind of number it is: `{ value, kind, unit }`. Scoring emits most of
+the figures the surface draws, which is why the kind travels on the figure rather than being
+decided where it is rendered — a value that arrived as `computed` cannot be re-typed on its
+way to the screen. A test round-trips a whole score through JSON and asserts the kinds survive.
+
+### `Score`
+
+| Field | Meaning |
+|---|---|
+| `forecastError`, `persistenceError`, `climatologyError` | Root-mean-square difference of interface-depth **anomaly** |
+| `skillAgainstPersistence`, `skillAgainstClimatology` | `1 − forecast/reference`; `null` where the reference is perfect |
+| `statement` | In the SRD's own words. The surface prints it verbatim |
+| `meanOffsets` | What was removed before comparing, published rather than absorbed |
+| `provenance` | Below. A score cannot be constructed without one |
+
+**Why anomalies.** A reduced-gravity model has no absolute reference for its free surface: only
+departures from a mean carry information, which is why the mean is removed at initialisation.
+Scoring uses the same convention or it measures an offset neither field claims to determine —
+and it did, to the tune of a hundred metres out of the hundred and forty first reported.
+
+### `ScoreProvenance`
+
+Reference, region label, margin in cells, cells actually scored, the window's two instants, the
+metric, the resolution floor **from the truth artefact**, the truth source's id, and the
+independence caveat naming any external observation the analysis assimilated in the window.
+
+A score without provenance is an assertion, so the type makes one impossible.
+
+### What the scorer refuses
+
+- A region finer than the truth record's own resolution: *scoring inside it would be scoring
+  interpolation, not the ocean.*
+- A valid instant outside the record — the refusal beat 009's validity statement rests on.
+- A region with nothing left after the margin is removed.
+- Division by a perfect reference: `null`, and *persistence is perfect here*.
+
 ## The figure kinds
 
 Not a type but a discipline, and the surface enforces it typographically.

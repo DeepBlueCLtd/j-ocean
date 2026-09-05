@@ -153,6 +153,34 @@ test.describe('the shell', () => {
     );
   });
 
+  test('never shows an error figure without two references and their provenance', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const panel = page.getByTestId('score-panel');
+    await expect(panel).toBeVisible();
+    await expect(panel).toContainText('never one here without');
+    await expect(page.getByTestId('score-run')).toBeVisible();
+
+    await page.getByTestId('score-run').click();
+    await expect(page.getByTestId('score-statement')).toBeVisible({ timeout: 30_000 });
+
+    // FR-021: the convention, and the words. Whichever way this run falls, the statement
+    // says it in the SRD's terms rather than in kinder ones.
+    await expect(page.getByTestId('score-statement')).toContainText(/than (persistence|climatology)/);
+    await expect(page.getByTestId('score-errors')).toContainText('persistence');
+    await expect(page.getByTestId('score-errors')).toContainText('climatology');
+
+    // FR-022: a score without provenance is an assertion.
+    await expect(page.getByTestId('score-provenance')).toContainText('root-mean-square');
+    await expect(page.getByTestId('score-provenance')).toContainText('sponge margin');
+    await expect(page.getByTestId('score-provenance')).toContainText('declines to resolve below');
+    await expect(page.getByTestId('score-offsets')).toContainText('published rather than absorbed');
+
+    // ADR-0007: the caveat travels with the figure.
+    await expect(page.getByTestId('score-caveat')).toContainText('not independent evidence');
+  });
+
   test('draws the attribution as the analysis own weights, and a cell breakdown on demand', async ({
     page,
   }) => {
