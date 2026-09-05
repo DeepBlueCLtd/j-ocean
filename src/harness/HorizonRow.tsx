@@ -8,7 +8,9 @@ import type { TruthSource } from '../ports/truth-source.js';
 import type { FieldContainer } from '../truth/container.js';
 import type { ForecastResult } from '../run/forecast.js';
 import { Panel } from './Panel.js';
-import type { Marker } from './FieldView.js';
+import { profileFromInterfaceDepth } from '../model/profile.js';
+import type { Footprint } from './footprint.js';
+import { markersFrom, marksOf, trackValueRange } from './footprint.js';
 
 /**
  * The horizon row (FR-013, FR-014, G-05).
@@ -31,7 +33,8 @@ export interface HorizonRowProps {
   readonly analysis: AnalysisRecord;
   readonly truth: TruthSource;
   readonly climatology: FieldContainer;
-  readonly markers: readonly Marker[];
+  /** Beat 008: the observation footprint, built once for the row and read by every panel. */
+  readonly footprint: Footprint;
   readonly onSelectCell: (cellIndex: number) => void;
 }
 
@@ -146,6 +149,38 @@ export function HorizonRow(props: HorizonRowProps) {
 
   const issued = new Date(forecast.issueInstantMs).toISOString();
 
+  // One producer of marks for the whole row (FR-001, FR-009). A mark cannot mean one thing on
+  // one panel and something else on another, because there is one list.
+  const markers = useMemo(() => markersFrom(props.footprint), [props.footprint]);
+  const trackRange = trackValueRange(props.footprint);
+
+  /**
+   * The model's diagnosed profile at a position, for *this* horizon's field (FR-005).
+   *
+   * The model produces it: the harness hands `profileFromInterfaceDepth` the published
+   * interface depth at the cell and draws what comes back, kinds and all. A second copy of
+   * the tanh in the surface would have been a profile the model never claimed.
+   */
+  const derivedProfileFor = useCallback(
+    (leadHours: number) => (lonDeg: number, latDeg: number) => {
+      const field = forecast.byHorizon.get(leadHours);
+      if (field === undefined) return null;
+      const { nx, ny } = forecast.parameters.grid;
+      const { west, east, south, north } = forecast.box;
+      const lonIndex = Math.min(nx - 1, Math.max(0, Math.floor(((lonDeg - west) / (east - west)) * nx)));
+      const latIndex = Math.min(ny - 1, Math.max(0, Math.floor(((latDeg - south) / (north - south)) * ny)));
+      const depth = field[latIndex * nx + lonIndex];
+      if (depth === undefined || !Number.isFinite(depth)) return null;
+      return profileFromInterfaceDepth(
+        depth,
+        lonIndex,
+        latIndex,
+        forecast.parameters.thermalStructure,
+      );
+    },
+    [forecast],
+  );
+
   /**
    * The declared geometry, handed to the stylesheet (Principle X). The row has to break out
    * of the page's prose column -- six legible panels do not fit in a measure set for reading
@@ -192,6 +227,31 @@ export function HorizonRow(props: HorizonRowProps) {
         </p>
       )}
 
+      {/* What was measured, counted. The flagged count is on the surface because FR-24 says
+          what was rejected is part of what the harness did, not a footnote in a log. */}
+      <p className="aside" data-testid="footprint-summary">
+        Drawn over every panel:{' '}
+        <span className="computed" data-testid="footprint-track-count">
+          {props.footprint.track.length}
+        </span>{' '}
+        surface measurements,{' '}
+        <span className="computed" data-testid="footprint-drop-count">
+          {props.footprint.needles.filter((needle) => needle.kind === 'drop').length}
+        </span>{' '}
+        XBT drops and{' '}
+        <span className="computed" data-testid="footprint-external-count">
+          {props.footprint.needles.filter((needle) => needle.kind === 'external').length}
+        </span>{' '}
+        Argo profiles, of which{' '}
+        <span className="computed" data-testid="footprint-flagged-count">
+          {marksOf(props.footprint).filter((mark) => mark.flagged).length}
+        </span>{' '}
+        carry a flag &mdash; drawn as flagged, never omitted.{' '}
+        {props.footprint.qualityControlEnabled
+          ? 'Quality control was on.'
+          : 'Quality control was off for this run.'}
+      </p>
+
       <div className="horizon-row" data-testid="horizon-row">
         {horizons.map((leadHours) => (
           <Panel
@@ -207,7 +267,13 @@ export function HorizonRow(props: HorizonRowProps) {
             observationsDominant={observationsDominant}
             hatchThreshold={config.presentation.attributionHatchThreshold}
             score={scores?.get(leadHours) ?? null}
-            markers={props.markers}
+            markers={markers}
+            footprint={props.footprint}
+            box={forecast.box}
+            elevationHeightPx={config.presentation.footprint.elevationHeightPx}
+            needleOffsetPx={config.presentation.footprint.needleOffsetPx}
+            levelTickLimit={config.presentation.footprint.levelTickLimit}
+            derivedProfileAt={derivedProfileFor(leadHours)}
             enlarged={enlarged === leadHours}
             showAttribution={showAttribution}
             onEnlarge={() => {
@@ -250,10 +316,21 @@ export function HorizonRow(props: HorizonRowProps) {
               <span className="dot warm" /> deeper interface
             </span>
             <span>
-              <span className="dot drop" /> XBT drop
+              <span className="dot drop" /> XBT drop &mdash; the glyph&rsquo;s length is the
+              depth it reached
             </span>
             <span>
               <span className="dot external" /> Argo (external)
+            </span>
+            <span data-testid="track-legend">
+              <span className="dot track" /> surface measurement, dark for warm, over{' '}
+              <span className="computed">{trackRange.low.toFixed(1)}</span> to{' '}
+              <span className="computed">{trackRange.high.toFixed(1)} &deg;C</span> &mdash; the
+              track&rsquo;s own range
+            </span>
+            <span data-testid="after-initialisation-legend">
+              <span className="dot dashed" /> dashed: measured after the forecast was
+              initialised, so it did not inform it
             </span>
           </>
         )}

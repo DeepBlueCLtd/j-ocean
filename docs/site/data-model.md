@@ -31,6 +31,9 @@ lives here, and no component in the tree holds a literal for one.
 | `presentation.panelGapPx`, `presentation.pageGutterPx` | The rest of the row's arithmetic, so that no width is a literal in the stylesheet. |
 | `presentation.anomalyLimitMetres` | The half-range the panels draw interface-depth anomalies against. |
 | `presentation.attributionHatchThreshold` | The weight above which a cell is hatched rather than merely tinted — the second channel that makes the layer readable without colour. |
+| `presentation.footprint.colocationToleranceDegrees` | Two profiles this close are the same place as far as the drawing is concerned, and are offset so both are visible. |
+| `presentation.footprint.needleOffsetPx`, `elevationHeightPx` | The offset applied to co-located needles, and the height of the enlarged panel's depth elevation. |
+| `presentation.footprint.levelTickLimit` | Above this many levels a needle draws its ticks only while hovered. An Argo profile carries five hundred; drawn always they are a solid bar. |
 | `domains.list[]` | Extents in degrees, and a declared `character` of `eventful` or `bland`. |
 
 The **configuration digest** is a SHA-256 over a canonical serialisation: object keys in
@@ -385,6 +388,30 @@ One module, `field-surface.ts`, owns every palette and shader. It reports the su
 — `webgl2` where the browser has it, `canvas2d` where it does not — on the canvas itself, and
 both paths are exercised by tests: headless Chromium here has WebGL2, so a test refuses it in
 an init script to make the fallback actually run.
+
+## The observation footprint
+
+What the instruments did, as marks. Built from the run's observations and from nothing else:
+the footprint does not sample truth and does not compute, and a test asserts that by reading
+the module's own imports.
+
+| Field | Meaning |
+|---|---|
+| `TrackMark.value` | The surface measurement itself. Its place in the track's own range drives the mark's size and fill, so the encoding survives having its colour removed. |
+| `FootprintMark.afterInitialisation` | Measured after the instant a forecast was initialised from, so it did not inform it. Drawn distinctly, because a mark that did not inform a forecast must not look like one that did. |
+| `FootprintMark.insideMargin` | Inside the sponge margin. The analysis used it; scoring excludes the region, and the hover says so. |
+| `FootprintMark.flagged` | Failed a declared check, or carries an Argo flag. Drawn as flagged, never omitted, and distinguishable by luminance rather than hue. |
+| `Needle.deepestMetres` | The depth **actually reached**, which is not the depth asked for: an XBT infers its depth from a fall-rate equation. The needle's extent is this and nothing else. |
+| `Needle.continuesBelow` | The probe went past the floor of the displayed volume. The needle says so rather than stopping as though the profile had. |
+| `Needle.measuredNothing` | The profile reports no value at any level. Five delayed-mode Argo profiles in the recorded case are like this; they are drawn as a cross at the surface, not as a needle of zero length. |
+| `Needle.assimilated` | ADR-0007: Argo is drawn either way, and the hover says which. |
+
+The **elevation** is a side elevation, not a scene: it shares the field's horizontal axis and
+puts depth downward, so latitude is not shown and position is read from the plan view above. A
+perspective volume would imply a viewpoint and a set of distances the harness does not have.
+
+Every panel also carries a visually hidden **list** of its marks, one entry per observation. A
+canvas says nothing to a reader who cannot see it, and nothing to a test either.
 
 ## The figure kinds
 

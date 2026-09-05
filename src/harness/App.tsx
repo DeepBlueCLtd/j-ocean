@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import configUrl from '../../config/j-ocean.json?url';
 import { ConfigurationError, fetchConfiguration, type LoadedConfiguration } from '../config/load.js';
+import type { Configuration } from '../config/schema.js';
 import { createRun, type Run } from '../run/run.js';
 import { serialiseManifest } from '../run/manifest.js';
 import { loadClimatology, loadObservations, loadTruth } from './artefacts.js';
 import { FieldView, type Marker } from './FieldView.js';
+import { footprintOf, markersFrom, type Footprint } from './footprint.js';
 import { HorizonRow } from './HorizonRow.js';
 import { runForecast, type ForecastResult } from '../run/forecast.js';
 import { climatologyReferenceOver } from '../instruments/climatology-reference.js';
@@ -93,28 +95,31 @@ interface Record002 {
   readonly observations: ObservationRecord;
 }
 
-/** Where the instruments sampled, in fractional grid coordinates, for the overlay. */
-function markersFor(view: RunView): Marker[] {
-  const { box } = view;
-  const { nx, ny } = view.results.grid;
-  const place = (lonDeg: number, latDeg: number) => ({
-    x: ((lonDeg - box.west) / (box.east - box.west)) * nx,
-    y: ((latDeg - box.south) / (box.north - box.south)) * ny,
+/**
+ * What the instruments measured, as the footprint (beat 008). One producer for every panel:
+ * the marks the field overlay draws come from here and from nowhere else, so a drop cannot be
+ * a needle on one panel and an undifferentiated dot on another.
+ */
+function footprintFor(config: Configuration, view: RunView, initialisedFromMs: number): Footprint {
+  const levels = config.model.thermalStructure.displayLevelsMetres;
+  return footprintOf({
+    surface: view.surface,
+    drops: view.drops.map(({ profile }) => profile),
+    argo: view.argo.map(({ profile }) => profile),
+    box: view.box,
+    grid: view.results.grid,
+    initialisedFromMs,
+    spongeWidthCells: config.model.sponge.widthCells,
+    volumeFloorMetres: levels[levels.length - 1] as number,
+    colocationToleranceDegrees: config.presentation.footprint.colocationToleranceDegrees,
+    qualityControlEnabled: config.instruments.qualityControl.enabled,
+    assimilateArgo: config.instruments.argo.assimilate,
   });
+}
 
-  return [
-    ...view.surface.map((o) => ({ ...place(o.lonDeg, o.latDeg), kind: 'track' as const, flagged: !isUsable(o) })),
-    ...view.drops.map(({ profile }) => ({
-      ...place(profile.lonDeg, profile.latDeg),
-      kind: 'drop' as const,
-      flagged: !isUsable(profile),
-    })),
-    ...view.argo.map(({ profile }) => ({
-      ...place(profile.lonDeg, profile.latDeg),
-      kind: 'external' as const,
-      flagged: (profile.levels ?? []).some((level) => level.flags.length > 0),
-    })),
-  ];
+function markersFor(config: Configuration, view: RunView): Marker[] {
+  // The panels outside the row show the run as it stands, initialised at the run's own start.
+  return markersFrom(footprintFor(config, view, Date.parse(config.clock.epoch)));
 }
 
 /** How many of each check fired, across everything the instruments produced. */
@@ -592,7 +597,7 @@ export function App() {
               limit={0.8}
               label={`Sea-surface height anomaly over ${view.run.domainId}, valid at ${view.instant}`}
               testId="field-view"
-              markers={markersFor(view)}
+              markers={markersFor(loaded.config, view)}
             />
             <p className="legend">
               <span>
@@ -658,7 +663,7 @@ export function App() {
               analysis={view.forecast.analysis}
               truth={record?.truth as never}
               climatology={record?.climatology as never}
-              markers={markersFor(view)}
+              footprint={footprintFor(loaded.config, view, view.forecast.issueInstantMs)}
               onSelectCell={(cellIndex) => {
                 setView((current) => (current === null ? current : { ...current, selectedCell: cellIndex }));
               }}
@@ -754,7 +759,7 @@ export function App() {
               unit=""
               label="Weight carried by observations in each cell"
               testId="attribution-view"
-              markers={markersFor(view).filter((marker) => marker.kind !== 'track')}
+              markers={markersFor(loaded.config, view).filter((marker) => marker.kind !== 'track')}
               onSelect={(cellIndex) => {
                 setView((current) => (current === null ? current : { ...current, selectedCell: cellIndex }));
               }}

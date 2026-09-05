@@ -93,7 +93,27 @@ export function diagnoseProfile(
   structure: ThermalStructure,
 ): DiagnosedProfile {
   const thickness = state.fields[THICKNESS] as Float64Array;
-  const interfaceDepthMetres = thickness[indexOf(state.grid, lonIndex, latIndex)] as number;
+  return profileFromInterfaceDepth(
+    thickness[indexOf(state.grid, lonIndex, latIndex)] as number,
+    lonIndex,
+    latIndex,
+    structure,
+  );
+}
+
+/**
+ * The same diagnosis from an interface depth alone, for a caller holding a published field
+ * rather than a state -- a forecast at a horizon, for instance. It exists so that the profile
+ * drawn beside an XBT is produced by the model's own arithmetic and not by a second copy of
+ * it in the surface (Principle III: the model decides what a profile is; the harness draws
+ * what it is given).
+ */
+export function profileFromInterfaceDepth(
+  interfaceDepthMetres: number,
+  lonIndex: number,
+  latIndex: number,
+  structure: ThermalStructure,
+): DiagnosedProfile {
   const levels = structure.displayLevelsMetres;
   const deepest = levels.length - 1;
 

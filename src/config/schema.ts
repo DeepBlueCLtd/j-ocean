@@ -100,7 +100,7 @@ const domainSchema = z
 
 export const configurationSchema = z
   .object({
-    schemaVersion: z.literal(3),
+    schemaVersion: z.literal(4),
 
     run: z.object({
       /**
@@ -173,6 +173,23 @@ export const configurationSchema = z
       anomalyLimitMetres: z.number().positive(),
       /** FR-019's second channel: a cell above this weight is hatched, not merely tinted. */
       attributionHatchThreshold: z.number().min(0).max(1),
+      /** Beat 008. How the observation footprint is drawn over and beneath a panel. */
+      footprint: z.object({
+        /**
+         * Two profiles within this of each other are the same place as far as the drawing is
+         * concerned, and are offset from each other so both are visible.
+         */
+        colocationToleranceDegrees: z.number().positive(),
+        needleOffsetPx: z.number().int().positive(),
+        /** The height of the enlarged panel's depth elevation. */
+        elevationHeightPx: z.number().int().positive(),
+        /**
+         * Above this many levels a needle draws its ticks only while hovered. An Argo profile
+         * carries five hundred; drawn always, they are a solid bar that says less than the
+         * extent line already does.
+         */
+        levelTickLimit: z.number().int().positive(),
+      }),
     }),
 
     domains: z.object({

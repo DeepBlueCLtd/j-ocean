@@ -287,3 +287,97 @@ button[disabled]:hover { background: #fff; color: var(--ink); }
 .dot.hatched, .swatch.hatched {
   background: repeating-linear-gradient(45deg, rgb(31, 51, 71) 0 2px, #fff 2px 4px);
 }
+
+/* Beat 008: the observation footprint.
+
+   The elevation is the enlarged panel's depth axis (FR-003). It shares the field's horizontal
+   axis and adds depth downward; it is a side elevation and not a scene, which the caption
+   says, because a perspective volume would imply a viewpoint and a set of distances the
+   harness does not have. */
+.elevation {
+  margin: 0.4rem 0 0;
+}
+
+.elevation svg {
+  width: 100%;
+  display: block;
+  background: #fff;
+  border: 1px solid var(--rule);
+}
+
+.elevation figcaption {
+  font-size: 0.72rem;
+  color: var(--host);
+  margin-top: 0.25rem;
+}
+
+/* What a mark says when it is hovered. It sits under the panel rather than floating over the
+   field, because a tooltip that covers the thing it describes is worse than no tooltip. */
+.observation-hover {
+  margin-top: 0.5rem;
+  border: 1px solid var(--rule);
+  background: #fff;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.74rem;
+}
+
+.observation-hover dl {
+  grid-template-columns: minmax(4.5rem, auto) 1fr;
+  gap: 0.15rem 0.6rem;
+}
+
+.observation-hover p { margin: 0.35rem 0 0; }
+
+.profile-comparison {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.4rem;
+  font-size: 0.72rem;
+}
+
+.profile-comparison caption {
+  text-align: left;
+  color: var(--host);
+  padding-bottom: 0.25rem;
+}
+
+.profile-comparison th,
+.profile-comparison td {
+  text-align: left;
+  padding: 0.1rem 0.3rem 0.1rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.dot.track { background: rgb(90, 90, 90); }
+.dot.dashed {
+  background: transparent;
+  border-bottom: 2px dashed var(--ink);
+  border-radius: 0;
+  height: 0;
+}
+
+/* The marks as text. Visually hidden, not display:none: it is in the accessibility tree,
+   because a canvas is not. */
+.mark-list {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  margin: 0;
+  padding: 0;
+}
+
+.elevation-stack { position: relative; }
+
+.elevation-axis span {
+  position: absolute;
+  left: 0;
+  transform: translateY(-50%);
+  font-size: 0.62rem;
+  color: var(--host);
+  background: rgba(255, 255, 255, 0.8);
+  padding: 0 0.15rem;
+  z-index: 1;
+}

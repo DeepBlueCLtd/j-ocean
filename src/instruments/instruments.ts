@@ -157,6 +157,24 @@ export function sampleSurface(context: SamplingContext): Observation[] {
   });
 }
 
+/**
+ * A profile with no level worth reading is flagged as such, whatever the reason: every level
+ * null in the source, or every level valueless because the probe reached past the end of the
+ * truth record. What matters to a reader is that it measured nothing.
+ */
+function noUsableLevelFlags(levels: readonly ObservationLevel[]): Flag[] {
+  const usable = levels.filter((level) => Number.isFinite(level.value));
+  return usable.length > 0
+    ? []
+    : [
+        {
+          code: 'unresolved',
+          detail: 'no usable level in this profile: it measured nothing',
+          usable: false,
+        },
+      ];
+}
+
 export interface XbtResult {
   /** The profile as measured, levels and all. Beat 008 draws its needles from this. */
   readonly profile: Observation;
@@ -230,7 +248,7 @@ export function sampleXbtDrops(context: SamplingContext): XbtResult[] {
       };
     });
 
-    const profileFlags: Flag[] = [];
+    const profileFlags: Flag[] = [...noUsableLevelFlags(levels)];
     if (context.config.instruments.qualityControl.enabled) {
       const inversion = verticalInversionCheck(levels, context.config);
       if (inversion !== null) profileFlags.push(inversion);
@@ -349,7 +367,17 @@ export function argoObservations(
         context.config.instruments.xbt.representativenessStandardDeviationDegC,
         0,
       ),
-      flags: [],
+      /*
+       * A profile that measured nothing carries a flag of its own (FR-24, beat 008).
+       *
+       * Five delayed-mode profiles in the recorded case report a temperature at no level at
+       * all: every level is null with an Argo flag of 4. The *derived* interface observation
+       * has always been flagged `unresolved` and excluded from the analysis, which is
+       * correct. But the profile that the footprint draws carried no flag, so a profile that
+       * measured nothing was drawn exactly like one that measured everything. The flag
+       * belongs on the thing that is drawn, not only on the thing that is consumed.
+       */
+      flags: noUsableLevelFlags(levels),
       external: true,
       streamName: 'external/argo',
       levels,

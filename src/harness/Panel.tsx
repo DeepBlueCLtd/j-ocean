@@ -1,5 +1,11 @@
+import { useState } from 'react';
+import type { DiagnosedProfile } from '../model/profile.js';
 import type { Score } from '../scoring/scorer.js';
 import { FieldView, type Marker } from './FieldView.js';
+import type { Footprint } from './footprint.js';
+import { marksOf } from './footprint.js';
+import { NeedleElevation } from './NeedleElevation.js';
+import { ObservationHover } from './ObservationHover.js';
 
 /**
  * One horizon (FR-013, FR-014, FR-015, FR-016, FR-021, FR-022).
@@ -31,6 +37,14 @@ export interface PanelProps {
   readonly hatchThreshold: number;
   readonly score: Score | null;
   readonly markers: readonly Marker[];
+  /** Beat 008: what the vessel measured, as marks. Read, never computed, by the panel. */
+  readonly footprint: Footprint;
+  readonly box: { readonly west: number; readonly east: number };
+  readonly elevationHeightPx: number;
+  readonly needleOffsetPx: number;
+  readonly levelTickLimit: number;
+  /** The model's diagnosed profile at a cell, for the measured-beside-derived comparison. */
+  readonly derivedProfileAt: (lonDeg: number, latDeg: number) => DiagnosedProfile | null;
   readonly enlarged: boolean;
   readonly showAttribution: boolean;
   readonly onEnlarge: () => void;
@@ -63,6 +77,16 @@ export function Panel(props: PanelProps) {
 
   const skill = (figure: { value: number } | null | undefined): string =>
     figure === null || figure === undefined ? 'undefined' : figure.value.toFixed(3);
+
+  /*
+   * Hover previews; a click pins. The pinned mark survives the pointer leaving, for the same
+   * reason beat 007's cell breakdown does: a reader who wants to read a profile has to be
+   * able to look away from the thing they are reading it from.
+   */
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [pinnedId, setPinnedId] = useState<string | null>(null);
+  const shownId = pinnedId ?? hoveredId;
+  const hovered = marksOf(props.footprint).find((mark) => mark.id === shownId) ?? null;
 
   return (
     <article
@@ -109,8 +133,46 @@ export function Panel(props: PanelProps) {
         testId={`panel-field-${String(leadHours)}`}
         markers={props.markers}
         onSelect={props.onSelectCell}
+        onHoverMark={setHoveredId}
         caption={false}
       />
+
+      {/* FR-003: the depth axis exists only where there is room for it to be read. At row
+          width a drop is a depth-coded glyph; enlarged, it is a needle at its own depths. */}
+      {enlarged && (
+        <NeedleElevation
+          footprint={props.footprint}
+          west={props.box.west}
+          east={props.box.east}
+          heightPx={props.elevationHeightPx}
+          offsetPx={props.needleOffsetPx}
+          levelTickLimit={props.levelTickLimit}
+          hoveredId={shownId}
+          onHoverMark={setHoveredId}
+          onSelectMark={(id) => { setPinnedId((current) => (current === id ? null : id)); }}
+        />
+      )}
+
+      {hovered !== null && (
+        <ObservationHover
+          mark={hovered}
+          pinned={pinnedId !== null}
+          onUnpin={() => { setPinnedId(null); }}
+          derived={
+            hovered.kind === 'track'
+              ? null
+              : props.derivedProfileAt(hovered.lonDeg, hovered.latDeg)
+          }
+          qualityControlEnabled={props.footprint.qualityControlEnabled}
+        />
+      )}
+
+      {/* FR-007: a run with quality control off says so on every panel, not in a footnote. */}
+      {!props.footprint.qualityControlEnabled && (
+        <p className="banner warn" data-testid={`quality-control-off-${String(leadHours)}`}>
+          Quality control was off for this run: no observation carries a check.
+        </p>
+      )}
 
       <dl className="panel-labels">
         {/* FR-015: absolute instants, not only a lead time. Shown to the minute, with the

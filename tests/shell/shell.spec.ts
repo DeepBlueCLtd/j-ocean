@@ -389,6 +389,167 @@ test.describe('the shell', () => {
     expect(distinct).toBeGreaterThan(32);
   });
 
+  test('draws every observation on every panel, and says how many it drew', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('build-row').click();
+    await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+
+    // SC-001: one mark per observation in each panel, counted rather than eyeballed. The
+    // marks are a list as well as a drawing, which is what a canvas owes a reader who cannot
+    // see it and the only way a count can be asserted at all.
+    const counts: number[] = [];
+    for (const lead of [0, 12, 24, 48, 72, 96]) {
+      counts.push(await page.getByTestId(`panel-field-${String(lead)}-marks`).locator('li').count());
+    }
+    expect(new Set(counts).size, `panels disagree about how many marks there are: ${counts.join(', ')}`).toBe(1);
+
+    const summary = page.getByTestId('footprint-summary');
+    const declaredTotal =
+      Number(await page.getByTestId('footprint-track-count').textContent()) +
+      Number(await page.getByTestId('footprint-drop-count').textContent()) +
+      Number(await page.getByTestId('footprint-external-count').textContent());
+    expect(counts[0]).toBe(declaredTotal);
+    expect(counts[0]).toBeGreaterThan(0);
+
+    // FR-24 on the surface: the rejected are counted where the drawing is, not in a log.
+    await expect(summary).toContainText('drawn as flagged, never omitted');
+    expect(Number(await page.getByTestId('footprint-flagged-count').textContent())).toBeGreaterThan(0);
+
+    // FR-002: the recorded case has marks on both sides of the initialisation instant, and
+    // they are distinguishable. A run in which they were not would make the distinction
+    // untestable and the drawing a claim nobody could check.
+    const marks = page.getByTestId('panel-field-24-marks');
+    expect(await marks.locator('li[data-after-initialisation="true"]').count()).toBeGreaterThan(0);
+    expect(await marks.locator('li[data-after-initialisation="false"]').count()).toBeGreaterThan(0);
+  });
+
+  test('draws a flagged mark so it survives having its colour removed', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('build-row').click();
+    await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+
+    // SC-004. A flagged mark is drawn white-filled inside a ring; an unflagged one is filled
+    // dark. That is a luminance difference, so it survives a monochrome print -- which is the
+    // whole claim, and it is measured on the rendered pixels rather than asserted.
+    const contrast = await page
+      .getByTestId('panel-field-24')
+      .evaluate((figure) => {
+        const list = figure.querySelector('ul');
+        const overlay = figure.querySelector('canvas.overlay') as HTMLCanvasElement | null;
+        if (list === null || overlay === null) return null;
+        const context = overlay.getContext('2d');
+        if (context === null) return null;
+        const image = context.getImageData(0, 0, overlay.width, overlay.height);
+        const scale = overlay.width / 100;
+        const luminance = (element: Element): number => {
+          const x = Math.round(Number((element as HTMLElement).dataset['x']) * scale);
+          const y = Math.round(overlay.height - Number((element as HTMLElement).dataset['y']) * scale);
+          const i = (Math.min(overlay.height - 1, Math.max(0, y)) * overlay.width + Math.min(overlay.width - 1, Math.max(0, x))) * 4;
+          const d = image.data;
+          return 0.2126 * (d[i] ?? 0) + 0.7152 * (d[i + 1] ?? 0) + 0.0722 * (d[i + 2] ?? 0);
+        };
+        const flagged = [...list.querySelectorAll('li[data-flagged="true"]')].map(luminance);
+        const plain = [...list.querySelectorAll('li[data-flagged="false"][data-kind="drop"]')].map(luminance);
+        const mean = (values: number[]): number => values.reduce((a, b) => a + b, 0) / values.length;
+        return { flagged: mean(flagged), plain: mean(plain), flaggedCount: flagged.length };
+      });
+
+    expect(contrast).not.toBeNull();
+    expect(contrast?.flaggedCount ?? 0).toBeGreaterThan(0);
+    const margin = Math.abs((contrast?.flagged ?? 0) - (contrast?.plain ?? 0));
+    console.log(`    flagged vs unflagged luminance: ${margin.toFixed(1)} of 255`);
+    expect(margin).toBeGreaterThan(40);
+  });
+
+  test('gives every profile a needle at the depths it actually reached', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('build-row').click();
+    await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+    await page.getByTestId('enlarge-24').click();
+
+    // FR-003: the depth axis exists where there is room to read it. At row width a drop is a
+    // depth-coded glyph; enlarged, it is a needle to the depth that probe reached.
+    const elevation = page.getByTestId('needle-elevation');
+    await expect(elevation).toBeVisible();
+    const needles = elevation.locator('[data-deepest-metres]');
+    expect(await needles.count()).toBeGreaterThan(0);
+
+    const depths = await elevation
+      .locator('[data-measured-nothing="false"]')
+      .evaluateAll((nodes) => nodes.map((node) => Number((node as HTMLElement).dataset['deepestMetres'])));
+    // SC-002: an XBT infers its depth from a fall-rate equation, so no two drops reach the
+    // same depth and none reaches exactly the depth it was asked for.
+    expect(depths.every((depth) => depth > 0)).toBe(true);
+    expect(new Set(depths.map((depth) => depth.toFixed(1))).size).toBeGreaterThan(1);
+
+    // Five delayed-mode Argo profiles in the recorded case report a temperature at no level
+    // at all. A needle of zero length would read as a probe that reached the surface, so they
+    // are drawn as what they are and flagged as such.
+    const nothing = elevation.locator('[data-measured-nothing="true"]');
+    expect(await nothing.count()).toBeGreaterThan(0);
+    expect(await elevation.locator('[data-measured-nothing="true"][data-flagged="true"]').count()).toBe(
+      await nothing.count(),
+    );
+
+    // The spec's second edge case: a probe past the floor of the displayed volume is drawn to
+    // the floor with an indicator, not silently truncated.
+    expect(await elevation.locator('[data-continues-below="true"]').count()).toBeGreaterThan(0);
+
+    await expect(elevation).toContainText('latitude is not shown');
+  });
+
+  test('shows a profile beside the model derived profile, with every level kind labelled', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await page.getByTestId('build-row').click();
+    await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+    await page.getByTestId('enlarge-24').click();
+
+    const needle = page.getByTestId('needle-elevation').locator('[data-kind="drop"]').first();
+    await needle.hover();
+    await expect(page.getByTestId('observation-hover')).toBeVisible();
+
+    // A click pins it: what a mark says has to survive the reader looking away from it, which
+    // is the same rule beat 007 applied to a cell's breakdown.
+    await needle.click();
+    await page.getByTestId('panel-0').hover();
+    await expect(page.getByTestId('observation-hover')).toBeVisible();
+
+    // FR-005 and FR-07: the comparison SRD section 10 makes the trigger for dynamic depth. A
+    // reader who sees the derived profile disagree with the XBT beside it has found
+    // something -- but only because every derived level says it is derived.
+    const comparison = page.getByTestId('profile-comparison');
+    await expect(comparison).toBeVisible();
+    expect(await comparison.locator('td[data-kind="derived"]').count()).toBeGreaterThan(0);
+    expect(await comparison.locator('td[data-kind="computed"]').count()).toBe(2);
+    await expect(comparison).toContainText('never advected');
+
+    await expect(page.getByTestId('hover-depth')).toContainText('m');
+    await expect(page.getByTestId('hover-assimilated')).toHaveText('yes');
+  });
+
+  test('says of an external profile whether it was assimilated', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('build-row').click();
+    await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+    await page.getByTestId('enlarge-24').click();
+
+    // ADR-0007 and review R-3: Argo is drawn either way, and the footprint says which.
+    //
+    // The event is dispatched rather than hovered because Argo needles genuinely overlap in a
+    // side elevation -- two floats at nearby longitudes are two needles a few pixels apart --
+    // so a real pointer reaches whichever is on top. That is what any drawing does; it is not
+    // a deterministic way to name the one this test means.
+    await page
+      .getByTestId('needle-elevation')
+      .locator('[data-kind="external"]')
+      .first()
+      .dispatchEvent('mouseover');
+    await expect(page.getByTestId('hover-instrument')).toContainText('argo');
+    await expect(page.getByTestId('hover-assimilated')).toHaveText(/yes|drawn, not assimilated/);
+  });
+
   test('never shows an error figure without two references and their provenance', async ({
     page,
   }) => {

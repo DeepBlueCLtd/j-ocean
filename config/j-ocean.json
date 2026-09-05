@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "run": {
     "defaultSeed": "6a09e667f3bcc908",
     "recordedCaseLabel": "the recorded case"
@@ -32,7 +32,13 @@
     "panelGapPx": 10,
     "pageGutterPx": 48,
     "anomalyLimitMetres": 220,
-    "attributionHatchThreshold": 0.5
+    "attributionHatchThreshold": 0.5,
+    "footprint": {
+      "colocationToleranceDegrees": 0.05,
+      "needleOffsetPx": 5,
+      "elevationHeightPx": 170,
+      "levelTickLimit": 24
+    }
   },
   "forecast": {
     "spinUpHours": 24,

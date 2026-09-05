@@ -54,6 +54,12 @@ drawing a depth profile states that the levels between the model's own are deriv
 <dd>The check that regenerates a committed artefact and fails the build on any difference,
 so that a change is attributed to the tree or to the upstream rather than guessed at.</dd>
 
+<dt>Footprint</dt>
+<dd>What the instruments did, drawn: the track and its measurements, and a needle or a
+depth-coded glyph for every profile. Built from the run's observations and from nothing
+else — it neither samples truth nor computes, so what it shows is what was measured rather
+than a picture of the answer.</dd>
+
 <dt>Gate</dt>
 <dd>A check that fails the build. Every gate is watched failing against a planted violation
 before it is trusted, and the commit that introduces it says so.</dd>
@@ -81,6 +87,12 @@ depth and time.</dd>
 <dt>Manifest</dt>
 <dd>The complete description of a run: seeds, versions, digests and counterfactual state.
 The unit of export and import, and the thing a run is rebuilt from.</dd>
+
+<dt>Needle</dt>
+<dd>A profile as drawn: a vertical line through the depth elevation extending exactly to the
+depth that probe reached, with a tick at every level it sampled and a barb where it carried
+on past the floor of the displayed volume. A profile that measured nothing is a cross at the
+surface instead, because a needle of no length would read as a probe that stopped there.</dd>
 
 <dt>Observation</dt>
 <dd>Truth sampled through an instrument. The type is opaque and has exactly one

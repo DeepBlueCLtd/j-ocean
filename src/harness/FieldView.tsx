@@ -9,12 +9,30 @@ import { FieldSurface, type Palette } from './field-surface.js';
  * together, which was fine for one field and would not have been for twelve.
  */
 
-/** A point to draw over the field, in fractional grid coordinates. */
+/**
+ * A point to draw over the field, in fractional grid coordinates.
+ *
+ * Beat 008 made the marks carry what they measured. A drop is never an undifferentiated dot
+ * (FR-004): it is a glyph whose length is the depth it actually reached. A surface mark's
+ * size and fill carry its value, so the track is readable as a measurement and not only as a
+ * path. A mark taken after the forecast was initialised is drawn distinctly, because it did
+ * not inform that forecast (FR-002).
+ */
 export interface Marker {
+  /** The observation's id, where the mark is hoverable. */
+  readonly id?: string;
   readonly x: number;
   readonly y: number;
   readonly kind: 'track' | 'drop' | 'external';
   readonly flagged: boolean;
+  /** 0..1: where this measurement sits in the track's own range. Drives size and fill. */
+  readonly intensity?: number;
+  /** 0..1: how far into the displayed volume the probe reached. Drives the glyph's length. */
+  readonly depthFraction?: number;
+  /** FR-002: this measurement post-dates the initialisation instant of the panel. */
+  readonly afterInitialisation?: boolean;
+  /** The probe went past the floor of the displayed volume. */
+  readonly continuesBelow?: boolean;
 }
 
 export interface FieldViewProps {
@@ -33,6 +51,8 @@ export interface FieldViewProps {
   readonly markers?: readonly Marker[];
   /** FR-18: a breakdown is an instrument of a selected cell. Clicking picks the cell. */
   readonly onSelect?: (cellIndex: number) => void;
+  /** Beat 008: the id of the mark under the pointer, or null. */
+  readonly onHoverMark?: (id: string | null) => void;
   /** Shown beneath the field. Absent on a panel, where the caption is the panel's own. */
   readonly caption?: boolean;
 }
@@ -46,6 +66,7 @@ export function FieldView({
   testId,
   markers = [],
   onSelect,
+  onHoverMark,
   palette = 'diverging',
   unit = 'm',
   hatch,
@@ -82,34 +103,91 @@ export function FieldView({
     context.clearRect(0, 0, element.width, element.height);
 
     const at = (marker: Marker): [number, number] => [marker.x * scale, (ny - marker.y) * scale];
+    const track = markers.filter((marker) => marker.kind === 'track');
 
-    context.strokeStyle = 'rgba(16, 23, 29, 0.85)';
-    context.lineWidth = Math.max(1, scale * 0.25);
-    context.beginPath();
-    markers
-      .filter((marker) => marker.kind === 'track')
-      .forEach((marker, index) => {
-        const [x, y] = at(marker);
-        if (index === 0) context.moveTo(x, y);
-        else context.lineTo(x, y);
-      });
-    context.stroke();
+    /*
+     * The track, in two styles. Segments up to the initialisation instant are solid: those
+     * measurements informed this forecast. Everything after it is dashed, because it did not,
+     * and a single line would have credited the forecast with information it never had.
+     */
+    const stroke = (from: Marker, to: Marker, dashed: boolean): void => {
+      context.save();
+      context.setLineDash(dashed ? [scale * 1.2, scale * 1.2] : []);
+      context.strokeStyle = dashed ? 'rgba(16, 23, 29, 0.45)' : 'rgba(16, 23, 29, 0.85)';
+      context.lineWidth = Math.max(1, scale * 0.25);
+      context.beginPath();
+      const [x0, y0] = at(from);
+      const [x1, y1] = at(to);
+      context.moveTo(x0, y0);
+      context.lineTo(x1, y1);
+      context.stroke();
+      context.restore();
+    };
+    for (let i = 1; i < track.length; i += 1) {
+      const to = track[i] as Marker;
+      stroke(track[i - 1] as Marker, to, to.afterInitialisation === true);
+    }
 
+    // A surface measurement, encoded on the line: radius and fill both carry the value, so
+    // the encoding survives having its colour removed (FR-001's second channel).
+    for (const marker of track) {
+      const [x, y] = at(marker);
+      const intensity = marker.intensity ?? 0.5;
+      context.beginPath();
+      context.arc(x, y, scale * (0.5 + intensity * 0.7), 0, Math.PI * 2);
+      const shade = Math.round(235 - intensity * 200);
+      context.fillStyle = marker.flagged ? 'rgba(255, 255, 255, 0.95)' : `rgb(${String(shade)}, ${String(shade)}, ${String(shade)})`;
+      context.fill();
+      context.strokeStyle = marker.flagged ? 'rgb(138, 31, 31)' : 'rgba(16, 23, 29, 0.8)';
+      context.lineWidth = Math.max(1, scale * (marker.flagged ? 0.4 : 0.2));
+      context.stroke();
+    }
+
+    /*
+     * A drop is a glyph whose length is the depth it reached, never a dot (FR-004). At row
+     * width that is the whole of the depth information a panel can carry; the enlarged
+     * panel's elevation carries the rest.
+     */
     for (const marker of markers) {
       if (marker.kind === 'track') continue;
       const [x, y] = at(marker);
-      context.beginPath();
-      context.arc(x, y, scale * (marker.kind === 'drop' ? 0.9 : 0.7), 0, Math.PI * 2);
-      // A flagged observation is drawn as flagged, never omitted (FR-24).
-      context.fillStyle = marker.flagged
-        ? 'rgba(255, 255, 255, 0.9)'
+      const fraction = Math.min(1, marker.depthFraction ?? 0.5);
+      const length = scale * (1.5 + fraction * 6);
+      context.save();
+      context.setLineDash(marker.afterInitialisation === true ? [scale * 0.9, scale * 0.9] : []);
+      context.strokeStyle = marker.flagged
+        ? 'rgb(138, 31, 31)'
         : marker.kind === 'drop'
           ? 'rgba(16, 23, 29, 0.95)'
           : 'rgba(107, 90, 46, 0.95)';
+      context.lineWidth = Math.max(1, scale * 0.45);
+      context.beginPath();
+      context.moveTo(x, y);
+      context.lineTo(x, y + length);
+      context.stroke();
+      context.restore();
+
+      // The head: filled for the ownship, hollow for an external profile, white for flagged.
+      context.beginPath();
+      context.arc(x, y, scale * (marker.kind === 'drop' ? 0.85 : 0.7), 0, Math.PI * 2);
+      context.fillStyle = marker.flagged
+        ? 'rgba(255, 255, 255, 0.95)'
+        : marker.kind === 'drop'
+          ? 'rgba(16, 23, 29, 0.95)'
+          : 'rgba(247, 246, 242, 0.95)';
       context.fill();
       context.strokeStyle = marker.flagged ? 'rgb(138, 31, 31)' : 'rgba(16, 23, 29, 0.9)';
       context.lineWidth = Math.max(1, scale * 0.3);
       context.stroke();
+
+      // A probe that went past the floor of the displayed volume says so with a barb.
+      if (marker.continuesBelow === true) {
+        context.beginPath();
+        context.moveTo(x - scale * 0.6, y + length);
+        context.lineTo(x, y + length + scale * 0.9);
+        context.lineTo(x + scale * 0.6, y + length);
+        context.stroke();
+      }
     }
   }, [markers, nx, ny]);
 
@@ -134,9 +212,67 @@ export function FieldView({
                   onSelect(iy * nx + ix);
                 }
           }
-          style={onSelect === undefined ? undefined : { cursor: 'crosshair', pointerEvents: 'auto' }}
+          onMouseMove={
+            onHoverMark === undefined
+              ? undefined
+              : (event) => {
+                  const bounds = event.currentTarget.getBoundingClientRect();
+                  const gx = ((event.clientX - bounds.left) / bounds.width) * nx;
+                  const gy = (1 - (event.clientY - bounds.top) / bounds.height) * ny;
+                  // Nearest mark within a few cells. A mark's own glyph hangs below it, so
+                  // the reach is deliberately generous downward.
+                  let best: { id: string; distance: number } | null = null;
+                  for (const marker of markers) {
+                    if (marker.id === undefined) continue;
+                    const distance = Math.hypot(marker.x - gx, marker.y - gy);
+                    if (distance < 4 && (best === null || distance < best.distance)) {
+                      best = { id: marker.id, distance };
+                    }
+                  }
+                  onHoverMark(best === null ? null : best.id);
+                }
+          }
+          onMouseLeave={onHoverMark === undefined ? undefined : () => { onHoverMark(null); }}
+          style={
+            onSelect === undefined && onHoverMark === undefined
+              ? undefined
+              : { cursor: 'crosshair', pointerEvents: 'auto' }
+          }
         />
       </div>
+
+      {/*
+        A canvas says nothing to a reader who cannot see it, and nothing to a test either. The
+        marks are therefore also a list: one entry per observation, carrying what it is, where
+        it is and whether it was flagged. It is the accessible equivalent of the overlay and
+        the thing the footprint's counts are asserted against.
+      */}
+      {markers.some((marker) => marker.id !== undefined) && (
+        <ul
+          className="mark-list"
+          data-testid={testId === undefined ? undefined : `${testId}-marks`}
+          aria-label="Every observation drawn over this field"
+        >
+          {markers
+            .filter((marker) => marker.id !== undefined)
+            .map((marker) => (
+              <li
+                key={marker.id}
+                data-mark-id={marker.id}
+                data-kind={marker.kind}
+                data-flagged={String(marker.flagged)}
+                data-after-initialisation={String(marker.afterInitialisation === true)}
+                data-x={marker.x.toFixed(3)}
+                data-y={marker.y.toFixed(3)}
+              >
+                {marker.kind === 'track' ? 'surface measurement' : marker.kind === 'drop' ? 'XBT drop' : 'Argo profile'}
+                {marker.flagged ? ', flagged' : ''}
+                {marker.afterInitialisation === true ? ', after initialisation' : ''}
+              </li>
+            ))}
+        </ul>
+      )}
+
       {caption && (
         <figcaption>
           {label}

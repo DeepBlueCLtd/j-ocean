@@ -69,6 +69,27 @@ test('the horizon row', async ({ page }) => {
   await page.getByTestId('horizon-row').screenshot({ path: `${IMAGES}007-enlarged.png` });
 });
 
+test('the observation footprint', async ({ page }) => {
+  await page.setViewportSize({ width: REFERENCE_WIDTH, height: 1100 });
+  await page.goto('/');
+  await page.getByTestId('build-row').click();
+  await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId('horizon-row-panel').screenshot({ path: `${IMAGES}008-footprint-row.png` });
+
+  await page.getByTestId('enlarge-24').click();
+  await expect(page.getByTestId('needle-elevation')).toBeVisible();
+  await page.getByTestId('panel-24').screenshot({ path: `${IMAGES}008-needles.png` });
+
+  // Scrolled into place *before* hovering: a scroll under a stationary pointer fires a
+  // mouseout, and the hover this figure exists to show would be gone by the time it was taken.
+  // Clicked rather than hovered: a click pins the mark, so what it says survives the scroll
+  // the screenshot itself performs.
+  const needle = page.getByTestId('needle-elevation').locator('[data-kind="drop"]').first();
+  await needle.click();
+  await expect(page.getByTestId('profile-comparison')).toBeVisible();
+  await page.getByTestId('panel-24').screenshot({ path: `${IMAGES}008-profile-comparison.png` });
+});
+
 test('what the forecast was worth', async ({ page }) => {
   await page.goto('/');
   await page.getByTestId('score-run').click();
