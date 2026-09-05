@@ -213,6 +213,54 @@ ocean whose interface is at 700 m reads the upper layer's own temperature and co
 interface hardly at all. An observation that constrains nothing must not be allowed to look
 as though it did.
 
+## Observations
+
+The only currency the analysis accepts, and the only thing `src/instruments/` produces.
+
+The type is **opaque**: it carries a brand keyed by a symbol that
+`src/instruments/observation.ts` declares and never exports, so a module that cannot name the
+key cannot construct one. Gate G-02 fails if that symbol's name appears anywhere else.
+
+| Field | Meaning |
+|---|---|
+| `kind` | `surface`, `profile`, or `interface-depth` |
+| `value`, `lonDeg`, `latDeg`, `depthMetres`, `instantMs` | What was measured, and where |
+| `error` | Three declared parts, never one opaque figure — see below |
+| `flags` | What each declared check found. A flag is carried; it never drops the observation |
+| `external` | True for Argo: a real measurement the truth record itself assimilated |
+| `streamName` | Which named RNG stream drew this observation's noise |
+| `levels` | For a profile: the depth actually **reached**, the depth requested, the value, and per-level flags |
+| `bound` | For an unresolved interface: *below 150 m*, say — a fact where a depth would not be |
+
+### `ObservationError`
+
+`instrumentNoiseSd` is what the device does. `representativenessSd` is what a point sample of
+the real ocean cannot know about a 1/12-degree six-hourly record. `declaredBias` is what a
+broken instrument adds (and it is added *after* noise and *before* the checks, or quality
+control could never catch it). `totalSd` is the two random parts in quadrature; a bias is not
+a variance and is not in it.
+
+### The observation operator
+
+A temperature profile in, an interface depth out — the same two-layer relation the model
+draws a profile from, inverted. Levels are combined by inverse-variance weighting with the
+depth error propagated from the temperature error:
+
+    |dh/dT| = 2L / (|T_deep − T_upper| · (1 − f²))
+
+That expression **diverges** as a measurement leaves the thermocline, so a level in the body
+of a layer acquires an enormous depth error and weighs almost nothing. That is the reason the
+operator was chosen (ADR-0005): the down-weighting happens through the arithmetic rather than
+through a rule.
+
+### Flags
+
+`gross-range`, `climatology-departure` (measured in standard deviations of the climatology at
+that depth — a scale the artefact can answer for), `vertical-inversion`, `argo-flagged`,
+`unresolved`, and `outside-record` (the probe reached somewhere the truth record does not
+cover). Each carries a `detail` good enough to draw and a `usable` boolean, so consumers
+cannot disagree about what a flag means.
+
 ## The figure kinds
 
 Not a type but a discipline, and the surface enforces it typographically.

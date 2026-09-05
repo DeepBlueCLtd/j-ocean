@@ -78,6 +78,107 @@
       "closedBoundaryVolumeRelativeDrift": 1e-12
     }
   },
+  "instruments": {
+    "qualityControl": {
+      "enabled": true,
+      "grossRange": {
+        "minimumDegC": -2.5,
+        "maximumDegC": 36.0
+      },
+      "climatologyDepartureStandardDeviations": 5,
+      "verticalInversionToleranceDegC": 0.6
+    },
+    "argo": {
+      "assimilate": true,
+      "note": "ADR-0007: the truth record assimilated these profiles, so skill measured against it while assimilating them is not independent evidence. Every score says so."
+    },
+    "surface": {
+      "id": "ownship-surface-thermometer",
+      "variable": "water_temperature",
+      "noiseStandardDeviationDegC": 0.05,
+      "representativenessStandardDeviationDegC": 0.15,
+      "biasDegC": 0
+    },
+    "xbt": {
+      "id": "ownship-xbt",
+      "variable": "water_temperature",
+      "depthsMetres": [
+        0,
+        25,
+        50,
+        75,
+        100,
+        150,
+        200,
+        300,
+        400,
+        500,
+        600,
+        650
+      ],
+      "noiseStandardDeviationDegC": 0.1,
+      "representativenessStandardDeviationDegC": 0.2,
+      "depthErrorFraction": 0.02,
+      "biasDegC": 0
+    },
+    "track": {
+      "sampleIntervalHours": 3,
+      "waypoints": [
+        {
+          "lonDeg": -74.5,
+          "latDeg": 34.4,
+          "offsetHours": 0
+        },
+        {
+          "lonDeg": -73.0,
+          "latDeg": 35.8,
+          "offsetHours": 24
+        },
+        {
+          "lonDeg": -71.6,
+          "latDeg": 37.2,
+          "offsetHours": 48
+        },
+        {
+          "lonDeg": -70.4,
+          "latDeg": 38.6,
+          "offsetHours": 72
+        }
+      ]
+    },
+    "drops": [
+      {
+        "lonDeg": -74.2,
+        "latDeg": 34.7,
+        "offsetHours": 6
+      },
+      {
+        "lonDeg": -73.4,
+        "latDeg": 35.4,
+        "offsetHours": 18
+      },
+      {
+        "lonDeg": -72.6,
+        "latDeg": 36.2,
+        "offsetHours": 30
+      },
+      {
+        "lonDeg": -71.9,
+        "latDeg": 36.9,
+        "offsetHours": 42
+      },
+      {
+        "lonDeg": -71.2,
+        "latDeg": 37.6,
+        "offsetHours": 54
+      },
+      {
+        "lonDeg": -70.6,
+        "latDeg": 38.3,
+        "offsetHours": 66
+      }
+    ]
+  },
   "domains": {
     "defaultId": "gulf-stream-front",
     "list": [

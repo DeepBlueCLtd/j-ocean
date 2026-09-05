@@ -17,6 +17,14 @@ import { useEffect, useRef } from 'react';
  * to invent it).
  */
 
+/** A point to draw over the field, in fractional grid coordinates. */
+export interface Marker {
+  readonly x: number;
+  readonly y: number;
+  readonly kind: 'track' | 'drop' | 'external';
+  readonly flagged: boolean;
+}
+
 export interface FieldViewProps {
   readonly values: Float64Array;
   readonly nx: number;
@@ -25,6 +33,8 @@ export interface FieldViewProps {
   readonly limit: number;
   readonly label: string;
   readonly testId?: string;
+  /** Where the instruments sampled. Beat 008 makes this a footprint; this is its first draft. */
+  readonly markers?: readonly Marker[];
 }
 
 /** Diverging blue-white-red, with lightness monotone in |value| so greyscale still reads. */
@@ -43,8 +53,9 @@ function colourOf(normalised: number): [number, number, number] {
   ];
 }
 
-export function FieldView({ values, nx, ny, limit, label, testId }: FieldViewProps) {
+export function FieldView({ values, nx, ny, limit, label, testId, markers = [] }: FieldViewProps) {
   const canvas = useRef<HTMLCanvasElement | null>(null);
+  const overlay = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
     const element = canvas.current;
@@ -76,9 +87,60 @@ export function FieldView({ values, nx, ny, limit, label, testId }: FieldViewPro
     context.putImageData(image, 0, 0);
   }, [values, nx, ny, limit]);
 
+  // The markers are drawn on a second canvas at a higher resolution, because the field's
+  // canvas is one pixel per cell and a track drawn there would be a staircase.
+  useEffect(() => {
+    const element = overlay.current;
+    if (element === null) return;
+    const context = element.getContext('2d');
+    if (context === null) return;
+    const scale = element.width / nx;
+    context.clearRect(0, 0, element.width, element.height);
+
+    const at = (marker: Marker): [number, number] => [marker.x * scale, (ny - marker.y) * scale];
+
+    context.strokeStyle = 'rgba(16, 23, 29, 0.85)';
+    context.lineWidth = Math.max(1, scale * 0.25);
+    context.beginPath();
+    const track = markers.filter((marker) => marker.kind === 'track');
+    track.forEach((marker, index) => {
+      const [x, y] = at(marker);
+      if (index === 0) context.moveTo(x, y);
+      else context.lineTo(x, y);
+    });
+    context.stroke();
+
+    for (const marker of markers) {
+      if (marker.kind === 'track') continue;
+      const [x, y] = at(marker);
+      const radius = scale * (marker.kind === 'drop' ? 0.9 : 0.7);
+      context.beginPath();
+      context.arc(x, y, radius, 0, Math.PI * 2);
+      // A flagged observation is drawn as flagged, never omitted (FR-24).
+      context.fillStyle = marker.flagged
+        ? 'rgba(255, 255, 255, 0.9)'
+        : marker.kind === 'drop'
+          ? 'rgba(16, 23, 29, 0.95)'
+          : 'rgba(107, 90, 46, 0.95)';
+      context.fill();
+      context.strokeStyle = marker.flagged ? 'rgb(138, 31, 31)' : 'rgba(16, 23, 29, 0.9)';
+      context.lineWidth = Math.max(1, scale * 0.3);
+      context.stroke();
+    }
+  }, [markers, nx, ny]);
+
   return (
     <figure className="field" data-testid={testId}>
-      <canvas ref={canvas} width={nx} height={ny} role="img" aria-label={label} />
+      <div className="field-stack">
+        <canvas ref={canvas} width={nx} height={ny} role="img" aria-label={label} />
+        <canvas
+          ref={overlay}
+          className="overlay"
+          width={nx * 8}
+          height={ny * 8}
+          aria-hidden="true"
+        />
+      </div>
       <figcaption>
         {label}
         <span className="scale">

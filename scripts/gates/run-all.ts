@@ -1,6 +1,7 @@
 import { checkArtefactDrift } from './check-artefact-drift.js';
 import { checkHostTime } from './check-host-time.js';
 import { checkModelImports } from './check-model-imports.js';
+import { checkTruthBoundary } from './check-truth-boundary.js';
 import { checkVocabulary } from './check-vocabulary.js';
 import { REPO_ROOT, report, type GateResult } from './gate-lib.js';
 
@@ -27,7 +28,7 @@ interface NotYetLanded {
 
 const GATES: readonly (Landed | NotYetLanded)[] = [
   { run: () => checkArtefactDrift([]) },
-  { name: 'G-02 truth boundary', beat: '004', holds: 'no truth value reaches the analysis except through an instrument' },
+  { run: checkTruthBoundary },
   { run: checkModelImports },
   { run: checkHostTime },
   { name: 'G-05 declared horizons rendered', beat: '007', holds: 'every declared horizon is rendered and no other panel is drawn' },

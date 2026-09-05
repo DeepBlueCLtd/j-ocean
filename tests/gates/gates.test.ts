@@ -6,6 +6,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { checkArtefactDrift } from '../../scripts/gates/check-artefact-drift.js';
 import { checkHostTime } from '../../scripts/gates/check-host-time.js';
 import { checkModelImports } from '../../scripts/gates/check-model-imports.js';
+import { checkTruthBoundary } from '../../scripts/gates/check-truth-boundary.js';
 import { checkVocabulary } from '../../scripts/gates/check-vocabulary.js';
 import { REPO_ROOT } from '../../scripts/gates/gate-lib.js';
 
@@ -57,6 +58,35 @@ describe('the gates fail on their planted violations', () => {
     expect(output).toContain('react');
   });
 
+  it('G-02 catches the analysis importing the truth-source port', () => {
+    const { code, output } = spawnGate('check-truth-boundary', 'scripts/gates/fixtures/truth-boundary-import');
+    expect(code).not.toBe(0);
+    expect(output).toContain('src/analysis/planted.ts:2');
+    expect(output).toContain('Principle II');
+  });
+
+  /**
+   * Not a hypothetical. Beat 003 put `initialiseFromTruth` under `src/model/`, where it held
+   * the truth-source port, and writing this gate is what made that visible. It is in
+   * `src/run/` now, which satisfies FR-013 and Principle II at once.
+   */
+  it('G-02 catches the model importing it, which is what beat 003 had done', () => {
+    const { code, output } = spawnGate('check-truth-boundary', 'scripts/gates/fixtures/truth-boundary-model');
+    expect(code).not.toBe(0);
+    expect(output).toContain('src/model/planted.ts');
+    expect(output).toContain('truth-source');
+  });
+
+  it('G-02 catches a second place that can forge an Observation', () => {
+    const { code, output } = spawnGate(
+      'check-truth-boundary',
+      'scripts/gates/fixtures/truth-boundary-constructor',
+    );
+    expect(code).not.toBe(0);
+    expect(output).toContain('OBSERVATION_BRAND appears outside');
+    expect(output).toContain('src/instruments/observation.ts');
+  });
+
   it('the vocabulary gate catches a word on the plaintext list', () => {
     const { code, output } = spawnGate('check-vocabulary', 'scripts/gates/fixtures/vocabulary');
     expect(code).not.toBe(0);
@@ -106,7 +136,7 @@ describe('G-01 fails on a planted byte in a committed artefact', () => {
 
 describe('the gates pass what they should pass', () => {
   it('lets the navigational use of a vessel path through, on every gate', () => {
-    for (const gate of ['check-host-time', 'check-model-imports', 'check-vocabulary']) {
+    for (const gate of ['check-host-time', 'check-model-imports', 'check-vocabulary', 'check-truth-boundary']) {
       const { code } = spawnGate(gate, CLEAN);
       expect(code, `${gate} must pass the clean fixture`).toBe(0);
     }
@@ -117,6 +147,7 @@ describe('the gates pass what they should pass', () => {
       checkHostTime(REPO_ROOT),
       checkModelImports(REPO_ROOT),
       checkVocabulary(REPO_ROOT),
+      checkTruthBoundary(REPO_ROOT),
       checkArtefactDrift([]),
     ]) {
       expect(result.violations, `${result.gate} must pass the tree`).toEqual([]);
@@ -128,6 +159,17 @@ describe('the gates pass what they should pass', () => {
     expect(checkHostTime(REPO_ROOT).scanned).toBeGreaterThan(0);
     expect(checkModelImports(REPO_ROOT).scanned).toBeGreaterThan(0);
     expect(checkVocabulary(REPO_ROOT).scanned).toBeGreaterThan(0);
+    expect(checkTruthBoundary(REPO_ROOT).scanned).toBeGreaterThan(0);
+  });
+
+  /**
+   * The half of G-02 that is not here yet says so on every run, so that its absence is a hole
+   * with a date on it rather than a hole nobody mentions.
+   */
+  it('G-02 names the behavioural half it cannot run until the analysis exists', () => {
+    const notes = (checkTruthBoundary(REPO_ROOT).notes ?? []).join('\n');
+    expect(notes).toMatch(/behavioural half/);
+    expect(notes).toMatch(/beat 005/);
   });
 
   it('lists every exemption marker it honoured, so that reviewing them is possible', () => {

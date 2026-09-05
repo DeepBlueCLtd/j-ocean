@@ -45,6 +45,13 @@ test('the ocean after twelve hours', async ({ page }) => {
   await page.getByTestId('run-panel').screenshot({ path: `${IMAGES}003-run-panel.png` });
 });
 
+test('what the instruments measured', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('instruments-panel')).toBeVisible();
+  await page.getByTestId('field-panel').screenshot({ path: `${IMAGES}004-field-with-track.png` });
+  await page.getByTestId('instruments-panel').screenshot({ path: `${IMAGES}004-instruments.png` });
+});
+
 test('the record the run is scored against', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('truth-panel')).toBeVisible();

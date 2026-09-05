@@ -72,7 +72,7 @@ test.describe('the shell', () => {
     await page.goto('/');
     const panel = page.getByTestId('field-panel');
     await expect(panel).toBeVisible();
-    await expect(panel.locator('canvas')).toBeVisible();
+    await expect(panel.getByRole('img')).toBeVisible();
     await expect(panel).toContainText('no fixture behind this');
     await expect(page.getByTestId('initialisation')).toContainText('geostrophic balance');
     // FR-003: the criterion is on the surface, not only in a test.
@@ -80,7 +80,7 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('outcrops')).toContainText('counted rather than swallowed');
 
     // The canvas holds a field with structure in it, not a flat colour.
-    const distinct = await panel.locator('canvas').evaluate((canvas) => {
+    const distinct = await panel.getByRole('img').evaluate((canvas) => {
       const context = (canvas as HTMLCanvasElement).getContext('2d');
       const image = context?.getImageData(0, 0, (canvas as HTMLCanvasElement).width, (canvas as HTMLCanvasElement).height);
       const seen = new Set<number>();
@@ -151,6 +151,27 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('climatology-overlap')).toContainText(
       'not a fully independent measure',
     );
+  });
+
+  test('says what the instruments measured and what each measurement was priced at', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const panel = page.getByTestId('instruments-panel');
+    await expect(panel).toBeVisible();
+    await expect(panel).toContainText('Truth becomes an observation in exactly one module');
+    await expect(page.getByTestId('surface-count')).toContainText('representativeness');
+    await expect(page.getByTestId('drop-count')).toContainText('the depth it');
+
+    // ADR-0007: the dependency travels with the figure, not in a document the surface does
+    // not carry.
+    await expect(page.getByTestId('argo-state')).toContainText('not independent evidence');
+
+    // FR-24: a flagged observation keeps its value and is drawn as flagged.
+    await expect(page.getByTestId('flag-summary')).toContainText('drawn as flagged');
+
+    // ADR-0005: the operator's justification, on the surface.
+    await expect(page.getByTestId('interface-estimates')).toContainText('interface depth');
   });
 
   test('states the declared values, so that no figure on the page is unattributed', async ({

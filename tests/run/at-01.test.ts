@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { geostrophicAgreement, initialiseFromTruth } from '../../src/model/initialise.js';
+import { geostrophicAgreement, initialiseFromTruth } from '../../src/run/initialise-from-truth.js';
 import { parametersFor } from '../../src/model/parameters.js';
 import { createReducedGravityKernel } from '../../src/model/reduced-gravity.js';
 import { invariantsOf, publishResults, seaSurfaceHeightFrom } from '../../src/model/results.js';

@@ -80,7 +80,7 @@ while a gate that is present but did not run is a hole that looks like a pass.
 | Gate | Holds | Landed |
 |---|---|---|
 | G-01 | artefacts regenerate identically | **002** |
-| G-02 | truth reaches the analysis only through an instrument | beat 004 |
+| G-02 | truth reaches the analysis only through an instrument | **004** (behavioural half: 005) |
 | G-03 | the model imports no rendering module | **001** |
 | G-04 | no host clock, no unseeded randomness | **001** |
 | G-05 | every declared horizon rendered, and no other | beat 007 |
@@ -104,6 +104,7 @@ src/config/        the one loader, the schema, the configuration digest
 src/ports/         the four ports and nothing else (Principle VIII)
 src/model/         kernel, grid, state; imports nothing above it (Principle III)
 src/truth/         the truth-source port over the committed artefacts
+src/instruments/   the only place a truth value becomes an observation (Principle II)
 src/run/           seeds, the manifest, the run that owns the clock (Principle I)
 src/harness/       the React shell, and the two bounded host-time exemptions
 scripts/gates/     the gates, their word list and their planted violations

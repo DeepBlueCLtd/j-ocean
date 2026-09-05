@@ -48,6 +48,28 @@ const windowSchema = z
 const hoursIn = (window: { start: string; end: string }): number =>
   (Date.parse(window.end) - Date.parse(window.start)) / 3_600_000;
 
+const waypointSchema = z.object({
+  lonDeg: z.number().min(-180).max(180),
+  latDeg: z.number().min(-90).max(90),
+  /** Hours after the run's start instant. */
+  offsetHours: z.number().nonnegative(),
+});
+
+const instrumentSchema = z.object({
+  id: z.string().min(1),
+  variable: z.string().min(1),
+  /** FR-12: the instrument's own noise, declared rather than assumed. */
+  noiseStandardDeviationDegC: z.number().nonnegative(),
+  /**
+   * What the measurement cannot know: the truth record is 1/12 degree and six-hourly, so a
+   * point sample of the real ocean differs from it by more than instrument noise. Declaring
+   * this separately from instrument noise is what lets the surface say which is which.
+   */
+  representativenessStandardDeviationDegC: z.number().nonnegative(),
+  /** FR-32: an instrument may be declared broken. Zero unless a reader breaks one. */
+  biasDegC: z.number(),
+});
+
 const domainSchema = z
   .object({
     id: z.string().min(1),
@@ -212,6 +234,33 @@ export const configurationSchema = z
       }),
     }),
 
+    /** The instruments, and the checks their observations pass through (FR-12, FR-24, FR-32). */
+    instruments: z.object({
+      qualityControl: z.object({
+        /** FR-007's "quality control off" toggle, which beat 010 wires to a control. */
+        enabled: z.boolean(),
+        grossRange: z.object({ minimumDegC: z.number(), maximumDegC: z.number() }),
+        climatologyDepartureStandardDeviations: z.number().positive(),
+        verticalInversionToleranceDegC: z.number().nonnegative(),
+      }),
+      argo: z.object({
+        /** ADR-0007, review R-3. The author's to set false; no code changes if they do. */
+        assimilate: z.boolean(),
+        note: z.string().min(1),
+      }),
+      surface: instrumentSchema,
+      xbt: instrumentSchema.extend({
+        depthsMetres: z.array(z.number().nonnegative()).min(2),
+        /** An XBT's depth is inferred from fall rate, so it is wrong by a fraction of itself. */
+        depthErrorFraction: z.number().nonnegative(),
+      }),
+      track: z.object({
+        sampleIntervalHours: z.number().positive(),
+        waypoints: z.array(waypointSchema).min(2),
+      }),
+      drops: z.array(waypointSchema).min(1),
+    }),
+
     climatology: z.object({ window: windowSchema }),
 
     observations: z.object({
@@ -286,6 +335,70 @@ export const configurationSchema = z
       error:
         'truth.period is too short: it must cover the last issue time plus the longest horizon',
       path: ['truth', 'period'],
+    },
+  )
+  .refine(
+    (c) =>
+      c.instruments.track.waypoints.every(
+        (w, i, all) => i === 0 || w.offsetHours > (all[i - 1] as { offsetHours: number }).offsetHours,
+      ),
+    { error: 'the track must go forwards in time', path: ['instruments', 'track', 'waypoints'] },
+  )
+  .refine(
+    (c) =>
+      c.instruments.xbt.depthsMetres.every((d, i, all) => i === 0 || d > (all[i - 1] as number)),
+    { error: 'the XBT depths must increase', path: ['instruments', 'xbt', 'depthsMetres'] },
+  )
+  /**
+   * A quality-control threshold below the instrument's own noise flags the instrument rather
+   * than the ocean. This was not a hypothetical: the first declared inversion tolerance was
+   * 0.05 degC against an XBT whose total error is 0.22 degC, and every real profile tripped
+   * it in the weakly stratified deep water. The schema now refuses that configuration.
+   */
+  .refine(
+    (c) =>
+      c.instruments.qualityControl.verticalInversionToleranceDegC >
+      2 *
+        Math.hypot(
+          c.instruments.xbt.noiseStandardDeviationDegC,
+          c.instruments.xbt.representativenessStandardDeviationDegC,
+        ),
+    {
+      error:
+        'the vertical-inversion tolerance is below twice the XBT total error, so the check ' +
+        'would flag the instrument rather than the ocean',
+      path: ['instruments', 'qualityControl', 'verticalInversionToleranceDegC'],
+    },
+  )
+  /**
+   * The spec's second edge case, checked here rather than discovered at run time: a drop or a
+   * waypoint outside the domain would sample nothing, and the failure should name it.
+   */
+  .refine(
+    (c) => {
+      const domain = c.domains.list.find((d) => d.id === c.domains.defaultId);
+      if (domain === undefined) return true;
+      const inside = (p: { lonDeg: number; latDeg: number }): boolean =>
+        p.lonDeg >= domain.west &&
+        p.lonDeg <= domain.east &&
+        p.latDeg >= domain.south &&
+        p.latDeg <= domain.north;
+      return c.instruments.track.waypoints.every(inside) && c.instruments.drops.every(inside);
+    },
+    {
+      error: 'a track waypoint or an XBT drop lies outside the default domain',
+      path: ['instruments'],
+    },
+  )
+  .refine(
+    (c) =>
+      Math.max(
+        ...c.instruments.track.waypoints.map((w) => w.offsetHours),
+        ...c.instruments.drops.map((d) => d.offsetHours),
+      ) <= (Date.parse(c.truth.period.end) - Date.parse(c.truth.period.start)) / 3_600_000,
+    {
+      error: 'an instrument samples after the truth record ends',
+      path: ['instruments'],
     },
   )
   .refine((c) => c.forecast.spinUpHours <= c.forecast.issueTimes.firstOffsetHours, {

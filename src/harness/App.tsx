@@ -4,8 +4,17 @@ import { ConfigurationError, fetchConfiguration, type LoadedConfiguration } from
 import { createRun, type Run } from '../run/run.js';
 import { serialiseManifest } from '../run/manifest.js';
 import { loadClimatology, loadObservations, loadTruth } from './artefacts.js';
-import { FieldView } from './FieldView.js';
-import { initialiseFromTruth, type InitialisationReport } from '../model/initialise.js';
+import { FieldView, type Marker } from './FieldView.js';
+import { climatologyReferenceOver } from '../instruments/climatology-reference.js';
+import {
+  argoObservations,
+  sampleSurface,
+  sampleXbtDrops,
+  type SamplingContext,
+  type XbtResult,
+} from '../instruments/instruments.js';
+import { isUsable, type Observation } from '../instruments/observation.js';
+import { initialiseFromTruth, type InitialisationReport } from '../run/initialise-from-truth.js';
 import { parametersFor } from '../model/parameters.js';
 import { createReducedGravityKernel } from '../model/reduced-gravity.js';
 import { publishResults, type ModelResults } from '../model/results.js';
@@ -57,6 +66,10 @@ interface RunView {
   readonly results: ModelResults;
   readonly initialisation: InitialisationReport;
   readonly integrating: boolean;
+  readonly surface: readonly Observation[];
+  readonly drops: readonly XbtResult[];
+  readonly argo: readonly XbtResult[];
+  readonly box: { readonly west: number; readonly east: number; readonly south: number; readonly north: number };
 }
 
 interface Record002 {
@@ -64,6 +77,47 @@ interface Record002 {
   readonly truth: ArtefactTruthSource;
   readonly climatology: FieldContainer;
   readonly observations: ObservationRecord;
+}
+
+/** Where the instruments sampled, in fractional grid coordinates, for the overlay. */
+function markersFor(view: RunView): Marker[] {
+  const { box } = view;
+  const { nx, ny } = view.results.grid;
+  const place = (lonDeg: number, latDeg: number) => ({
+    x: ((lonDeg - box.west) / (box.east - box.west)) * nx,
+    y: ((latDeg - box.south) / (box.north - box.south)) * ny,
+  });
+
+  return [
+    ...view.surface.map((o) => ({ ...place(o.lonDeg, o.latDeg), kind: 'track' as const, flagged: !isUsable(o) })),
+    ...view.drops.map(({ profile }) => ({
+      ...place(profile.lonDeg, profile.latDeg),
+      kind: 'drop' as const,
+      flagged: !isUsable(profile),
+    })),
+    ...view.argo.map(({ profile }) => ({
+      ...place(profile.lonDeg, profile.latDeg),
+      kind: 'external' as const,
+      flagged: (profile.levels ?? []).some((level) => level.flags.length > 0),
+    })),
+  ];
+}
+
+/** How many of each check fired, across everything the instruments produced. */
+function flagSummary(view: RunView): [string, number][] {
+  const counts = new Map<string, number>();
+  const add = (observation: Observation): void => {
+    for (const flag of observation.flags) counts.set(flag.code, (counts.get(flag.code) ?? 0) + 1);
+    for (const level of observation.levels ?? []) {
+      for (const flag of level.flags) counts.set(flag.code, (counts.get(flag.code) ?? 0) + 1);
+    }
+  };
+  for (const observation of view.surface) add(observation);
+  for (const { profile, interface: inferred } of [...view.drops, ...view.argo]) {
+    add(profile);
+    add(inferred);
+  }
+  return [...counts.entries()].sort(([a], [b]) => a.localeCompare(b));
 }
 
 export function App() {
@@ -137,6 +191,20 @@ export function App() {
         recordedCase,
         ...(seed === undefined ? {} : { seed }),
       });
+      // The instruments sample the truth record through the port, in the one module allowed
+      // to do so. Nothing here touches truth itself.
+      const sampling: SamplingContext = {
+        config: loaded.config,
+        truth: record.truth,
+        rng: run.rng,
+        climatology: climatologyReferenceOver(record.climatology),
+        structure: parameters.thermalStructure,
+        startMs: Date.parse(loaded.config.truth.period.start),
+      };
+      const surface = sampleSurface(sampling);
+      const drops = sampleXbtDrops(sampling);
+      const argo = argoObservations(record.observations, sampling);
+
       return {
         run,
         recordedCase: run.recordedCase,
@@ -146,6 +214,10 @@ export function App() {
         results: publishResults(state, parameters, run.stability),
         initialisation: report,
         integrating: false,
+        surface,
+        drops,
+        argo,
+        box: report.box,
       };
     },
     [loaded, record],
@@ -422,7 +494,22 @@ export function App() {
               limit={0.8}
               label={`Sea-surface height anomaly over ${view.run.domainId}, valid at ${view.instant}`}
               testId="field-view"
+              markers={markersFor(view)}
             />
+            <p className="legend">
+              <span>
+                <span className="dot drop" />
+                XBT drop
+              </span>
+              <span>
+                <span className="dot external" />
+                Argo profile (external)
+              </span>
+              <span>
+                <span className="dot flagged" />
+                flagged &mdash; drawn, never omitted
+              </span>
+            </p>
             <dl>
               <dt>Valid at</dt>
               <dd>
@@ -446,6 +533,96 @@ export function App() {
               <dd>
                 <Declared>{view.results.spongeWidthCells} cells</Declared> of sponge at each
                 edge, relaxed toward the initial state. Scoring will exclude it.
+              </dd>
+            </dl>
+          </section>
+
+          <section data-testid="instruments-panel">
+            <h2>What the instruments measured</h2>
+            <p className="aside">
+              Truth becomes an observation in exactly one module, and this is everything that
+              module produced. Every figure below is what a measurement was priced at, not
+              what it turned out to be worth &mdash; that is the analysis&rsquo;s question.
+            </p>
+            <dl>
+              <dt>Ownship surface</dt>
+              <dd data-testid="surface-count">
+                <Computed>{view.surface.length}</Computed> measurements along the declared
+                track, at <Declared>{loaded.config.instruments.track.sampleIntervalHours} h</Declared>{' '}
+                intervals. Declared error{' '}
+                <Declared>
+                  {loaded.config.instruments.surface.noiseStandardDeviationDegC} degC
+                </Declared>{' '}
+                instrument and{' '}
+                <Declared>
+                  {loaded.config.instruments.surface.representativenessStandardDeviationDegC} degC
+                </Declared>{' '}
+                representativeness.
+              </dd>
+
+              <dt>XBT drops</dt>
+              <dd data-testid="drop-count">
+                <Computed>{view.drops.length}</Computed> drops of{' '}
+                <Declared>{loaded.config.instruments.xbt.depthsMetres.length}</Declared> levels
+                each. An XBT infers its depth from a fall rate, so each level records the depth
+                it <em>reached</em>, not the depth it was asked for.
+              </dd>
+
+              <dt>What a drop told us</dt>
+              <dd data-testid="interface-estimates">
+                {view.drops.map(({ interface: inferred }) => (
+                  <span key={inferred.id} className="estimate">
+                    {isUsable(inferred) ? (
+                      <>
+                        <Computed>{inferred.value.toFixed(0)} m</Computed>
+                        <span className="host-time"> &plusmn;{inferred.error.totalSd.toFixed(0)} m</span>
+                      </>
+                    ) : (
+                      <em>unresolved</em>
+                    )}
+                  </span>
+                ))}
+                <br />
+                The observed quantity is the interface depth, inverted from the same two-layer
+                relation the profile above is drawn from. A level far from the thermocline
+                acquires an enormous depth error and weighs almost nothing, through the
+                arithmetic rather than through a rule.
+              </dd>
+
+              <dt>Argo</dt>
+              <dd data-testid="argo-state">
+                {loaded.config.instruments.argo.assimilate ? (
+                  <>
+                    <Computed>{view.argo.length}</Computed> profiles admitted, marked{' '}
+                    <em>external</em>. The truth record assimilated these profiles, so skill
+                    measured against it while assimilating them is not independent evidence,
+                    and every score will say so.
+                  </>
+                ) : (
+                  <>Drawn, not assimilated. The toggle is off.</>
+                )}
+              </dd>
+
+              <dt>Flags</dt>
+              <dd data-testid="flag-summary">
+                {flagSummary(view).length === 0 ? (
+                  <>No check fired. Quality control is{' '}
+                    <Declared>
+                      {loaded.config.instruments.qualityControl.enabled ? 'on' : 'off'}
+                    </Declared>
+                    .
+                  </>
+                ) : (
+                  flagSummary(view).map(([code, count]) => (
+                    <span key={code} className="estimate">
+                      <Computed>{count}</Computed> {code}
+                    </span>
+                  ))
+                )}
+                <br />
+                A flagged observation keeps its value and is drawn as flagged. Nothing is
+                dropped, because what the analysis chose to ignore is as interesting as what
+                it used.
               </dd>
             </dl>
           </section>

@@ -1,12 +1,20 @@
 import type { ModelState } from '../ports/kernel.js';
 import type { TruthSource } from '../ports/truth-source.js';
-import { createField, indexOf } from './grid.js';
-import type { ReducedGravityParameters } from './parameters.js';
-import type { ReducedGravityKernel } from './reduced-gravity.js';
-import { THICKNESS, VELOCITY_U, VELOCITY_V } from './reduced-gravity.js';
+import { createField, indexOf } from '../model/grid.js';
+import type { ReducedGravityParameters } from '../model/parameters.js';
+import type { ReducedGravityKernel } from '../model/reduced-gravity.js';
+import { THICKNESS, VELOCITY_U, VELOCITY_V } from '../model/reduced-gravity.js';
 
 /**
  * Initialising the model from the truth record (FR-013).
+ *
+ * **This lives in the run ring, not the model ring, and that is a correction.** It was
+ * written under `src/model/` in beat 003, where it imported the truth-source port -- and
+ * constitution Principle II says in terms that *the model and the analysis import neither
+ * the truth port nor the scoring module*. Gate G-02, landing in beat 004, caught it. The
+ * SRD's FR-013 asks that initialisation go through the port, and the constitution says the
+ * model may not hold the port; both are satisfied by the run doing the wiring, which is what
+ * the run is for. Where a spec and the constitution disagree, the constitution wins.
  *
  * Two declared relations, and the reasons for both.
  *
