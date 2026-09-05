@@ -47,7 +47,7 @@ const scoreAt = (leadHours: number, overrides: Partial<Parameters<typeof score>[
     config,
     domain,
     truth,
-    forecast: result.byHorizon.get(leadHours) as Float64Array,
+    forecast: result.byHorizon.get(leadHours)?.field as Float64Array,
     initial: result.initial,
     climatology: result.climatologyField,
     truthAtValidInstant: truthAt(validInstantMs),
@@ -122,11 +122,36 @@ describe('every score carries its provenance', () => {
     expect(p.truthSource).toContain(domain.id);
   });
 
-  /** ADR-0007 and review R-3: the caveat travels with the figure. */
-  it('carries the independence caveat when the analysis assimilated Argo', () => {
-    expect(result.externalObservationIds.length).toBeGreaterThan(0);
-    expect(s.provenance.independenceCaveat).toMatch(/not independent evidence/);
-    expect(s.provenance.externalObservationIds.length).toBe(result.externalObservationIds.length);
+  /**
+   * ADR-0007 and review R-3: the caveat travels with the figure.
+   *
+   * Beat 009 changed which run this can be asked of. Now that the analysis sees only what had
+   * happened by its issue instant, the recorded case's default issue time has **no Argo
+   * profile at all** -- the first has not arrived -- so the caveat is never triggered there.
+   * That is good for independence and useless for testing the caveat, so the caveat is tested
+   * on a later issue time, and the absence at the default one is asserted for what it is.
+   */
+  it('carries no caveat at the default issue time, because no Argo has arrived', () => {
+    expect(result.externalObservationIds).toEqual([]);
+    expect(s.provenance.independenceCaveat).toBeNull();
+  });
+
+  it('carries the independence caveat once Argo has arrived and been assimilated', () => {
+    const later = runForecast({
+      config,
+      domain,
+      truth,
+      climatology: climatologyContainer(domain.id),
+      argo: argoRecord(domain.id),
+      issueInstantMs: issueInstantMs + 72 * 3_600_000,
+      anchorInstantMs: issueInstantMs,
+    });
+    expect(later.externalObservationIds.length).toBeGreaterThan(0);
+    const withArgo = scoreAt(24, { externalObservationIds: later.externalObservationIds });
+    expect(withArgo.provenance.independenceCaveat).toMatch(/not independent evidence/);
+    expect(withArgo.provenance.externalObservationIds.length).toBe(
+      later.externalObservationIds.length,
+    );
   });
 
   it('carries no caveat when nothing external was assimilated', () => {

@@ -25,7 +25,8 @@ export interface PanelProps {
   readonly leadHours: number;
   readonly validInstant: string;
   readonly initialisedFrom: string;
-  readonly field: Float64Array;
+  /** Absent where the panel is outside validity or before its issue instant (FR-005). */
+  readonly field: Float64Array | null;
   readonly nx: number;
   readonly ny: number;
   readonly limit: number;
@@ -36,6 +37,12 @@ export interface PanelProps {
   /** Declared: above this weight a cell is hatched rather than merely tinted (FR-019). */
   readonly hatchThreshold: number;
   readonly score: Score | null;
+  /** FR-026: the frozen quay-side brief, scored at the same instant, as the baseline. */
+  readonly briefScore: Score | null;
+  /** Present exactly when there is no field. FR-027: said, never extrapolated. */
+  readonly refusal: string | null;
+  /** What was actually asked of the model: the valid instant less the issue instant. */
+  readonly leadFromIssueHours: number;
   readonly markers: readonly Marker[];
   /** Beat 008: what the vessel measured, as marks. Read, never computed, by the panel. */
   readonly footprint: Footprint;
@@ -111,8 +118,18 @@ export function Panel(props: PanelProps) {
         </button>
       </header>
 
+      {/*
+        FR-027. A panel outside its forecast's validity, or before it was issued, draws
+        nothing and says why. There is no field to give it that would not be an
+        extrapolation, and an extrapolation drawn beside five forecasts would read as one.
+      */}
+      {props.refusal !== null ? (
+        <p className="banner warn" data-testid={`panel-refusal-${String(leadHours)}`}>
+          {props.refusal}
+        </p>
+      ) : (
       <FieldView
-        values={showAttribution ? props.observationWeight : props.field}
+        values={showAttribution ? props.observationWeight : (props.field as Float64Array)}
         nx={props.nx}
         ny={props.ny}
         limit={showAttribution ? 1 : props.limit}
@@ -136,6 +153,7 @@ export function Panel(props: PanelProps) {
         onHoverMark={setHoveredId}
         caption={false}
       />
+      )}
 
       {/* FR-003: the depth axis exists only where there is room for it to be read. At row
           width a drop is a depth-coded glyph; enlarged, it is a needle at its own depths. */}
@@ -182,10 +200,19 @@ export function Panel(props: PanelProps) {
         <Instant value={validInstant} testId={`panel-valid-${String(leadHours)}`} />
         <dt>Initialised</dt>
         <Instant value={initialisedFrom} testId={`panel-initialised-${String(leadHours)}`} />
+        {/* Beat 009: the declared horizon names the panel and fixes the valid instant; this
+            is what was actually asked of the model, and the two differ the moment issue time
+            moves. Conflating them is the confusion the second axis exists to remove. */}
+        <dt>Lead asked</dt>
+        <dd className="computed" data-testid={`panel-actual-lead-${String(leadHours)}`}>
+          +{props.leadFromIssueHours.toFixed(0)} h
+        </dd>
       </dl>
 
       <div className="panel-score" data-testid={`panel-score-${String(leadHours)}`}>
-        {score === null ? (
+        {props.refusal !== null ? (
+          <span className="unmeasured">no score: this panel has no forecast</span>
+        ) : score === null ? (
           <span className="unmeasured">not scored yet</span>
         ) : (
           <>
@@ -195,6 +222,17 @@ export function Panel(props: PanelProps) {
               <dd className="computed">{skill(score.skillAgainstPersistence)}</dd>
               <dt>vs climatology</dt>
               <dd className="computed">{skill(score.skillAgainstClimatology)}</dd>
+              {/* FR-026: the departure brief, the baseline everything else is watched
+                  against. Persistence from the quay side, never refreshed -- correct at
+                  issue and losing to the world on its own. */}
+              <dt>brief error</dt>
+              <dd className="computed" data-testid={`panel-brief-${String(leadHours)}`}>
+                {props.briefScore === null
+                  ? '—'
+                  : `${props.briefScore.forecastError.value.toFixed(1)} m`}
+              </dd>
+              <dt>this forecast</dt>
+              <dd className="computed">{score.forecastError.value.toFixed(1)} m</dd>
             </dl>
             <details data-testid={`panel-provenance-${String(leadHours)}`}>
               <summary>Where this figure came from</summary>
@@ -209,8 +247,16 @@ export function Panel(props: PanelProps) {
                 <span className="computed">{score.meanOffsets.forecast.value.toFixed(1)} m</span>,
                 truth <span className="computed">{score.meanOffsets.truth.value.toFixed(1)} m</span>.
               </p>
-              {score.provenance.independenceCaveat !== null && (
+              {/* Review R-3. The caveat when there was something external to caveat, and the
+                  statement that there was not when there was not -- a reader cannot tell the
+                  difference between "independent" and "nobody checked" from a blank space. */}
+              {score.provenance.independenceCaveat !== null ? (
                 <p className="caveat">{score.provenance.independenceCaveat}</p>
+              ) : (
+                <p className="unmeasured" data-testid={`panel-independence-${String(leadHours)}`}>
+                  No external observation was assimilated in this window, so this figure carries
+                  no independence caveat.
+                </p>
               )}
             </details>
           </>

@@ -11,6 +11,8 @@ import { Panel } from './Panel.js';
 import { profileFromInterfaceDepth } from '../model/profile.js';
 import type { Footprint } from './footprint.js';
 import { markersFrom, marksOf, trackValueRange } from './footprint.js';
+import { SkillInset, type SkillCurve } from './SkillInset.js';
+import type { DepartureBrief } from '../run/forecast.js';
 
 /**
  * The horizon row (FR-013, FR-014, G-05).
@@ -35,7 +37,23 @@ export interface HorizonRowProps {
   readonly climatology: FieldContainer;
   /** Beat 008: the observation footprint, built once for the row and read by every panel. */
   readonly footprint: Footprint;
+  /** FR-026: the frozen quay-side analysis, the baseline every panel is watched against. */
+  readonly brief: DepartureBrief;
+  /** Beat 009: the issue-time axis. The row is the lead-time axis; these two are all there is. */
+  readonly issueInstantMs: number;
+  readonly defaultIssueInstantMs: number;
+  readonly pendingIssueInstantMs: number;
+  readonly onPendingIssueInstantChange: (instantMs: number) => void;
+  readonly onReissue: () => void;
+  readonly reissuing: boolean;
   readonly onSelectCell: (cellIndex: number) => void;
+}
+
+/** "twelve hours earlier", in the words a reader would use rather than a signed number. */
+function describeOffset(deltaMs: number): string {
+  const hours = Math.round(Math.abs(deltaMs) / 3_600_000);
+  const unit = hours === 1 ? 'hour' : 'hours';
+  return `${String(hours)} ${unit} ${deltaMs < 0 ? 'earlier' : 'later'} than the recorded case`;
 }
 
 export function HorizonRow(props: HorizonRowProps) {
@@ -48,7 +66,10 @@ export function HorizonRow(props: HorizonRowProps) {
   const [enlarged, setEnlarged] = useState<number | null>(null);
   const [showAttribution, setShowAttribution] = useState(false);
   const [scores, setScores] = useState<ReadonlyMap<number, Score | null> | null>(null);
+  const [briefScores, setBriefScores] = useState<ReadonlyMap<number, Score | null> | null>(null);
   const [scoringFailure, setScoringFailure] = useState<string | null>(null);
+  /** One entry per issue instant somebody has scored. See `scoreAll`. */
+  const [curves, setCurves] = useState<readonly SkillCurve[]>([]);
 
   /**
    * Each panel's field as an **anomaly** about its own regional mean.
@@ -64,8 +85,8 @@ export function HorizonRow(props: HorizonRowProps) {
   const anomalies = useMemo(() => {
     const out = new Map<number, Float64Array>();
     for (const leadHours of horizons) {
-      const field = forecast.byHorizon.get(leadHours);
-      if (field === undefined) continue;
+      const field = forecast.byHorizon.get(leadHours)?.field;
+      if (field === undefined || field === null) continue;
       let n = 0;
       let mean = 0;
       for (let i = 0; i < field.length; i += 1) {
@@ -104,33 +125,58 @@ export function HorizonRow(props: HorizonRowProps) {
       forecast.parameters.grid,
     );
     const next = new Map<number, Score | null>();
+    const briefNext = new Map<number, Score | null>();
     try {
       for (const leadHours of horizons) {
-        const validInstantMs = forecast.issueInstantMs + leadHours * 3_600_000;
-        next.set(
+        const panel = forecast.byHorizon.get(leadHours);
+        // FR-005: a panel with no field has nothing to score, and says why instead.
+        if (panel === undefined || panel.field === null) {
+          next.set(leadHours, null);
+          briefNext.set(leadHours, null);
+          continue;
+        }
+        const validInstantMs = panel.validInstantMs;
+        const truthAtValidInstant = interfaceFieldFromTruth(
+          truth,
+          forecast.parameters.thermalStructure,
+          forecast.box,
+          forecast.parameters.grid,
+          validInstantMs,
+        );
+        const common = {
+          config,
+          domain,
+          truth,
+          initial: forecast.initial,
+          climatology: climatologyField,
+          truthAtValidInstant,
+          region,
+          fromInstantMs: forecast.issueInstantMs,
+          validInstantMs,
+          externalObservationIds: forecast.externalObservationIds,
+        };
+        next.set(leadHours, score({ ...common, forecast: panel.field }));
+        // FR-026: the baseline everything else is watched against, scored the same way at the
+        // same instant so the two figures are comparable rather than merely adjacent.
+        briefNext.set(
           leadHours,
-          score({
-            config,
-            domain,
-            truth,
-            forecast: forecast.byHorizon.get(leadHours) as Float64Array,
-            initial: forecast.initial,
-            climatology: climatologyField,
-            truthAtValidInstant: interfaceFieldFromTruth(
-              truth,
-              forecast.parameters.thermalStructure,
-              forecast.box,
-              forecast.parameters.grid,
-              validInstantMs,
-            ),
-            region,
-            fromInstantMs: forecast.issueInstantMs,
-            validInstantMs,
-            externalObservationIds: forecast.externalObservationIds,
-          }),
+          score({ ...common, forecast: props.brief.field, initial: props.brief.field }),
         );
       }
       setScores(next);
+      setBriefScores(briefNext);
+      setCurves((current) => {
+        const points = horizons.map((leadHours) => ({
+          leadHours,
+          skill: next.get(leadHours)?.skillAgainstPersistence?.value ?? null,
+        }));
+        // The inset draws the curves that have actually been computed, labelled by issue
+        // instant. It never draws a curve for an issue time nobody has scored.
+        return [
+          ...current.filter((curve) => curve.issueInstantMs !== forecast.issueInstantMs),
+          { issueInstantMs: forecast.issueInstantMs, points },
+        ].sort((a, b) => a.issueInstantMs - b.issueInstantMs);
+      });
       setScoringFailure(null);
     } catch (error) {
       // The spec's second edge case: a horizon whose valid instant is outside the record.
@@ -140,14 +186,23 @@ export function HorizonRow(props: HorizonRowProps) {
         error instanceof ScoringRefusal ? error.message : String(error),
       );
     }
-  }, [config, domain, forecast, truth, climatology, horizons]);
+  }, [config, domain, forecast, truth, climatology, horizons, props.brief]);
 
   useEffect(() => {
     setScores(null);
+    setBriefScores(null);
     setEnlarged(null);
   }, [forecast]);
 
   const issued = new Date(forecast.issueInstantMs).toISOString();
+  const runStartMs = Date.parse(config.truth.period.start);
+  const earliestMs = runStartMs + config.forecast.issueTimeControl.earliestOffsetHours * 3_600_000;
+  const latestMs = runStartMs + config.forecast.issueTimeControl.latestOffsetHours * 3_600_000;
+  const observationInstants = [
+    ...new Set(marksOf(props.footprint).map((mark) => mark.instantMs)),
+  ]
+    .filter((instantMs) => instantMs >= earliestMs && instantMs <= latestMs)
+    .sort((a, b) => a - b);
 
   // One producer of marks for the whole row (FR-001, FR-009). A mark cannot mean one thing on
   // one panel and something else on another, because there is one list.
@@ -163,8 +218,8 @@ export function HorizonRow(props: HorizonRowProps) {
    */
   const derivedProfileFor = useCallback(
     (leadHours: number) => (lonDeg: number, latDeg: number) => {
-      const field = forecast.byHorizon.get(leadHours);
-      if (field === undefined) return null;
+      const field = forecast.byHorizon.get(leadHours)?.field;
+      if (field === undefined || field === null) return null;
       const { nx, ny } = forecast.parameters.grid;
       const { west, east, south, north } = forecast.box;
       const lonIndex = Math.min(nx - 1, Math.max(0, Math.floor(((lonDeg - west) / (east - west)) * nx)));
@@ -203,6 +258,76 @@ export function HorizonRow(props: HorizonRowProps) {
         One panel per declared horizon, in order, all visible at once. Not a slider: what is
         not on screen is what the eye forgets, and the whole point of the row is that a reader
         sees the decay rather than being told about it.
+      </p>
+
+      {/*
+        The issue-time axis (FR-025, FR-002, and §11's open question).
+        Exactly one control. Staleness and lead time are conflated everywhere, and only two
+        controls can pull them apart: this one moves the instant the forecast was made, and
+        the row itself is the lead time being asked of it. Moving this leaves every panel's
+        valid instant exactly where it was and makes each of them a longer forecast of the
+        same moment, which is why the whole curve drops bodily rather than shifting sideways.
+      */}
+      <div className="issue-control" data-testid="issue-control">
+        <label htmlFor="issue-time">Issued</label>
+        <input
+          id="issue-time"
+          type="range"
+          data-testid="issue-time"
+          min={earliestMs}
+          max={latestMs}
+          step={config.forecast.issueTimeControl.resolutionHours * 3_600_000}
+          list="issue-observation-instants"
+          value={props.pendingIssueInstantMs}
+          onChange={(event) => { props.onPendingIssueInstantChange(Number(event.target.value)); }}
+        />
+        {/* The instants at which something was actually measured, marked on the axis, so a
+            reader can see which moves change what the analysis had to work with. */}
+        <datalist id="issue-observation-instants" data-testid="issue-observation-instants">
+          {observationInstants.map((instantMs) => (
+            <option key={instantMs} value={instantMs} />
+          ))}
+        </datalist>
+        <span className="computed" data-testid="pending-issue-instant">
+          {new Date(props.pendingIssueInstantMs).toISOString()}
+        </span>
+        <span data-testid="issue-offset">
+          {props.pendingIssueInstantMs === props.defaultIssueInstantMs
+            ? 'the recorded case'
+            : `issued ${describeOffset(props.pendingIssueInstantMs - props.defaultIssueInstantMs)}`}
+        </span>
+        <button
+          type="button"
+          data-testid="reissue"
+          onClick={props.onReissue}
+          disabled={props.reissuing || props.pendingIssueInstantMs === props.issueInstantMs}
+        >
+          {props.reissuing ? 'Re-issuing…' : 'Re-issue'}
+        </button>
+      </div>
+
+      {/* NFR-04: re-integrating takes seconds, so the row keeps the forecast it has and says
+          which one that is, rather than freezing while it makes another. */}
+      {props.pendingIssueInstantMs !== props.issueInstantMs && (
+        <p className="banner warn" data-testid="issue-stale">
+          Showing the forecast issued at{' '}
+          <span className="computed">{new Date(props.issueInstantMs).toISOString()}</span>.
+          Re-issue to see the one made at{' '}
+          <span className="computed">{new Date(props.pendingIssueInstantMs).toISOString()}</span>.
+        </p>
+      )}
+
+      <p className="aside" data-testid="issue-observations">
+        The analysis at this issue instant saw{' '}
+        <span className="computed" data-testid="observations-available">
+          {forecast.observationsAvailable}
+        </span>{' '}
+        {forecast.observationsAvailable === 1 ? 'observation' : 'observations'};{' '}
+        <span className="computed" data-testid="observations-withheld">
+          {forecast.observationsWithheld}
+        </span>{' '}
+        had not happened yet.
+        {forecast.observationsAvailable === 0 && ' No observations at this issue time: the analysis is the background and the climatology.'}
       </p>
 
       <div className="row-controls">
@@ -257,9 +382,12 @@ export function HorizonRow(props: HorizonRowProps) {
           <Panel
             key={leadHours}
             leadHours={leadHours}
-            validInstant={new Date(forecast.issueInstantMs + leadHours * 3_600_000).toISOString()}
+            validInstant={new Date(
+              forecast.byHorizon.get(leadHours)?.validInstantMs ??
+                forecast.anchorInstantMs + leadHours * 3_600_000,
+            ).toISOString()}
             initialisedFrom={issued}
-            field={anomalies.get(leadHours) as Float64Array}
+            field={anomalies.get(leadHours) ?? null}
             nx={forecast.parameters.grid.nx}
             ny={forecast.parameters.grid.ny}
             limit={config.presentation.anomalyLimitMetres}
@@ -267,6 +395,9 @@ export function HorizonRow(props: HorizonRowProps) {
             observationsDominant={observationsDominant}
             hatchThreshold={config.presentation.attributionHatchThreshold}
             score={scores?.get(leadHours) ?? null}
+            briefScore={briefScores?.get(leadHours) ?? null}
+            refusal={forecast.byHorizon.get(leadHours)?.refusal ?? null}
+            leadFromIssueHours={forecast.byHorizon.get(leadHours)?.leadFromIssueHours ?? leadHours}
             markers={markers}
             footprint={props.footprint}
             box={forecast.box}
@@ -283,6 +414,13 @@ export function HorizonRow(props: HorizonRowProps) {
           />
         ))}
       </div>
+
+      <SkillInset
+        curves={curves}
+        currentIssueInstantMs={forecast.issueInstantMs}
+        widthPx={360}
+        heightPx={140}
+      />
 
       <p className="legend" data-testid="row-legend">
         {showAttribution ? (

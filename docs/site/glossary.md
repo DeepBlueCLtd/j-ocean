@@ -54,6 +54,12 @@ drawing a depth profile states that the levels between the model's own are deriv
 <dd>The check that regenerates a committed artefact and fails the build on any difference,
 so that a change is attributed to the tree or to the upstream rather than guessed at.</dd>
 
+<dt>Departure brief</dt>
+<dd>The analysis at the quay-side instant, held constant and never refreshed: correct at
+issue and losing to the world on its own. The baseline every forecast is watched against.
+In the recorded case nothing has reported by then, so it is the background blended with
+climatology — which makes it a generous baseline rather than a straw man.</dd>
+
 <dt>Footprint</dt>
 <dd>What the instruments did, drawn: the track and its measurements, and a needle or a
 depth-coded glyph for every profile. Built from the run's observations and from nothing
@@ -88,6 +94,12 @@ depth and time.</dd>
 <dd>The complete description of a run: seeds, versions, digests and counterfactual state.
 The unit of export and import, and the thing a run is rebuilt from.</dd>
 
+<dt>Issue time</dt>
+<dd>The instant a forecast was made, and an axis of its own. The row is the lead-time axis;
+one scrubber above it is the issue-time axis. Moving it leaves every panel valid at the same
+moment and makes each a longer forecast of it, so the whole skill curve drops bodily. An
+analysis may see only observations with instants at or before its issue time.</dd>
+
 <dt>Needle</dt>
 <dd>A profile as drawn: a vertical line through the depth elevation extending exactly to the
 depth that probe reached, with a tick at every level it sampled and a barb where it carried
@@ -121,6 +133,12 @@ will not quietly be a fifth.</dd>
 <dd>The run produced by the declared default seed: the one two readers are both looking at
 when they say "the recorded case". A reader may draw a new run instead, and the surface
 then says the run is no longer the recorded case.</dd>
+
+<dt>Outside validity</dt>
+<dd>A panel whose valid instant is past its forecast's declared validity window, or before
+the forecast was issued. It says so and draws nothing: there is no field to give it that
+would not be an extrapolation, and an extrapolation drawn beside five forecasts would read
+as one.</dd>
 
 <dt>Row</dt>
 <dd>The primary surface: one panel per declared horizon, in order, all visible at once. Not

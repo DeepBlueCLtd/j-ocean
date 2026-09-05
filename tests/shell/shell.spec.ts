@@ -257,7 +257,9 @@ test.describe('the shell', () => {
     await provenance.getByRole('group').or(provenance).click();
     await expect(provenance).toContainText('root-mean-square');
     await expect(provenance).toContainText('declining to resolve below');
-    await expect(provenance).toContainText('not independent evidence');
+    // Beat 009: at the default issue time no Argo has arrived, so there is nothing to caveat
+    // -- and the panel says that rather than leaving a blank space a reader cannot read.
+    await expect(provenance).toContainText('no independence caveat');
   });
 
   /**
@@ -340,9 +342,20 @@ test.describe('the shell', () => {
           }
           return total / n;
         };
-        // The south-east quarter carries the ownship track and most of the Argo profiles; the
-        // north-west corner is the unvisited one.
-        return { observed: patch(70, 30), unvisited: patch(12, 82) };
+        // Where the observations actually mattered, and where they did not, read from the
+        // rendered field rather than assumed. Beat 009 moved them: once the analysis sees
+        // only what had happened by its issue instant, the observed patch is wherever the two
+        // drops that had reported by then were, and a hard-coded corner measured nothing.
+        let brightest = { x: 0, y: 0, luminance: -1 };
+        let darkest = { x: 0, y: 0, luminance: 256 };
+        for (let y = 6; y < height - 6; y += 4) {
+          for (let x = 6; x < width - 6; x += 4) {
+            const value = luminanceAt(x, y);
+            if (value > brightest.luminance) brightest = { x, y, luminance: value };
+            if (value < darkest.luminance) darkest = { x, y, luminance: value };
+          }
+        }
+        return { observed: patch(darkest.x, darkest.y), unvisited: patch(brightest.x, brightest.y) };
       });
 
     // A declared margin, in luminance out of 255. Anything less and a monochrome print of the
@@ -548,6 +561,99 @@ test.describe('the shell', () => {
       .dispatchEvent('mouseover');
     await expect(page.getByTestId('hover-instrument')).toContainText('argo');
     await expect(page.getByTestId('hover-assimilated')).toHaveText(/yes|drawn, not assimilated/);
+  });
+
+  test('has one issue-time control, and moving it changes only when the forecast was made', async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await page.goto('/');
+    await page.getByTestId('build-row').click();
+    await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+
+    // §11's open question. Exactly one control, because the row is already the other axis and
+    // a two-dimensional control is one nobody can read.
+    await expect(page.getByTestId('issue-time')).toHaveCount(1);
+    await expect(page.getByTestId('issue-offset')).toContainText('the recorded case');
+    expect(
+      await page.getByTestId('issue-observation-instants').locator('option').count(),
+    ).toBeGreaterThan(0);
+
+    const validBefore = await page.getByTestId('panel-valid-24').getAttribute('title');
+    const issuedAt = await page.getByTestId('panel-initialised-24').getAttribute('title');
+
+    // Move it twelve hours earlier. Nothing happens to the row yet: re-integrating takes
+    // seconds, and NFR-04 says the interface does not freeze while it does.
+    const control = page.getByTestId('issue-time');
+    const step = 12 * 3_600_000;
+    const current = Number(await control.inputValue());
+    await control.fill(String(current - step));
+    await expect(page.getByTestId('issue-stale')).toBeVisible();
+    await expect(page.getByTestId('issue-offset')).toContainText('12 hours earlier');
+    await expect(page.getByTestId('panel-initialised-24')).toHaveAttribute('title', issuedAt ?? '');
+
+    await page.getByTestId('reissue').click();
+    await expect(page.getByTestId('issue-stale')).toHaveCount(0, { timeout: 120_000 });
+
+    // FR-002: the valid instant is where it was; what moved is the instant it was made and
+    // therefore the lead actually asked of the model.
+    await expect(page.getByTestId('panel-valid-24')).toHaveAttribute('title', validBefore ?? '');
+    await expect(page.getByTestId('panel-initialised-24')).not.toHaveAttribute('title', issuedAt ?? '');
+    await expect(page.getByTestId('panel-actual-lead-24')).toHaveText('+36 h');
+
+    // FR-027: the panel that has fallen outside validity says so and draws nothing.
+    await expect(page.getByTestId('panel-refusal-96')).toContainText('outside validity');
+    await expect(page.getByTestId('panel-field-96')).toHaveCount(0);
+    await expect(page.getByTestId('panel-score-96')).toContainText('no score');
+  });
+
+  test('shows the departure brief beside every forecast, and never refreshes it', async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await page.goto('/');
+    await page.getByTestId('build-row').click();
+    await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+    await page.getByTestId('score-row').click();
+    await expect(page.getByTestId('panel-score-24')).toContainText('persistence', { timeout: 60_000 });
+
+    // FR-026: persistence from the quay side, held constant, as the baseline everything else
+    // is watched against.
+    const brief = await page.getByTestId('panel-brief-24').textContent();
+    expect(brief).toMatch(/^\d+\.\d m$/);
+
+    // And it does not move when the issue time does, because it is never re-analysed.
+    const control = page.getByTestId('issue-time');
+    await control.fill(String(Number(await control.inputValue()) - 12 * 3_600_000));
+    await page.getByTestId('reissue').click();
+    await expect(page.getByTestId('issue-stale')).toHaveCount(0, { timeout: 120_000 });
+    await page.getByTestId('score-row').click();
+    await expect(page.getByTestId('panel-score-24')).toContainText('persistence', { timeout: 60_000 });
+    expect(await page.getByTestId('panel-brief-24').textContent()).toBe(brief);
+
+    // FR-008: two curves once two issue times have been scored, labelled by issue instant.
+    const curves = page.getByTestId('skill-inset').locator('[data-issue-instant]');
+    expect(await curves.count()).toBe(2);
+    // Exactly one of them is the row's current issue time; the other is the one it was.
+    expect(await page.getByTestId('skill-inset').locator('[data-current="true"]').count()).toBe(1);
+    await expect(page.getByTestId('skill-inset')).toContainText('Skill against persistence');
+
+    // FR-009: the manifest records the issue time, so a rerun is reproducible from it.
+    await expect(page.getByTestId('manifest')).toContainText('"issueInstantMs"');
+  });
+
+  test('says how many observations the analysis was allowed to see', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('build-row').click();
+    await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+
+    // FR-001, and the finding this beat opened with: an analysis may only see what had
+    // happened by the instant it was made, and the surface says how much that leaves out.
+    const available = Number(await page.getByTestId('observations-available').textContent());
+    const withheld = Number(await page.getByTestId('observations-withheld').textContent());
+    expect(available).toBeGreaterThan(0);
+    expect(withheld).toBeGreaterThan(0);
+    await expect(page.getByTestId('issue-observations')).toContainText('had not happened yet');
   });
 
   test('never shows an error figure without two references and their provenance', async ({

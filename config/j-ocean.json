@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "run": {
     "defaultSeed": "6a09e667f3bcc908",
     "recordedCaseLabel": "the recorded case"
@@ -46,6 +46,13 @@
       "firstOffsetHours": 24,
       "lastOffsetHours": 168,
       "strideHours": 12
+    },
+    "validityWindowHours": 96,
+    "quaysideOffsetHours": 0,
+    "issueTimeControl": {
+      "earliestOffsetHours": 0,
+      "latestOffsetHours": 48,
+      "resolutionHours": 1
     }
   },
   "model": {

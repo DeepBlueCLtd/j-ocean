@@ -36,7 +36,27 @@ export interface ForecastInputs {
   readonly argo: ObservationRecord;
   /** The instant the forecast is issued. Defaults to the run's start plus spin-up. */
   readonly issueInstantMs: number;
+  /**
+   * The instant the *declared horizons* are measured from, which fixes the six valid instants
+   * the row shows (beat 009, FR-002). Moving the issue time earlier does not move the panels:
+   * it makes each of them a longer forecast of the same moment, which is the whole point of
+   * having two axes. Defaults to the issue instant, so a caller that has only one axis gets
+   * the behaviour it had before.
+   */
+  readonly anchorInstantMs?: number;
   readonly seed?: string;
+}
+
+/** One panel's forecast: a field, or a statement of why there is not one (FR-005). */
+export interface HorizonForecast {
+  /** The declared horizon. It names the panel and fixes the valid instant. */
+  readonly leadHours: number;
+  readonly validInstantMs: number;
+  /** What was actually asked of the model: valid instant less issue instant. */
+  readonly leadFromIssueHours: number;
+  readonly field: Float64Array | null;
+  /** Present exactly when the field is absent. FR-027: said, never extrapolated. */
+  readonly refusal: string | null;
 }
 
 export interface ForecastResult {
@@ -49,12 +69,42 @@ export interface ForecastResult {
   readonly analysis: AnalysisRecord;
   readonly observations: readonly Observation[];
   readonly externalObservationIds: readonly string[];
-  /** One field per declared horizon, keyed by lead time in hours. */
-  readonly byHorizon: ReadonlyMap<number, Float64Array>;
+  /** One entry per declared horizon, keyed by the declared lead time in hours. */
+  readonly byHorizon: ReadonlyMap<number, HorizonForecast>;
+  readonly issueInstantMs: number;
+  readonly anchorInstantMs: number;
+  /**
+   * How many observations existed in the run and how many the analysis was allowed to see.
+   * They differ whenever the issue instant is not the end of the sampling period, and the
+   * difference is what beat 009 exists to make visible.
+   */
+  readonly observationsAvailable: number;
+  readonly observationsWithheld: number;
+}
+
+/**
+ * The analysis at an issue instant, with nothing integrated forward from it.
+ *
+ * `runForecast` is this plus the integration; the departure brief is this and nothing else
+ * (FR-026), which is why it is a function rather than a stage inside one.
+ */
+export interface IssueAnalysis {
+  readonly parameters: ReducedGravityParameters;
+  /** The concrete kernel, because the forecast adopts a state into it. */
+  readonly kernel: ReturnType<typeof createReducedGravityKernel>;
+  readonly grid: ReturnType<typeof gridFor>;
+  readonly box: { west: number; east: number; south: number; north: number };
+  readonly background: ModelState;
+  readonly analysis: AnalysisRecord;
+  readonly climatologyField: Float64Array;
+  readonly observations: readonly Observation[];
+  readonly externalObservationIds: readonly string[];
+  readonly observationsAvailable: number;
+  readonly observationsWithheld: number;
   readonly issueInstantMs: number;
 }
 
-export function runForecast(inputs: ForecastInputs): ForecastResult {
+export function analyseAtIssue(inputs: ForecastInputs): IssueAnalysis {
   const { config, domain, truth } = inputs;
   const parameters = parametersFor(config, domain);
   const grid = gridFor(config, domain);
@@ -90,8 +140,19 @@ export function runForecast(inputs: ForecastInputs): ForecastResult {
   };
   const drops = sampleXbtDrops(sampling);
   const argo = argoObservations(inputs.argo, sampling);
-  const observations = [...drops, ...argo].map((r) => r.interface);
+
+  /*
+   * Only what had happened by the issue instant (FR-001).
+   *
+   * The instruments are sampled in full first and filtered afterwards, so that every draw
+   * from every named stream happens whichever issue instant is asked for. Filtering earlier
+   * would make the noise on an observation depend on when somebody chose to issue a forecast,
+   * and two runs at different issue times would no longer be the same run seen twice.
+   */
+  const sampled = [...drops, ...argo].map((r) => r.interface);
+  const observations = sampled.filter((o) => o.instantMs <= inputs.issueInstantMs);
   const externalObservationIds = argo
+    .filter((r) => r.interface.instantMs <= inputs.issueInstantMs)
     .map((r) => r.interface)
     .filter((o) => o.flags.every((flag) => flag.usable))
     .map((o) => o.id);
@@ -114,6 +175,59 @@ export function runForecast(inputs: ForecastInputs): ForecastResult {
     report.box,
   );
 
+  return {
+    parameters,
+    kernel,
+    grid,
+    box: report.box,
+    background: state,
+    analysis,
+    climatologyField,
+    observations,
+    externalObservationIds,
+    observationsAvailable: observations.length,
+    observationsWithheld: sampled.length - observations.length,
+    issueInstantMs: inputs.issueInstantMs,
+  };
+}
+
+/**
+ * The departure brief (FR-026): the analysis at the declared quay-side instant, held
+ * constant and never refreshed.
+ *
+ * It is correct at issue and loses to the world on its own, which is exactly what a baseline
+ * is for. At the quay-side instant of the recorded case no instrument has reported yet, so
+ * the brief is the background blended with climatology and nothing else -- a generous
+ * baseline rather than a weak one, and the surface says which.
+ */
+export interface DepartureBrief {
+  readonly field: Float64Array;
+  readonly instantMs: number;
+  readonly observationsUsed: number;
+}
+
+export function departureBrief(inputs: ForecastInputs): DepartureBrief {
+  const quaysideMs =
+    Date.parse(inputs.config.truth.period.start) +
+    inputs.config.forecast.quaysideOffsetHours * 3_600_000;
+  const at = analyseAtIssue({ ...inputs, issueInstantMs: quaysideMs });
+  return {
+    field: at.analysis.field.slice(),
+    instantMs: quaysideMs,
+    observationsUsed: at.observationsAvailable,
+  };
+}
+
+export function runForecast(inputs: ForecastInputs): ForecastResult {
+  const at = analyseAtIssue(inputs);
+  const { config } = inputs;
+  const { parameters, kernel, grid, analysis } = at;
+  const state = at.background;
+  // The forecast's own stream, derived by name: it is the same stream whether or not
+  // anything else drew from the generator first, so the integration does not depend on how
+  // many observations the issue instant happened to admit.
+  const forecastStream = new SeededRng(inputs.seed ?? config.run.defaultSeed).stream('model/forecast');
+
   // The analysis is the initial condition. Integrating it forward is the forecast.
   const analysed: ModelState = kernel.adopt({
     grid,
@@ -124,12 +238,46 @@ export function runForecast(inputs: ForecastInputs): ForecastResult {
     },
   });
 
-  const byHorizon = new Map<number, Float64Array>();
+  const anchorInstantMs = inputs.anchorInstantMs ?? inputs.issueInstantMs;
+  const validityMs = config.forecast.validityWindowHours * 3_600_000;
+  const byHorizon = new Map<number, HorizonForecast>();
   const horizons = [...config.horizons.leadHours].sort((a, b) => a - b);
-  const forecastStream = rng.stream('model/forecast');
   let stepsTaken = 0;
   for (const leadHours of horizons) {
-    const target = Math.round((leadHours * 3600) / config.clock.timestepSeconds);
+    const validInstantMs = anchorInstantMs + leadHours * 3_600_000;
+    const leadMs = validInstantMs - inputs.issueInstantMs;
+    const common = {
+      leadHours,
+      validInstantMs,
+      leadFromIssueHours: leadMs / 3_600_000,
+    };
+
+    // FR-005 and FR-027: a panel outside the forecast's validity, or before it was issued,
+    // says so and gets no field. There is no field to give it that would not be an
+    // extrapolation, and an extrapolation drawn beside five forecasts would read as one.
+    if (leadMs < 0) {
+      byHorizon.set(leadHours, {
+        ...common,
+        field: null,
+        refusal:
+          `valid at ${new Date(validInstantMs).toISOString()}, which is before this forecast ` +
+          `was issued at ${new Date(inputs.issueInstantMs).toISOString()}`,
+      });
+      continue;
+    }
+    if (leadMs > validityMs) {
+      byHorizon.set(leadHours, {
+        ...common,
+        field: null,
+        refusal:
+          `outside validity: issued ${new Date(inputs.issueInstantMs).toISOString()}, valid to ` +
+          `${new Date(inputs.issueInstantMs + validityMs).toISOString()}, and this panel is ` +
+          `valid at ${new Date(validInstantMs).toISOString()}`,
+      });
+      continue;
+    }
+
+    const target = Math.round(leadMs / 1000 / config.clock.timestepSeconds);
     while (stepsTaken < target) {
       kernel.step(analysed, {
         step: stepsTaken,
@@ -139,19 +287,26 @@ export function runForecast(inputs: ForecastInputs): ForecastResult {
       });
       stepsTaken += 1;
     }
-    byHorizon.set(leadHours, (analysed.fields[THICKNESS] as Float64Array).slice());
+    byHorizon.set(leadHours, {
+      ...common,
+      field: (analysed.fields[THICKNESS] as Float64Array).slice(),
+      refusal: null,
+    });
   }
 
   return {
     parameters,
     kernel,
-    box: report.box,
+    box: at.box,
     initial: analysis.field.slice(),
-    climatologyField,
+    climatologyField: at.climatologyField,
     analysis,
-    observations,
-    externalObservationIds,
+    observations: at.observations,
+    externalObservationIds: at.externalObservationIds,
     byHorizon,
     issueInstantMs: inputs.issueInstantMs,
+    anchorInstantMs,
+    observationsAvailable: at.observationsAvailable,
+    observationsWithheld: at.observationsWithheld,
   };
 }

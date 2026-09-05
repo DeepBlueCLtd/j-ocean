@@ -90,6 +90,26 @@ test('the observation footprint', async ({ page }) => {
   await page.getByTestId('panel-24').screenshot({ path: `${IMAGES}008-profile-comparison.png` });
 });
 
+test('the two axes', async ({ page }) => {
+  test.setTimeout(180_000);
+  await page.setViewportSize({ width: REFERENCE_WIDTH, height: 1100 });
+  await page.goto('/');
+  await page.getByTestId('build-row').click();
+  await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId('score-row').click();
+  await expect(page.getByTestId('panel-score-24')).toContainText('persistence', { timeout: 60_000 });
+  await page.getByTestId('horizon-row-panel').screenshot({ path: `${IMAGES}009-issued-at-default.png` });
+
+  const control = page.getByTestId('issue-time');
+  await control.fill(String(Number(await control.inputValue()) - 12 * 3_600_000));
+  await page.getByTestId('reissue').click();
+  await expect(page.getByTestId('issue-stale')).toHaveCount(0, { timeout: 120_000 });
+  await page.getByTestId('score-row').click();
+  await expect(page.getByTestId('panel-score-24')).toContainText('persistence', { timeout: 60_000 });
+  await page.getByTestId('horizon-row-panel').screenshot({ path: `${IMAGES}009-issued-earlier.png` });
+  await page.getByTestId('skill-inset').screenshot({ path: `${IMAGES}009-skill-inset.png` });
+});
+
 test('what the forecast was worth', async ({ page }) => {
   await page.goto('/');
   await page.getByTestId('score-run').click();

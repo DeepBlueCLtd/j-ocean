@@ -43,7 +43,7 @@ describe('AT-02: the recorded case, scored across the row', () => {
         config,
         domain,
         truth,
-        forecast: result.byHorizon.get(leadHours) as Float64Array,
+        forecast: result.byHorizon.get(leadHours)?.field as Float64Array,
         initial: result.initial,
         climatology: result.climatologyField,
         truthAtValidInstant: interfaceFieldFromTruth(

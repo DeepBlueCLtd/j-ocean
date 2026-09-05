@@ -100,7 +100,7 @@ const domainSchema = z
 
 export const configurationSchema = z
   .object({
-    schemaVersion: z.literal(4),
+    schemaVersion: z.literal(5),
 
     run: z.object({
       /**
@@ -208,6 +208,24 @@ export const configurationSchema = z
         firstOffsetHours: z.number().nonnegative(),
         lastOffsetHours: z.number().positive(),
         strideHours: z.number().positive(),
+      }),
+      /**
+       * Beat 009, FR-027 and FR-006. How far past its issue instant a forecast claims to be
+       * valid. A panel whose valid instant is beyond it says so and draws nothing: there is no
+       * field to give it that would not be an extrapolation, and an extrapolation drawn beside
+       * five forecasts would read as one.
+       */
+      validityWindowHours: z.number().positive(),
+      /**
+       * The quay-side instant, as an offset from the run's start. The departure brief is the
+       * analysis at this instant, held constant and never refreshed (FR-026).
+       */
+      quaysideOffsetHours: z.number().nonnegative(),
+      /** The range and step of the issue-time control (§11): one control, declared bounds. */
+      issueTimeControl: z.object({
+        earliestOffsetHours: z.number().nonnegative(),
+        latestOffsetHours: z.number().positive(),
+        resolutionHours: z.number().positive(),
       }),
     }),
 
@@ -368,6 +386,28 @@ export const configurationSchema = z
    * seventh horizon declared without widening the reference width is refused, instead of
    * quietly becoming a row that scrolls.
    */
+  /**
+   * Beat 009. The default issue time must be one the control can reach and the validity
+   * window must cover the declared horizons from it, or the recorded case would open with a
+   * panel refusing itself.
+   */
+  .refine(
+    (c) =>
+      c.forecast.issueTimeControl.earliestOffsetHours <= c.forecast.spinUpHours &&
+      c.forecast.spinUpHours <= c.forecast.issueTimeControl.latestOffsetHours,
+    {
+      error: 'forecast.spinUpHours (the default issue time) is outside forecast.issueTimeControl',
+      path: ['forecast', 'issueTimeControl'],
+    },
+  )
+  .refine((c) => c.forecast.validityWindowHours >= Math.max(...c.horizons.leadHours), {
+    error: 'forecast.validityWindowHours is shorter than the longest declared horizon',
+    path: ['forecast', 'validityWindowHours'],
+  })
+  .refine((c) => c.forecast.quaysideOffsetHours <= c.forecast.spinUpHours, {
+    error: 'forecast.quaysideOffsetHours must not be after the default issue time',
+    path: ['forecast', 'quaysideOffsetHours'],
+  })
   .refine(
     (c) =>
       c.presentation.referenceViewportWidthPx - c.presentation.pageGutterPx >=

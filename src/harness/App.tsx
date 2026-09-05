@@ -8,7 +8,7 @@ import { loadClimatology, loadObservations, loadTruth } from './artefacts.js';
 import { FieldView, type Marker } from './FieldView.js';
 import { footprintOf, markersFrom, type Footprint } from './footprint.js';
 import { HorizonRow } from './HorizonRow.js';
-import { runForecast, type ForecastResult } from '../run/forecast.js';
+import { departureBrief, runForecast, type DepartureBrief, type ForecastResult } from '../run/forecast.js';
 import { climatologyReferenceOver } from '../instruments/climatology-reference.js';
 import { interfaceFieldFromContainer, interfaceFieldFromTruth } from '../instruments/interface-field.js';
 import {
@@ -83,6 +83,10 @@ interface RunView {
   readonly scoringLeadHours: number;
   /** The row's forecasts. Computed on demand: it costs a couple of seconds (NFR-04). */
   readonly forecast: ForecastResult | null;
+  /** FR-026: the frozen quay-side analysis. Computed once and never refreshed. */
+  readonly brief: DepartureBrief | null;
+  /** Where the issue-time control is, which is not where the shown forecast was issued. */
+  readonly pendingIssueInstantMs: number | null;
   /** FR-18: the breakdown is an instrument of a *selected* cell, never a per-panel summary. */
   readonly selectedCell: number | null;
   readonly box: { readonly west: number; readonly east: number; readonly south: number; readonly north: number };
@@ -260,6 +264,8 @@ export function App() {
         score: null,
         scoringLeadHours: 24,
         forecast: null,
+        brief: null,
+        pendingIssueInstantMs: null,
         selectedCell: null,
         box: report.box,
       };
@@ -376,22 +382,35 @@ export function App() {
    * when a reader asks rather than on load -- NFR-04 says the integration does not block the
    * interface, and the honest way to obey that is not to start it unbidden.
    */
-  const buildRow = useCallback(() => {
-    if (loaded === null || record === null || view === null) return;
-    const domain = loaded.config.domains.list.find((d) => d.id === record.domainId);
-    if (domain === undefined) return;
-    const forecast = runForecast({
-      config: loaded.config,
-      domain,
-      truth: record.truth,
-      climatology: record.climatology,
-      argo: record.observations,
-      issueInstantMs:
-        Date.parse(loaded.config.truth.period.start) + loaded.config.forecast.spinUpHours * 3_600_000,
-      ...(view.recordedCase ? {} : { seed: view.run.rng.rootSeed }),
-    });
-    setView({ ...view, forecast });
-  }, [loaded, record, view]);
+  const buildRow = useCallback(
+    (issueInstantMs?: number) => {
+      if (loaded === null || record === null || view === null) return;
+      const domain = loaded.config.domains.list.find((d) => d.id === record.domainId);
+      if (domain === undefined) return;
+      const startMs = Date.parse(loaded.config.truth.period.start);
+      const defaultIssueInstantMs = startMs + loaded.config.forecast.spinUpHours * 3_600_000;
+      const inputs = {
+        config: loaded.config,
+        domain,
+        truth: record.truth,
+        climatology: record.climatology,
+        argo: record.observations,
+        issueInstantMs: issueInstantMs ?? defaultIssueInstantMs,
+        // The declared horizons are measured from the *default* issue instant, so moving the
+        // control leaves every panel valid at the same moment it was (FR-002).
+        anchorInstantMs: defaultIssueInstantMs,
+        ...(view.recordedCase ? {} : { seed: view.run.rng.rootSeed }),
+      };
+      const forecast = runForecast(inputs);
+      // FR-009: the manifest records which issue time produced the fields it describes.
+      view.run.reissue(forecast.issueInstantMs);
+      // FR-026: computed once and held. It is never refreshed, and the identity assertion in
+      // the test is on this object.
+      const brief = view.brief ?? departureBrief(inputs);
+      setView({ ...view, forecast, brief, pendingIssueInstantMs: forecast.issueInstantMs });
+    },
+    [loaded, record, view],
+  );
 
   const newRun = useCallback(() => {
     // Exemption (b): entropy is drawn here, once, before the run exists.
@@ -649,7 +668,7 @@ export function App() {
                 them means integrating the analysis forward four days, which takes a couple of
                 seconds &mdash; so it happens when you ask.
               </p>
-              <button type="button" onClick={buildRow} data-testid="build-row">
+              <button type="button" onClick={() => { buildRow(); }} data-testid="build-row">
                 Build the horizon row
               </button>
             </section>
@@ -664,6 +683,22 @@ export function App() {
               truth={record?.truth as never}
               climatology={record?.climatology as never}
               footprint={footprintFor(loaded.config, view, view.forecast.issueInstantMs)}
+              brief={view.brief as DepartureBrief}
+              issueInstantMs={view.forecast.issueInstantMs}
+              defaultIssueInstantMs={
+                Date.parse(loaded.config.truth.period.start) +
+                loaded.config.forecast.spinUpHours * 3_600_000
+              }
+              pendingIssueInstantMs={view.pendingIssueInstantMs ?? view.forecast.issueInstantMs}
+              onPendingIssueInstantChange={(instantMs) => {
+                setView((current) =>
+                  current === null ? current : { ...current, pendingIssueInstantMs: instantMs },
+                );
+              }}
+              onReissue={() => {
+                buildRow(view.pendingIssueInstantMs ?? view.forecast?.issueInstantMs);
+              }}
+              reissuing={false}
               onSelectCell={(cellIndex) => {
                 setView((current) => (current === null ? current : { ...current, selectedCell: cellIndex }));
               }}

@@ -33,6 +33,9 @@ lives here, and no component in the tree holds a literal for one.
 | `presentation.attributionHatchThreshold` | The weight above which a cell is hatched rather than merely tinted — the second channel that makes the layer readable without colour. |
 | `presentation.footprint.colocationToleranceDegrees` | Two profiles this close are the same place as far as the drawing is concerned, and are offset so both are visible. |
 | `presentation.footprint.needleOffsetPx`, `elevationHeightPx` | The offset applied to co-located needles, and the height of the enlarged panel's depth elevation. |
+| `forecast.validityWindowHours` | How far past its issue instant a forecast claims to be valid. A panel beyond it says so and draws nothing. |
+| `forecast.quaysideOffsetHours` | The departure brief's instant: the analysis there, held constant and never refreshed. |
+| `forecast.issueTimeControl` | The range and step of the one issue-time control. The schema refuses a default issue time it cannot reach. |
 | `presentation.footprint.levelTickLimit` | Above this many levels a needle draws its ticks only while hovered. An Argo profile carries five hundred; drawn always they are a solid bar. |
 | `domains.list[]` | Extents in degrees, and a declared `character` of `eventful` or `bland`. |
 
@@ -56,6 +59,7 @@ Everything needed to rebuild a run, and none of its state.
 | `clock` | The epoch and timestep the run used. |
 | `configDigest` | The digest above. A mismatch is refused, naming both digests. |
 | `steps` | How far the run had got. |
+| `issueInstantMs` | The instant the shore forecast was issued. A reader's choice rather than a property of the integration, so a manifest that did not record it could not rebuild the fields it describes. |
 | `recordedCase` | False once a reader has asked for a new run. |
 | `counterfactual` | The reader's edits. Empty until the counterfactuals beat; present from the first beat so the shape never changes. |
 
@@ -388,6 +392,22 @@ One module, `field-surface.ts`, owns every palette and shader. It reports the su
 — `webgl2` where the browser has it, `canvas2d` where it does not — on the canvas itself, and
 both paths are exercised by tests: headless Chromium here has WebGL2, so a test refuses it in
 an init script to make the fallback actually run.
+
+## The forecast, on two axes
+
+`runForecast` produces one entry per declared horizon. The declared horizons are measured from
+the **default** issue instant, so moving the issue time leaves every panel valid at the same
+moment and makes each of them a longer forecast of it.
+
+| Field | Meaning |
+|---|---|
+| `HorizonForecast.leadHours` | The declared horizon. It names the panel and fixes the valid instant. |
+| `HorizonForecast.leadFromIssueHours` | What was actually asked of the model: the valid instant less the issue instant. The two differ the moment issue time moves, and conflating them is the confusion the second axis exists to remove. |
+| `HorizonForecast.field` | Absent where the panel is outside validity or before its issue instant. |
+| `HorizonForecast.refusal` | Present exactly when the field is absent, and says which of the two it is. |
+| `ForecastResult.observationsAvailable` | How many observations the analysis was allowed to see: those with instants **at or before** the issue instant. |
+| `ForecastResult.observationsWithheld` | How many had not happened yet. Until beat 009 this was zero because the analysis was handed all of them, which is the correction that beat records. |
+| `DepartureBrief` | The analysis at the declared quay-side instant, held constant and never refreshed (FR-026). At the quay side of the recorded case nothing has reported, so it is background blended with climatology — a generous baseline, not a straw man. |
 
 ## The observation footprint
 

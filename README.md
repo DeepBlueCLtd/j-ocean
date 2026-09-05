@@ -21,13 +21,16 @@ streams, the run manifest and its byte-identical replay, the committed HYCOM and
 records with the drift gate over them, the one-and-a-half layer reduced-gravity model, the
 simulated instruments that are the only way truth reaches it, optimal interpolation with the
 attribution that is its own gain, skill against two references with provenance on every
-figure, the horizon row that is the primary surface, and the observation footprint drawn over it.
+figure, the horizon row that is the primary surface, the observation footprint drawn over it, and the
+shore forecast on two axes.
 **All seven gates now run**, each watched failing against a planted violation.
 
-Two things the tree reports rather than hides: the model is **worse than climatology at
-every horizon**, for a reason beat 006's note traces to two declared numbers that disagree;
-and the attribution the row draws is **one analysis shown on six panels**, until beat 009
-cycles the forecast. Beat 009, the shore forecast, is next.
+Three things the tree reports rather than hides. Beat 009 found that the analysis had been
+reading observations from **after** its own issue instant, so three beats of skill figures
+were optimistic; corrected, the model is roughly no better than persistence. It is **worse
+than climatology at every horizon**, for a reason beat 006's note traces to two declared
+numbers that disagree. And the attribution the row draws is **one analysis shown on six
+panels** until the forecast cycles. Beat 010, the counterfactuals, is next.
 
 ## Running it
 

@@ -8,7 +8,7 @@ const raw = (): Record<string, unknown> => JSON.parse(readFileSync(CONFIG_PATH, 
 describe('the configuration loader', () => {
   it('loads the declared configuration and digests it', () => {
     const { config, digest } = declaredConfiguration();
-    expect(config.schemaVersion).toBe(4);
+    expect(config.schemaVersion).toBe(5);
     expect(config.grid.nx).toBe(100);
     expect(config.grid.ny).toBe(100);
     expect(digest).toMatch(/^[0-9a-f]{64}$/);
@@ -92,11 +92,29 @@ describe('the configuration loader', () => {
     });
 
     it('rejects a first issue time inside spin-up', () => {
+      const current = raw()['forecast'] as Record<string, unknown>;
+      const broken = { ...raw(), forecast: { ...current, spinUpHours: 48 } };
+      expect(() => validateConfiguration(broken)).toThrow(/at or after the end of spin-up/);
+    });
+
+    it('rejects a validity window shorter than the longest declared horizon', () => {
+      // Otherwise the recorded case opens with a panel refusing itself, which is a
+      // configuration mistake dressed up as a considered refusal.
+      const current = raw()['forecast'] as Record<string, unknown>;
+      const broken = { ...raw(), forecast: { ...current, validityWindowHours: 48 } };
+      expect(() => validateConfiguration(broken)).toThrow(/shorter than the longest declared horizon/);
+    });
+
+    it('rejects a default issue time the issue-time control cannot reach', () => {
+      const current = raw()['forecast'] as Record<string, unknown>;
       const broken = {
         ...raw(),
-        forecast: { spinUpHours: 48, issueTimes: { firstOffsetHours: 24, lastOffsetHours: 168, strideHours: 12 } },
+        forecast: {
+          ...current,
+          issueTimeControl: { earliestOffsetHours: 30, latestOffsetHours: 48, resolutionHours: 1 },
+        },
       };
-      expect(() => validateConfiguration(broken)).toThrow(/at or after the end of spin-up/);
+      expect(() => validateConfiguration(broken)).toThrow(/outside forecast.issueTimeControl/);
     });
 
     it('rejects a clock epoch that is not the start of the truth period', () => {
@@ -136,6 +154,6 @@ describe('the configuration loader', () => {
   });
 
   it('rejects a schema version it does not know', () => {
-    expect(() => validateConfiguration({ ...raw(), schemaVersion: 5 })).toThrow(/schemaVersion/);
+    expect(() => validateConfiguration({ ...raw(), schemaVersion: 6 })).toThrow(/schemaVersion/);
   });
 });

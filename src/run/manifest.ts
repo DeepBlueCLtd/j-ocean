@@ -13,7 +13,7 @@ import type { ClockConfiguration } from '../ports/clock.js';
  * anything, since a snapshot compared with itself proves nothing.
  */
 
-export const MANIFEST_FORMAT_VERSION = 1;
+export const MANIFEST_FORMAT_VERSION = 2;
 
 export interface RunManifest {
   readonly formatVersion: number;
@@ -28,6 +28,13 @@ export interface RunManifest {
   readonly configDigest: string;
   /** How many steps the run had taken when the manifest was exported. */
   readonly steps: number;
+  /**
+   * The instant the shore forecast was issued (beat 009, FR-009). It is a field of the
+   * manifest and not of the configuration because it is a *reader's* choice: the row can be
+   * re-issued, and a manifest that did not record which issue time produced the fields it
+   * describes could not rebuild them.
+   */
+  readonly issueInstantMs: number;
   /** FR-012: false once a reader has asked for a new run. */
   readonly recordedCase: boolean;
   /**
@@ -67,7 +74,7 @@ export function parseManifest(text: string): RunManifest {
 
   const required = [
     'formatVersion', 'generatorVersion', 'kernelId', 'rootSeed', 'derivedSeeds',
-    'clock', 'configDigest', 'steps', 'recordedCase', 'counterfactual',
+    'clock', 'configDigest', 'steps', 'issueInstantMs', 'recordedCase', 'counterfactual',
   ] as const;
   const missing = required.filter((key) => !(key in value));
   if (missing.length > 0) {

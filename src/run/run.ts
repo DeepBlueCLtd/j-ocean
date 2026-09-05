@@ -46,6 +46,12 @@ export interface CreateRunOptions {
   /** False once a reader has asked for a new run (FR-012, FR-013). */
   readonly recordedCase?: boolean;
   /**
+   * The instant the shore forecast is issued (beat 009). Defaults to the declared spin-up,
+   * which is the recorded case's issue time; a reader who moves the control creates a run
+   * whose manifest records where they moved it to.
+   */
+  readonly issueInstantMs?: number;
+  /**
    * A state built elsewhere -- from the truth record, through the truth-source port. When it
    * is absent the kernel builds one from its own stream, which is what the contract and
    * replay tests exercise.
@@ -68,6 +74,12 @@ export class Run {
   readonly state: ModelState;
   readonly configDigest: string;
   readonly recordedCase: boolean;
+  /**
+   * Beat 009. A reader's choice rather than a property of the integration: moving it changes
+   * which analysis the row is built from and nothing about the run's own trajectory, which is
+   * why it can be set after construction and why the manifest has to record it.
+   */
+  issueInstantMs: number;
   readonly domainId: string;
   /** FR-003: the computed stability limit beside the declared timestep. */
   readonly stability: StabilityAssessment;
@@ -80,6 +92,9 @@ export class Run {
     const { config, configDigest } = options;
     this.configDigest = configDigest;
     this.recordedCase = options.recordedCase ?? true;
+    this.issueInstantMs =
+      options.issueInstantMs ??
+      Date.parse(options.config.truth.period.start) + options.config.forecast.spinUpHours * 3_600_000;
     this.rng = new SeededRng(options.seed ?? config.run.defaultSeed);
     this.domainId = options.domainId ?? config.domains.defaultId;
     const domain = config.domains.list.find((candidate) => candidate.id === this.domainId);
@@ -132,6 +147,11 @@ export class Run {
     }
   }
 
+  /** Record a new issue instant. It changes no state; it changes what the manifest says. */
+  reissue(instantMs: number): void {
+    this.issueInstantMs = instantMs;
+  }
+
   /** Everything needed to rebuild this run, and nothing of its state (FR-005). */
   exportManifest(): RunManifest {
     return {
@@ -143,6 +163,7 @@ export class Run {
       clock: this.#clockConfig,
       configDigest: this.configDigest,
       steps: this.steps,
+      issueInstantMs: this.issueInstantMs,
       recordedCase: this.recordedCase,
       counterfactual: null,
     };
@@ -204,6 +225,7 @@ export function createRunFromManifest(
     seed: manifest.rootSeed,
     kernel,
     recordedCase: manifest.recordedCase,
+    issueInstantMs: manifest.issueInstantMs,
   });
   if (options.replay !== false) run.advance(manifest.steps);
   return run;
