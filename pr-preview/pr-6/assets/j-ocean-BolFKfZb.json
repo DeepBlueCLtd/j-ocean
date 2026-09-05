@@ -1,0 +1,250 @@
+{
+  "schemaVersion": 2,
+  "run": {
+    "defaultSeed": "6a09e667f3bcc908",
+    "recordedCaseLabel": "the recorded case"
+  },
+  "clock": {
+    "epoch": "2013-09-01T00:00:00Z",
+    "timestepSeconds": 240,
+    "stabilityCriterionCfl": 0.5
+  },
+  "grid": {
+    "nx": 100,
+    "ny": 100
+  },
+  "horizons": {
+    "leadHours": [
+      0,
+      12,
+      24,
+      48,
+      72,
+      96
+    ]
+  },
+  "budget": {
+    "frameBudgetMs": 33
+  },
+  "forecast": {
+    "spinUpHours": 24,
+    "issueTimes": {
+      "firstOffsetHours": 24,
+      "lastOffsetHours": 168,
+      "strideHours": 12
+    }
+  },
+  "model": {
+    "kernelId": "reduced-gravity/1",
+    "precision": "float64",
+    "reducedGravityMetresPerSecondSquared": 0.02,
+    "meanUpperLayerThicknessMetres": 500,
+    "minimumLayerThicknessMetres": 50,
+    "lateralViscosityMetresSquaredPerSecond": 200,
+    "bottomDragPerSecond": 1e-07,
+    "robertAsselinCoefficient": 0.05,
+    "sponge": {
+      "widthCells": 6,
+      "timescaleSeconds": 43200
+    },
+    "chunkSteps": 72,
+    "thermalStructure": {
+      "upperTemperatureDegC": 26,
+      "deepTemperatureDegC": 8,
+      "transitionThicknessMetres": 80,
+      "displayLevelsMetres": [
+        0,
+        25,
+        50,
+        75,
+        100,
+        150,
+        200,
+        300,
+        400,
+        500,
+        600,
+        700
+      ]
+    },
+    "tolerances": {
+      "volumeRelativeDrift": 0.05,
+      "energyRelativeDrift": 0.5,
+      "varianceBandOfInitial": [
+        0.1,
+        3
+      ],
+      "kernelAcceptanceRelative": 1e-05,
+      "closedBoundaryVolumeRelativeDrift": 1e-12
+    }
+  },
+  "instruments": {
+    "qualityControl": {
+      "enabled": true,
+      "grossRange": {
+        "minimumDegC": -2.5,
+        "maximumDegC": 36.0
+      },
+      "climatologyDepartureStandardDeviations": 5,
+      "verticalInversionToleranceDegC": 0.6
+    },
+    "argo": {
+      "assimilate": true,
+      "note": "ADR-0007: the truth record assimilated these profiles, so skill measured against it while assimilating them is not independent evidence. Every score says so."
+    },
+    "surface": {
+      "id": "ownship-surface-thermometer",
+      "variable": "water_temperature",
+      "noiseStandardDeviationDegC": 0.05,
+      "representativenessStandardDeviationDegC": 0.15,
+      "biasDegC": 0
+    },
+    "xbt": {
+      "id": "ownship-xbt",
+      "variable": "water_temperature",
+      "depthsMetres": [
+        0,
+        25,
+        50,
+        75,
+        100,
+        150,
+        200,
+        300,
+        400,
+        500,
+        600,
+        650
+      ],
+      "noiseStandardDeviationDegC": 0.1,
+      "representativenessStandardDeviationDegC": 0.2,
+      "depthErrorFraction": 0.02,
+      "biasDegC": 0
+    },
+    "track": {
+      "sampleIntervalHours": 3,
+      "waypoints": [
+        {
+          "lonDeg": -74.5,
+          "latDeg": 34.4,
+          "offsetHours": 0
+        },
+        {
+          "lonDeg": -73.0,
+          "latDeg": 35.8,
+          "offsetHours": 24
+        },
+        {
+          "lonDeg": -71.6,
+          "latDeg": 37.2,
+          "offsetHours": 48
+        },
+        {
+          "lonDeg": -70.4,
+          "latDeg": 38.6,
+          "offsetHours": 72
+        }
+      ]
+    },
+    "drops": [
+      {
+        "lonDeg": -74.2,
+        "latDeg": 34.7,
+        "offsetHours": 6
+      },
+      {
+        "lonDeg": -73.4,
+        "latDeg": 35.4,
+        "offsetHours": 18
+      },
+      {
+        "lonDeg": -72.6,
+        "latDeg": 36.2,
+        "offsetHours": 30
+      },
+      {
+        "lonDeg": -71.9,
+        "latDeg": 36.9,
+        "offsetHours": 42
+      },
+      {
+        "lonDeg": -71.2,
+        "latDeg": 37.6,
+        "offsetHours": 54
+      },
+      {
+        "lonDeg": -70.6,
+        "latDeg": 38.3,
+        "offsetHours": 66
+      }
+    ]
+  },
+  "domains": {
+    "defaultId": "gulf-stream-front",
+    "list": [
+      {
+        "id": "gulf-stream-front",
+        "label": "Gulf Stream front",
+        "west": -75,
+        "east": -70,
+        "south": 34,
+        "north": 39,
+        "character": "eventful",
+        "nativeResolutionDegrees": 0.08,
+        "truthToModelResolutionRatio": 1.6
+      },
+      {
+        "id": "open-gyre",
+        "label": "Open gyre",
+        "west": -45,
+        "east": -40,
+        "south": 25,
+        "north": 30,
+        "character": "bland",
+        "nativeResolutionDegrees": 0.08,
+        "truthToModelResolutionRatio": 1.6
+      }
+    ]
+  },
+  "truth": {
+    "source": {
+      "id": "hycom-glbv0.08-expt_53.X",
+      "label": "HYCOM GOFS 3.1 GLBv0.08 expt_53.X reanalysis",
+      "service": "ncss",
+      "baseUrl": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data",
+      "nativeResolutionDegrees": 0.08
+    },
+    "period": {
+      "start": "2013-09-01T00:00:00Z",
+      "end": "2013-09-15T00:00:00Z",
+      "strideHours": 6,
+      "maxInstantGapHours": 12
+    },
+    "depthLevelsMetres": [
+      0,
+      50,
+      100,
+      200,
+      400,
+      700
+    ],
+    "contrast": {
+      "minimumEventfulToBlandVarianceRatio": 4
+    }
+  },
+  "climatology": {
+    "window": {
+      "start": "2013-08-01T00:00:00Z",
+      "end": "2013-09-30T00:00:00Z",
+      "strideHours": 48
+    }
+  },
+  "observations": {
+    "source": {
+      "id": "argo-core-ifremer",
+      "label": "Argo core profiles, Ifremer mirror",
+      "indexUrl": "https://data-argo.ifremer.fr/ar_index_global_prof.txt.gz",
+      "profileBaseUrl": "https://data-argo.ifremer.fr/dac"
+    }
+  }
+}
