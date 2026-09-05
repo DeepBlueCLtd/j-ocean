@@ -8,7 +8,7 @@ const raw = (): Record<string, unknown> => JSON.parse(readFileSync(CONFIG_PATH, 
 describe('the configuration loader', () => {
   it('loads the declared configuration and digests it', () => {
     const { config, digest } = declaredConfiguration();
-    expect(config.schemaVersion).toBe(5);
+    expect(config.schemaVersion).toBe(6);
     expect(config.grid.nx).toBe(100);
     expect(config.grid.ny).toBe(100);
     expect(digest).toMatch(/^[0-9a-f]{64}$/);
@@ -154,6 +154,6 @@ describe('the configuration loader', () => {
   });
 
   it('rejects a schema version it does not know', () => {
-    expect(() => validateConfiguration({ ...raw(), schemaVersion: 6 })).toThrow(/schemaVersion/);
+    expect(() => validateConfiguration({ ...raw(), schemaVersion: 7 })).toThrow(/schemaVersion/);
   });
 });

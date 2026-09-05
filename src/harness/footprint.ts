@@ -59,6 +59,11 @@ export interface FootprintMark {
   readonly afterInitialisation: boolean;
   /** Inside the sponge margin, which scoring excludes and the analysis does not. */
   readonly insideMargin: boolean;
+  /**
+   * Withheld from the analysis by the reader. Drawn in a withheld style and never omitted:
+   * what a reader withheld is part of what the reader did (FR-006).
+   */
+  readonly withheld: boolean;
 }
 
 export interface TrackMark extends FootprintMark {
@@ -110,6 +115,8 @@ export interface FootprintInput {
   readonly colocationToleranceDegrees: number;
   readonly qualityControlEnabled: boolean;
   readonly assimilateArgo: boolean;
+  /** FR-006 of beat 010: withheld by the reader, and still drawn. */
+  readonly withheldIds?: readonly string[];
 }
 
 const flaggedAnywhere = (observation: Observation): boolean =>
@@ -142,6 +149,9 @@ export function footprintOf(input: FootprintInput): Footprint {
       flagged: flaggedAnywhere(observation),
       afterInitialisation: observation.instantMs > input.initialisedFromMs,
       insideMargin: inMargin(x, y),
+      withheld: (input.withheldIds ?? []).some(
+        (id) => id === observation.id || id === `${observation.id}/interface`,
+      ),
     };
   };
 
@@ -239,6 +249,7 @@ export function markersFrom(footprint: Footprint): Marker[] {
       flagged: mark.flagged,
       intensity: span === 0 ? 0.5 : (mark.value - low) / span,
       afterInitialisation: mark.afterInitialisation,
+      withheld: mark.withheld,
     })),
     ...footprint.needles.map((needle) => ({
       id: needle.id,
@@ -249,6 +260,7 @@ export function markersFrom(footprint: Footprint): Marker[] {
       depthFraction: Math.min(1, needle.deepestMetres / footprint.volumeFloorMetres),
       afterInitialisation: needle.afterInitialisation,
       continuesBelow: needle.continuesBelow,
+      withheld: needle.withheld,
     })),
   ];
 }

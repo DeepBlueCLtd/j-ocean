@@ -12,6 +12,8 @@ import { profileFromInterfaceDepth } from '../model/profile.js';
 import type { Footprint } from './footprint.js';
 import { markersFrom, marksOf, trackValueRange } from './footprint.js';
 import { SkillInset, type SkillCurve } from './SkillInset.js';
+import { Counterfactuals } from './Counterfactuals.js';
+import type { Edit } from '../instruments/edits.js';
 import type { DepartureBrief } from '../run/forecast.js';
 
 /**
@@ -46,6 +48,10 @@ export interface HorizonRowProps {
   readonly onPendingIssueInstantChange: (instantMs: number) => void;
   readonly onReissue: () => void;
   readonly reissuing: boolean;
+  /** Beat 010: the reader's edits, the run without them, and how to change them. */
+  readonly edits: readonly Edit[];
+  readonly baseline: ForecastResult;
+  readonly onApplyEdits: (edits: readonly Edit[]) => void;
   readonly onSelectCell: (cellIndex: number) => void;
 }
 
@@ -65,6 +71,7 @@ export function HorizonRow(props: HorizonRowProps) {
 
   const [enlarged, setEnlarged] = useState<number | null>(null);
   const [showAttribution, setShowAttribution] = useState(false);
+  const [showDifference, setShowDifference] = useState(false);
   const [scores, setScores] = useState<ReadonlyMap<number, Score | null> | null>(null);
   const [briefScores, setBriefScores] = useState<ReadonlyMap<number, Score | null> | null>(null);
   const [scoringFailure, setScoringFailure] = useState<string | null>(null);
@@ -101,6 +108,39 @@ export function HorizonRow(props: HorizonRowProps) {
     }
     return out;
   }, [forecast, horizons]);
+
+  /**
+   * Edited minus recorded, per horizon (FR-005 of this beat, FR-029).
+   *
+   * Both fields come from runs at the same issue instant, so what the difference shows is the
+   * edit and nothing else. With no edits the two runs are the same object and every
+   * difference is exactly zero, which is worth being able to see.
+   */
+  const differences = useMemo(() => {
+    const out = new Map<number, Float64Array>();
+    for (const leadHours of horizons) {
+      const edited = forecast.byHorizon.get(leadHours)?.field;
+      const before = props.baseline.byHorizon.get(leadHours)?.field;
+      if (edited == null || before == null) continue;
+      const difference = new Float64Array(edited.length);
+      for (let i = 0; i < edited.length; i += 1) {
+        difference[i] = (edited[i] as number) - (before[i] as number);
+      }
+      out.set(leadHours, difference);
+    }
+    return out;
+  }, [forecast, props.baseline, horizons]);
+
+  /** The magnitude of that difference, which is what the outline is a threshold on. */
+  const differenceMagnitudes = useMemo(() => {
+    const out = new Map<number, Float64Array>();
+    for (const [leadHours, difference] of differences) {
+      const magnitude = new Float64Array(difference.length);
+      for (let i = 0; i < difference.length; i += 1) magnitude[i] = Math.abs(difference[i] as number);
+      out.set(leadHours, magnitude);
+    }
+    return out;
+  }, [differences]);
 
   /**
    * Which cells the observations lead in. This is read from the analysis's own attribution
@@ -189,9 +229,11 @@ export function HorizonRow(props: HorizonRowProps) {
   }, [config, domain, forecast, truth, climatology, horizons, props.brief]);
 
   useEffect(() => {
+    // The scores belong to the forecast that has just been replaced, so they go. The
+    // *enlargement* does not: it is display state, and a recomputation collapsing the panel a
+    // reader was looking at is the converse of the mistake FR-014 forbids.
     setScores(null);
     setBriefScores(null);
-    setEnlarged(null);
   }, [forecast]);
 
   const issued = new Date(forecast.issueInstantMs).toISOString();
@@ -208,6 +250,117 @@ export function HorizonRow(props: HorizonRowProps) {
   // one panel and something else on another, because there is one list.
   const markers = useMemo(() => markersFrom(props.footprint), [props.footprint]);
   const trackRange = trackValueRange(props.footprint);
+
+  /**
+   * A mark's own counterfactuals (FR-006, FR-003).
+   *
+   * Only the enlarged panel offers them, because an edit is a deliberate act and a row of six
+   * small panels is not where one should be a click away. The withhold applies to the
+   * *interface* observation, which is what the analysis consumes; the profile edit applies to
+   * the profile, which is what the operator reads.
+   */
+  /**
+   * Redrawing the track (FR-008, FR-033).
+   *
+   * The waypoints are drawn on the enlarged panel and dragged there; the edit is applied on
+   * release. What the reader is asking is "would that have been a better place to have
+   * sailed", and the answer is the same instruments sampling truth at the new positions --
+   * not a different instrument, and not the same measurements moved.
+   */
+  const [redrawTrack, setRedrawTrack] = useState(false);
+  const declaredWaypoints = config.instruments.track.waypoints;
+  const trackEdit = props.edits.find(
+    (edit): edit is Extract<Edit, { kind: 'track' }> => edit.kind === 'track',
+  );
+  const [draftWaypoints, setDraftWaypoints] = useState<readonly {
+    lonDeg: number;
+    latDeg: number;
+    offsetHours: number;
+  }[] | null>(null);
+  const currentWaypoints = draftWaypoints ?? trackEdit?.waypoints ?? declaredWaypoints;
+
+  const waypointsOnGrid = currentWaypoints.map((waypoint) => ({
+    x: ((waypoint.lonDeg - forecast.box.west) / (forecast.box.east - forecast.box.west)) *
+      forecast.parameters.grid.nx,
+    y: ((waypoint.latDeg - forecast.box.south) / (forecast.box.north - forecast.box.south)) *
+      forecast.parameters.grid.ny,
+  }));
+
+  const dragWaypoint = useCallback(
+    (index: number, x: number, y: number) => {
+      setDraftWaypoints(
+        currentWaypoints.map((waypoint, i) =>
+          i === index
+            ? {
+                ...waypoint,
+                lonDeg:
+                  forecast.box.west +
+                  (x / forecast.parameters.grid.nx) * (forecast.box.east - forecast.box.west),
+                latDeg:
+                  forecast.box.south +
+                  (y / forecast.parameters.grid.ny) * (forecast.box.north - forecast.box.south),
+              }
+            : waypoint,
+        ),
+      );
+    },
+    [currentWaypoints, forecast.box, forecast.parameters.grid],
+  );
+
+  const dropWaypoint = useCallback(() => {
+    if (draftWaypoints === null) return;
+    props.onApplyEdits([
+      ...props.edits.filter((edit) => edit.kind !== 'track'),
+      { kind: 'track', waypoints: draftWaypoints },
+    ]);
+    setDraftWaypoints(null);
+  }, [draftWaypoints, props]);
+
+  const counterfactualFor = useCallback(
+    (markId: string) => {
+      if (props.edits === undefined) return null;
+      const interfaceId = `${markId}/interface`;
+      const withheld = props.edits.some(
+        (edit) => edit.kind === 'withhold' && (edit.observationId === interfaceId || edit.observationId === markId),
+      );
+      const existing = props.edits.find(
+        (edit): edit is Extract<Edit, { kind: 'profile' }> =>
+          edit.kind === 'profile' && edit.observationId === markId,
+      );
+      const without = (kind: Edit['kind']) =>
+        props.edits.filter(
+          (edit) =>
+            !(
+              edit.kind === kind &&
+              ((kind === 'withhold' && 'observationId' in edit && (edit.observationId === interfaceId || edit.observationId === markId)) ||
+                (kind === 'profile' && 'observationId' in edit && edit.observationId === markId))
+            ),
+        );
+      return {
+        withheld,
+        edited: existing !== undefined,
+        ghost:
+          forecast.ghosts
+            .get(markId)
+            ?.map((level) => ({ depthMetres: level.depthMetres, value: level.value })) ?? null,
+        onWithhold: (next: boolean) => {
+          props.onApplyEdits(
+            next
+              ? [...without('withhold'), { kind: 'withhold', observationId: interfaceId }]
+              : without('withhold'),
+          );
+        },
+        onEditProfile: (levels: readonly { depthMetres: number; value: number }[] | null) => {
+          props.onApplyEdits(
+            levels === null
+              ? without('profile')
+              : [...without('profile'), { kind: 'profile', observationId: markId, levels }],
+          );
+        },
+      };
+    },
+    [props, forecast.ghosts],
+  );
 
   /**
    * The model's diagnosed profile at a position, for *this* horizon's field (FR-005).
@@ -330,6 +483,37 @@ export function HorizonRow(props: HorizonRowProps) {
         {forecast.observationsAvailable === 0 && ' No observations at this issue time: the analysis is the background and the climatology.'}
       </p>
 
+      <Counterfactuals
+        edits={props.edits}
+        instrumentIds={[config.instruments.surface.id, config.instruments.xbt.id]}
+        qualityControlDefault={config.instruments.qualityControl.enabled}
+        busy={props.reissuing}
+        onApply={props.onApplyEdits}
+      />
+
+      <div className="row-controls">
+        <button
+          type="button"
+          data-testid="toggle-redraw-track"
+          aria-pressed={redrawTrack}
+          onClick={() => { setRedrawTrack((current) => !current); }}
+        >
+          {redrawTrack ? 'Stop redrawing the track' : 'Redraw the track'}
+        </button>
+        {redrawTrack && (
+          <span className="aside" data-testid="redraw-hint">
+            Enlarge a panel and drag a waypoint. The instruments resample truth where you put
+            it, through the same instruments and the same noise streams.
+          </span>
+        )}
+      </div>
+
+      {forecast.trackStretch !== null && (
+        <p className="banner warn" data-testid="track-stretch">
+          {forecast.trackStretch.statement}
+        </p>
+      )}
+
       <div className="row-controls">
         <button type="button" onClick={scoreAll} data-testid="score-row" disabled={scores !== null}>
           {scores === null ? 'Score every horizon against truth' : 'Scored'}
@@ -337,7 +521,25 @@ export function HorizonRow(props: HorizonRowProps) {
         <button
           type="button"
           onClick={() => {
+            setShowDifference((current) => !current);
+            setShowAttribution(false);
+          }}
+          data-testid="toggle-difference"
+          aria-pressed={showDifference}
+          disabled={props.edits.length === 0}
+          title={
+            props.edits.length === 0
+              ? 'There is nothing to difference until something has been edited'
+              : undefined
+          }
+        >
+          {showDifference ? 'Show the forecast field' : 'Show what the edit changed'}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
             setShowAttribution((current) => !current);
+            setShowDifference(false);
           }}
           data-testid="toggle-attribution"
           aria-pressed={showAttribution}
@@ -387,10 +589,25 @@ export function HorizonRow(props: HorizonRowProps) {
                 forecast.anchorInstantMs + leadHours * 3_600_000,
             ).toISOString()}
             initialisedFrom={issued}
-            field={anomalies.get(leadHours) ?? null}
+            field={
+              showDifference
+                ? (differences.get(leadHours) ?? null)
+                : (anomalies.get(leadHours) ?? null)
+            }
+            showDifference={showDifference}
+            differenceOutlineMetres={config.counterfactual.differenceOutlineMetres}
+            differenceMagnitude={differenceMagnitudes.get(leadHours) ?? null}
+            counterfactualFor={counterfactualFor}
+            waypoints={redrawTrack ? waypointsOnGrid : null}
+            onDragWaypoint={dragWaypoint}
+            onDropWaypoint={dropWaypoint}
             nx={forecast.parameters.grid.nx}
             ny={forecast.parameters.grid.ny}
-            limit={config.presentation.anomalyLimitMetres}
+            limit={
+              showDifference
+                ? config.counterfactual.differenceLimitMetres
+                : config.presentation.anomalyLimitMetres
+            }
             observationWeight={analysis.attribution.observationWeight}
             observationsDominant={observationsDominant}
             hatchThreshold={config.presentation.attributionHatchThreshold}

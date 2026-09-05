@@ -33,6 +33,8 @@ export interface Marker {
   readonly afterInitialisation?: boolean;
   /** The probe went past the floor of the displayed volume. */
   readonly continuesBelow?: boolean;
+  /** Withheld from the analysis by the reader, and still drawn (beat 010, FR-006). */
+  readonly withheld?: boolean;
 }
 
 export interface FieldViewProps {
@@ -53,6 +55,14 @@ export interface FieldViewProps {
   readonly onSelect?: (cellIndex: number) => void;
   /** Beat 008: the id of the mark under the pointer, or null. */
   readonly onHoverMark?: (id: string | null) => void;
+  /**
+   * Beat 010, FR-008: the track's waypoints in fractional grid coordinates, draggable. Given
+   * only where an edit is a deliberate act -- the enlarged panel -- because a row of six small
+   * panels is not where a track should be redrawn by accident.
+   */
+  readonly waypoints?: readonly { readonly x: number; readonly y: number }[];
+  readonly onDragWaypoint?: (index: number, x: number, y: number) => void;
+  readonly onDropWaypoint?: () => void;
   /** Shown beneath the field. Absent on a panel, where the caption is the panel's own. */
   readonly caption?: boolean;
 }
@@ -67,6 +77,9 @@ export function FieldView({
   markers = [],
   onSelect,
   onHoverMark,
+  waypoints,
+  onDragWaypoint,
+  onDropWaypoint,
   palette = 'diverging',
   unit = 'm',
   hatch,
@@ -167,6 +180,19 @@ export function FieldView({
       context.stroke();
       context.restore();
 
+      // Withheld by the reader: struck through, and still there. What was withheld is part
+      // of what the reader did, so it is never omitted from the picture.
+      if (marker.withheld === true) {
+        context.save();
+        context.strokeStyle = 'rgb(138, 31, 31)';
+        context.lineWidth = Math.max(1, scale * 0.35);
+        context.beginPath();
+        context.moveTo(x - scale * 1.4, y - scale * 1.4);
+        context.lineTo(x + scale * 1.4, y + scale * 1.4);
+        context.stroke();
+        context.restore();
+      }
+
       // The head: filled for the ownship, hollow for an external profile, white for flagged.
       context.beginPath();
       context.arc(x, y, scale * (marker.kind === 'drop' ? 0.85 : 0.7), 0, Math.PI * 2);
@@ -189,7 +215,23 @@ export function FieldView({
         context.stroke();
       }
     }
-  }, [markers, nx, ny]);
+    // The track's waypoints, where they are draggable. Squares, so they are not mistaken for
+    // a measurement: a waypoint is a decision about where to sail, not a thing that was read.
+    for (const waypoint of waypoints ?? []) {
+      const wx = waypoint.x * scale;
+      const wy = (ny - waypoint.y) * scale;
+      context.beginPath();
+      context.rect(wx - scale * 1.2, wy - scale * 1.2, scale * 2.4, scale * 2.4);
+      context.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      context.fill();
+      context.strokeStyle = 'rgb(31, 79, 122)';
+      context.lineWidth = Math.max(1, scale * 0.35);
+      context.stroke();
+    }
+  }, [markers, nx, ny, waypoints]);
+
+  /** Which waypoint the pointer took hold of, if any. */
+  const dragging = useRef<number | null>(null);
 
   return (
     <figure className="field" data-testid={testId}>
@@ -233,6 +275,47 @@ export function FieldView({
                 }
           }
           onMouseLeave={onHoverMark === undefined ? undefined : () => { onHoverMark(null); }}
+          onPointerDown={
+            onDragWaypoint === undefined
+              ? undefined
+              : (event) => {
+                  const bounds = event.currentTarget.getBoundingClientRect();
+                  const gx = ((event.clientX - bounds.left) / bounds.width) * nx;
+                  const gy = (1 - (event.clientY - bounds.top) / bounds.height) * ny;
+                  let best: { index: number; distance: number } | null = null;
+                  (waypoints ?? []).forEach((waypoint, index) => {
+                    const distance = Math.hypot(waypoint.x - gx, waypoint.y - gy);
+                    if (distance < 5 && (best === null || distance < best.distance)) {
+                      best = { index, distance };
+                    }
+                  });
+                  if (best === null) return;
+                  dragging.current = (best as { index: number }).index;
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                }
+          }
+          onPointerMove={
+            onDragWaypoint === undefined
+              ? undefined
+              : (event) => {
+                  if (dragging.current === null) return;
+                  const bounds = event.currentTarget.getBoundingClientRect();
+                  const gx = ((event.clientX - bounds.left) / bounds.width) * nx;
+                  const gy = (1 - (event.clientY - bounds.top) / bounds.height) * ny;
+                  onDragWaypoint(dragging.current, gx, gy);
+                }
+          }
+          onPointerUp={
+            onDropWaypoint === undefined
+              ? undefined
+              : () => {
+                  if (dragging.current === null) return;
+                  dragging.current = null;
+                  // Applied on release: every application reruns the analysis and
+                  // re-integrates six horizons, which is not a thing to do per mouse-move.
+                  onDropWaypoint();
+                }
+          }
           style={
             onSelect === undefined && onHoverMark === undefined
               ? undefined
@@ -262,14 +345,35 @@ export function FieldView({
                 data-kind={marker.kind}
                 data-flagged={String(marker.flagged)}
                 data-after-initialisation={String(marker.afterInitialisation === true)}
+                data-withheld={String(marker.withheld === true)}
                 data-x={marker.x.toFixed(3)}
                 data-y={marker.y.toFixed(3)}
               >
                 {marker.kind === 'track' ? 'surface measurement' : marker.kind === 'drop' ? 'XBT drop' : 'Argo profile'}
                 {marker.flagged ? ', flagged' : ''}
+                {marker.withheld === true ? ', withheld' : ''}
                 {marker.afterInitialisation === true ? ', after initialisation' : ''}
               </li>
             ))}
+        </ul>
+      )}
+
+      {waypoints !== undefined && waypoints.length > 0 && (
+        <ul
+          className="mark-list"
+          data-testid={testId === undefined ? undefined : `${testId}-waypoints`}
+          aria-label="The track's waypoints, draggable"
+        >
+          {waypoints.map((waypoint, index) => (
+            <li
+              key={`${String(waypoint.x)},${String(waypoint.y)}`}
+              data-waypoint-index={String(index)}
+              data-x={waypoint.x.toFixed(3)}
+              data-y={waypoint.y.toFixed(3)}
+            >
+              waypoint {index + 1}
+            </li>
+          ))}
         </ul>
       )}
 

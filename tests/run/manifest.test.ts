@@ -27,9 +27,9 @@ describe('the run manifest', () => {
     expect(manifest.configDigest).toBe(digest);
     expect(manifest.steps).toBe(10);
     expect(manifest.recordedCase).toBe(true);
-    // FR-34: the slot exists from the first beat, so beat 010 changes what a manifest
-    // means and not what shape it has.
-    expect(manifest.counterfactual).toBeNull();
+    // FR-34: the slot existed from the first beat, so beat 010 changed what a manifest
+    // means and not what shape it has. An unedited run carries an empty list.
+    expect(manifest.counterfactual).toEqual([]);
   });
 
   it('round-trips through JSON unchanged', () => {
@@ -97,9 +97,22 @@ describe('the run manifest', () => {
       expect(() => parseManifest(text)).toThrow(new RegExp(String(MANIFEST_FORMAT_VERSION)));
     });
 
-    it('refuses a manifest carrying a counterfactual no code here can honour', () => {
+    it('refuses a counterfactual slot that is not a list of edits', () => {
       const text = JSON.stringify({ ...manifestOf(), counterfactual: { edits: [] } });
-      expect(() => parseManifest(text)).toThrow(/feature 010/);
+      expect(() => parseManifest(text)).toThrow(/not a list of edits/);
+    });
+
+    it('carries the reader edits, in order (FR-002)', () => {
+      const run = createRun({ config, configDigest: digest });
+      run.setCounterfactual([
+        { kind: 'withhold', observationId: 'ownship-xbt/0002' },
+        { kind: 'quality-control', enabled: false },
+      ]);
+      const manifest = parseManifest(serialiseManifest(run.exportManifest()));
+      expect(manifest.counterfactual).toEqual([
+        { kind: 'withhold', observationId: 'ownship-xbt/0002' },
+        { kind: 'quality-control', enabled: false },
+      ]);
     });
 
     it('refuses something that is not a manifest at all', () => {

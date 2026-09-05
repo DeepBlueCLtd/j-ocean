@@ -656,6 +656,154 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('issue-observations')).toContainText('had not happened yet');
   });
 
+  test('says whether it shows the recorded case or an edit, and comes back in one action', async ({
+    page,
+  }) => {
+    test.setTimeout(240_000);
+    await page.goto('/');
+    await page.getByTestId('build-row').click();
+    await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+
+    // FR-034. Every other counterfactual is unsafe without this one: a reader who cannot tell
+    // an edit from the record has been misled by the harness.
+    await expect(page.getByTestId('run-status')).toContainText('recorded case');
+    await expect(page.getByTestId('revert')).toBeDisabled();
+
+    // Break the XBT by a degree and a half -- inside the gross-range check, which is the case
+    // the harness must not pretend it catches.
+    await page.getByTestId('bias-degrees').fill('1.5');
+    await page.getByTestId('bias-degrees').blur();
+    await expect(page.getByTestId('run-status')).toContainText('edit', { timeout: 120_000 });
+    await expect(page.getByTestId('edit-list')).toContainText('biased by 1.50');
+
+    await page.getByTestId('quality-control').uncheck();
+    await expect(page.getByTestId('edit-list')).toContainText('quality control off', {
+      timeout: 120_000,
+    });
+
+    // FR-010: edits compose in order, and one action removes all of them.
+    await page.getByTestId('revert').click();
+    await expect(page.getByTestId('run-status')).toContainText('recorded case', { timeout: 120_000 });
+    await expect(page.getByTestId('revert')).toBeDisabled();
+  });
+
+  test('withholds a measurement, keeps drawing it, and shows what the edit changed', async ({
+    page,
+  }) => {
+    test.setTimeout(240_000);
+    await page.goto('/');
+    await page.getByTestId('build-row').click();
+    await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+
+    // Nothing to difference until something has been edited: the control says so.
+    await expect(page.getByTestId('toggle-difference')).toBeDisabled();
+
+    await page.getByTestId('enlarge-24').click();
+    const needle = page.getByTestId('needle-elevation').locator('[data-kind="drop"]').first();
+    await needle.click();
+    await expect(page.getByTestId('observation-hover')).toBeVisible();
+    await page.getByTestId('withhold-mark').click();
+
+    // FR-006: withheld from the analysis and still drawn, because what a reader withheld is
+    // part of what the reader did.
+    await expect(page.getByTestId('run-status')).toContainText('withheld', { timeout: 120_000 });
+    await expect(
+      page.getByTestId('panel-field-24-marks').locator('li[data-withheld="true"]'),
+    ).toHaveCount(1);
+
+    // FR-005: edited minus recorded, for every horizon, with the moved region outlined.
+    await page.getByTestId('toggle-difference').click();
+    // The panel is drawing a difference, and says so where a reader who cannot see it can
+    // still be told: on the image's own label.
+    await expect(page.getByTestId('panel-field-24').getByRole('img')).toHaveAttribute(
+      'aria-label',
+      /Edited minus recorded/,
+    );
+    const spread = await page
+      .getByTestId('panel-field-24')
+      .locator('canvas')
+      .first()
+      .evaluate((element) => {
+        const canvas = element as HTMLCanvasElement;
+        const gl = canvas.getContext('webgl2');
+        const pixels = new Uint8Array(canvas.width * canvas.height * 4);
+        gl?.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        const seen = new Set<number>();
+        for (let i = 0; i < pixels.length; i += 4) {
+          seen.add(((pixels[i] ?? 0) << 16) | ((pixels[i + 1] ?? 0) << 8) | (pixels[i + 2] ?? 0));
+        }
+        return seen.size;
+      });
+    // A difference field that is everywhere zero would be one flat colour. This one is not.
+    expect(spread).toBeGreaterThan(8);
+  });
+
+  test('drags a measured profile and keeps the measurement as a ghost', async ({ page }) => {
+    test.setTimeout(240_000);
+    await page.goto('/');
+    await page.getByTestId('build-row').click();
+    await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+    await page.getByTestId('enlarge-24').click();
+    await page.getByTestId('needle-elevation').locator('[data-kind="drop"]').first().click();
+    await expect(page.getByTestId('profile-editor')).toBeVisible();
+
+    // FR-003: the measured profile stays drawn behind the edit. A picture that forgot the
+    // measurement would make the difference field meaningless.
+    await expect(page.getByTestId('profile-ghost')).toBeVisible();
+
+    const point = page.getByTestId('profile-point-4');
+    // Scrolled into view first: the mouse works in viewport coordinates, and an enlarged
+    // panel puts its hover panel well below the fold.
+    await point.scrollIntoViewIfNeeded();
+    const box = await point.boundingBox();
+    expect(box).not.toBeNull();
+    await page.mouse.move((box?.x ?? 0) + 2, (box?.y ?? 0) + 2);
+    await page.mouse.down();
+    await page.mouse.move((box?.x ?? 0) + 40, (box?.y ?? 0) + 2, { steps: 5 });
+    await page.mouse.up();
+
+    await expect(page.getByTestId('run-status')).toContainText('edited the profile', {
+      timeout: 120_000,
+    });
+  });
+
+  test('offers the track for redrawing, and says what redrawing it would cost', async ({
+    page,
+  }) => {
+    test.setTimeout(240_000);
+    await page.goto('/');
+    await page.getByTestId('build-row').click();
+    await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+
+    await page.getByTestId('toggle-redraw-track').click();
+    await expect(page.getByTestId('redraw-hint')).toContainText('resample truth');
+
+    await page.getByTestId('enlarge-24').click();
+    const overlay = page.getByTestId('panel-field-24-overlay');
+    await overlay.scrollIntoViewIfNeeded();
+    const box = await overlay.boundingBox();
+    expect(box).not.toBeNull();
+    // Where the waypoints actually are, read from the panel rather than guessed at.
+    const first = page.getByTestId('panel-field-24-waypoints').locator('li').first();
+    const grid = await first.evaluate((node) => ({
+      x: Number((node as HTMLElement).dataset['x']),
+      y: Number((node as HTMLElement).dataset['y']),
+    }));
+    const x = (box?.x ?? 0) + ((box?.width ?? 0) * grid.x) / 100;
+    const y = (box?.y ?? 0) + (box?.height ?? 0) * (1 - grid.y / 100);
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + 20, y - 20, { steps: 5 });
+    await page.mouse.up();
+
+    // FR-008 and FR-009: the instruments resample where the reader put the track, and the
+    // surface says what the vessel would have had to do to sail it.
+    await expect(page.getByTestId('run-status')).toContainText('track redrawn', {
+      timeout: 120_000,
+    });
+    await expect(page.getByTestId('track-stretch')).toContainText(/knots/);
+  });
+
   test('never shows an error figure without two references and their provenance', async ({
     page,
   }) => {

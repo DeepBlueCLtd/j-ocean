@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "run": {
     "defaultSeed": "6a09e667f3bcc908",
     "recordedCaseLabel": "the recorded case"
@@ -107,7 +107,8 @@
         "maximumDegC": 36.0
       },
       "climatologyDepartureStandardDeviations": 5,
-      "verticalInversionToleranceDegC": 0.6
+      "verticalInversionToleranceDegC": 0.6,
+      "profileRejectionFraction": 0.1
     },
     "argo": {
       "assimilate": true,
@@ -165,7 +166,8 @@
           "latDeg": 38.6,
           "offsetHours": 72
         }
-      ]
+      ],
+      "vesselSpeedKnots": 12
     },
     "drops": [
       {
@@ -277,6 +279,21 @@
       "label": "Argo core profiles, Ifremer mirror",
       "indexUrl": "https://data-argo.ifremer.fr/ar_index_global_prof.txt.gz",
       "profileBaseUrl": "https://data-argo.ifremer.fr/dac"
+    }
+  },
+  "counterfactual": {
+    "differenceOutlineMetres": 5,
+    "differenceLimitMetres": 40,
+    "at06": {
+      "nearHorizonHours": 24,
+      "farHorizonHours": 96,
+      "minimumNearChangeMetres": 1,
+      "maximumFarFractionOfNear": 0.75
+    },
+    "at03": {
+      "regionRadiusKm": 120,
+      "minimumInsideSkillDrop": 0.01,
+      "outsideSkillTolerance": 0.05
     }
   }
 }

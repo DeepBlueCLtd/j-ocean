@@ -54,11 +54,22 @@ drawing a depth profile states that the levels between the model's own are deriv
 <dd>The check that regenerates a committed artefact and fails the build on any difference,
 so that a change is attributed to the tree or to the upstream rather than guessed at.</dd>
 
+<dt>Counterfactual</dt>
+<dd>An edit a reader made, as a value: withhold a measurement, drag a profile, break an
+instrument, turn quality control off, redraw the track. Edits are applied in order to a
+fresh run and recorded in the manifest, so reverting is removing them rather than undoing
+them — which is why the recorded case comes back byte for byte.</dd>
+
 <dt>Departure brief</dt>
 <dd>The analysis at the quay-side instant, held constant and never refreshed: correct at
 issue and losing to the world on its own. The baseline every forecast is watched against.
 In the recorded case nothing has reported by then, so it is the background blended with
 climatology — which makes it a generous baseline rather than a straw man.</dd>
+
+<dt>Ghost</dt>
+<dd>The measured profile, kept drawn behind an edited one. A reader dragging a profile is
+stating what the instrument would have read, not erasing what it did read, and a picture
+that forgot the measurement would make the difference field meaningless.</dd>
 
 <dt>Footprint</dt>
 <dd>What the instruments did, drawn: the track and its measurements, and a needle or a

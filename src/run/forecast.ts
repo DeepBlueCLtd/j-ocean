@@ -3,11 +3,19 @@ import { analyse, type AnalysisRecord } from '../analysis/optimal-interpolation.
 import { climatologyReferenceOver } from '../instruments/climatology-reference.js';
 import {
   argoObservations,
+  sampleSurface,
   sampleXbtDrops,
   type SamplingContext,
 } from '../instruments/instruments.js';
+import {
+  applyObservationEdits,
+  configurationWith,
+  isWithheld,
+  type Edit,
+  type TrackStretch,
+} from '../instruments/edits.js';
 import { interfaceFieldFromContainer } from '../instruments/interface-field.js';
-import type { Observation } from '../instruments/observation.js';
+import type { Observation, ObservationLevel } from '../instruments/observation.js';
 import { gridFor, parametersFor, type ReducedGravityParameters } from '../model/parameters.js';
 import { createReducedGravityKernel, THICKNESS } from '../model/reduced-gravity.js';
 import type { ModelKernel, ModelState } from '../ports/kernel.js';
@@ -44,6 +52,12 @@ export interface ForecastInputs {
    * the behaviour it had before.
    */
   readonly anchorInstantMs?: number;
+  /**
+   * Beat 010. The reader's edits, in order. An edit is a value applied to a fresh run, so
+   * reverting is removing it and "byte-identical to the recorded case" is a property of the
+   * design rather than a promise about undo.
+   */
+  readonly counterfactual?: readonly Edit[];
   readonly seed?: string;
 }
 
@@ -80,6 +94,14 @@ export interface ForecastResult {
    */
   readonly observationsAvailable: number;
   readonly observationsWithheld: number;
+  /** Beat 010: the edits, what they withheld, the ghosts, and the track's speed statement. */
+  readonly edits: readonly Edit[];
+  readonly withheldIds: readonly string[];
+  readonly ghosts: ReadonlyMap<string, readonly ObservationLevel[]>;
+  readonly trackStretch: TrackStretch | null;
+  readonly profiles: readonly Observation[];
+  readonly argoProfiles: readonly Observation[];
+  readonly surface: readonly Observation[];
 }
 
 /**
@@ -102,10 +124,23 @@ export interface IssueAnalysis {
   readonly observationsAvailable: number;
   readonly observationsWithheld: number;
   readonly issueInstantMs: number;
+  /** The edits this run was made with, in order, and what they did (beat 010). */
+  readonly edits: readonly Edit[];
+  readonly withheldIds: readonly string[];
+  readonly ghosts: ReadonlyMap<string, readonly ObservationLevel[]>;
+  readonly trackStretch: TrackStretch | null;
+  /** The profiles as sampled and edited, for the footprint to draw. */
+  readonly profiles: readonly Observation[];
+  readonly argoProfiles: readonly Observation[];
+  readonly surface: readonly Observation[];
 }
 
 export function analyseAtIssue(inputs: ForecastInputs): IssueAnalysis {
-  const { config, domain, truth } = inputs;
+  const { domain, truth } = inputs;
+  const edits = inputs.counterfactual ?? [];
+  // Three of the five edits are edits to the declared configuration, applied before anything
+  // is sampled so the instruments do exactly what they always do with what they are told.
+  const { config, stretch } = configurationWith(inputs.config, edits);
   const parameters = parametersFor(config, domain);
   const grid = gridFor(config, domain);
   const kernel = createReducedGravityKernel(parameters);
@@ -138,8 +173,16 @@ export function analyseAtIssue(inputs: ForecastInputs): IssueAnalysis {
     structure: parameters.thermalStructure,
     startMs,
   };
-  const drops = sampleXbtDrops(sampling);
-  const argo = argoObservations(inputs.argo, sampling);
+  const sampledDrops = sampleXbtDrops(sampling);
+  const sampledArgo = argoObservations(inputs.argo, sampling);
+  const surface = sampleSurface(sampling);
+
+  // And two are edits to what was measured, applied after.
+  const editedDrops = applyObservationEdits(sampledDrops, edits, sampling);
+  const editedArgo = applyObservationEdits(sampledArgo, edits, sampling);
+  const drops = editedDrops.results;
+  const argo = editedArgo.results;
+  const ghosts = new Map([...editedDrops.ghosts, ...editedArgo.ghosts]);
 
   /*
    * Only what had happened by the issue instant (FR-001).
@@ -150,7 +193,12 @@ export function analyseAtIssue(inputs: ForecastInputs): IssueAnalysis {
    * and two runs at different issue times would no longer be the same run seen twice.
    */
   const sampled = [...drops, ...argo].map((r) => r.interface);
-  const observations = sampled.filter((o) => o.instantMs <= inputs.issueInstantMs);
+  const observations = sampled
+    .filter((o) => o.instantMs <= inputs.issueInstantMs)
+    // A withheld observation is excluded from the analysis and kept in the record: the
+    // footprint still draws it, in a withheld style, because what a reader withheld is part
+    // of what the reader did (FR-006).
+    .filter((o) => !isWithheld(edits, o.id));
   const externalObservationIds = argo
     .filter((r) => r.interface.instantMs <= inputs.issueInstantMs)
     .map((r) => r.interface)
@@ -188,6 +236,13 @@ export function analyseAtIssue(inputs: ForecastInputs): IssueAnalysis {
     observationsAvailable: observations.length,
     observationsWithheld: sampled.length - observations.length,
     issueInstantMs: inputs.issueInstantMs,
+    edits,
+    withheldIds: [...editedDrops.withheldIds, ...editedArgo.withheldIds],
+    ghosts,
+    trackStretch: stretch,
+    profiles: drops.map((r) => r.profile),
+    argoProfiles: argo.map((r) => r.profile),
+    surface,
   };
 }
 
@@ -308,5 +363,12 @@ export function runForecast(inputs: ForecastInputs): ForecastResult {
     anchorInstantMs,
     observationsAvailable: at.observationsAvailable,
     observationsWithheld: at.observationsWithheld,
+    edits: at.edits,
+    withheldIds: at.withheldIds,
+    ghosts: at.ghosts,
+    trackStretch: at.trackStretch,
+    profiles: at.profiles,
+    argoProfiles: at.argoProfiles,
+    surface: at.surface,
   };
 }

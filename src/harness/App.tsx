@@ -7,6 +7,7 @@ import { serialiseManifest } from '../run/manifest.js';
 import { loadClimatology, loadObservations, loadTruth } from './artefacts.js';
 import { FieldView, type Marker } from './FieldView.js';
 import { footprintOf, markersFrom, type Footprint } from './footprint.js';
+import type { Edit } from '../instruments/edits.js';
 import { HorizonRow } from './HorizonRow.js';
 import { departureBrief, runForecast, type DepartureBrief, type ForecastResult } from '../run/forecast.js';
 import { climatologyReferenceOver } from '../instruments/climatology-reference.js';
@@ -87,6 +88,10 @@ interface RunView {
   readonly brief: DepartureBrief | null;
   /** Where the issue-time control is, which is not where the shown forecast was issued. */
   readonly pendingIssueInstantMs: number | null;
+  /** FR-034: the reader's edits, in order. Empty means this is the recorded case. */
+  readonly edits: readonly Edit[];
+  /** The same run without the edits, at the same issue instant: what a difference is from. */
+  readonly baseline: ForecastResult | null;
   /** FR-18: the breakdown is an instrument of a *selected* cell, never a per-panel summary. */
   readonly selectedCell: number | null;
   readonly box: { readonly west: number; readonly east: number; readonly south: number; readonly north: number };
@@ -107,17 +112,24 @@ interface Record002 {
 function footprintFor(config: Configuration, view: RunView, initialisedFromMs: number): Footprint {
   const levels = config.model.thermalStructure.displayLevelsMetres;
   return footprintOf({
-    surface: view.surface,
-    drops: view.drops.map(({ profile }) => profile),
-    argo: view.argo.map(({ profile }) => profile),
+    // The edited run's own observations where there is one, so an edited profile's needle is
+    // the edited profile and a withheld mark is the mark that was withheld.
+    surface: view.forecast?.surface ?? view.surface,
+    drops: view.forecast?.profiles ?? view.drops.map(({ profile }) => profile),
+    argo: view.forecast?.argoProfiles ?? view.argo.map(({ profile }) => profile),
     box: view.box,
     grid: view.results.grid,
     initialisedFromMs,
     spongeWidthCells: config.model.sponge.widthCells,
     volumeFloorMetres: levels[levels.length - 1] as number,
     colocationToleranceDegrees: config.presentation.footprint.colocationToleranceDegrees,
-    qualityControlEnabled: config.instruments.qualityControl.enabled,
+    qualityControlEnabled:
+      view.forecast?.edits.reduce<boolean>(
+        (current, edit) => (edit.kind === 'quality-control' ? edit.enabled : current),
+        config.instruments.qualityControl.enabled,
+      ) ?? config.instruments.qualityControl.enabled,
     assimilateArgo: config.instruments.argo.assimilate,
+    withheldIds: view.forecast?.withheldIds ?? [],
   });
 }
 
@@ -266,6 +278,8 @@ export function App() {
         forecast: null,
         brief: null,
         pendingIssueInstantMs: null,
+        edits: [],
+        baseline: null,
         selectedCell: null,
         box: report.box,
       };
@@ -383,31 +397,44 @@ export function App() {
    * interface, and the honest way to obey that is not to start it unbidden.
    */
   const buildRow = useCallback(
-    (issueInstantMs?: number) => {
+    (issueInstantMs?: number, edits?: readonly Edit[]) => {
       if (loaded === null || record === null || view === null) return;
       const domain = loaded.config.domains.list.find((d) => d.id === record.domainId);
       if (domain === undefined) return;
       const startMs = Date.parse(loaded.config.truth.period.start);
       const defaultIssueInstantMs = startMs + loaded.config.forecast.spinUpHours * 3_600_000;
+      const counterfactual = edits ?? view.edits;
       const inputs = {
         config: loaded.config,
         domain,
         truth: record.truth,
         climatology: record.climatology,
         argo: record.observations,
-        issueInstantMs: issueInstantMs ?? defaultIssueInstantMs,
+        issueInstantMs: issueInstantMs ?? view.forecast?.issueInstantMs ?? defaultIssueInstantMs,
         // The declared horizons are measured from the *default* issue instant, so moving the
         // control leaves every panel valid at the same moment it was (FR-002).
         anchorInstantMs: defaultIssueInstantMs,
         ...(view.recordedCase ? {} : { seed: view.run.rng.rootSeed }),
       };
-      const forecast = runForecast(inputs);
-      // FR-009: the manifest records which issue time produced the fields it describes.
+      const forecast = runForecast({ ...inputs, counterfactual });
+      // The same run without the edits, so a difference field is a difference from something
+      // that came from the same issue time (FR-005). With no edits it *is* the run.
+      const baseline =
+        counterfactual.length === 0 ? forecast : runForecast({ ...inputs, counterfactual: [] });
+      // FR-009 and FR-002: the manifest records the issue time and the edits.
       view.run.reissue(forecast.issueInstantMs);
+      view.run.setCounterfactual(counterfactual);
       // FR-026: computed once and held. It is never refreshed, and the identity assertion in
       // the test is on this object.
       const brief = view.brief ?? departureBrief(inputs);
-      setView({ ...view, forecast, brief, pendingIssueInstantMs: forecast.issueInstantMs });
+      setView({
+        ...view,
+        forecast,
+        baseline,
+        brief,
+        edits: counterfactual,
+        pendingIssueInstantMs: forecast.issueInstantMs,
+      });
     },
     [loaded, record, view],
   );
@@ -699,6 +726,11 @@ export function App() {
                 buildRow(view.pendingIssueInstantMs ?? view.forecast?.issueInstantMs);
               }}
               reissuing={false}
+              edits={view.edits}
+              baseline={view.baseline ?? view.forecast}
+              onApplyEdits={(edits) => {
+                buildRow(view.forecast?.issueInstantMs, edits);
+              }}
               onSelectCell={(cellIndex) => {
                 setView((current) => (current === null ? current : { ...current, selectedCell: cellIndex }));
               }}

@@ -289,6 +289,38 @@ export function interfaceObservationFrom(
   const estimate = interfaceFromProfile(levels, profile.error.totalSd, context.structure);
 
   const flags: Flag[] = [...profile.flags];
+
+  /*
+   * Beat 010's finding. The declared checks flag *levels*, and until now the flags stopped
+   * there: the interface-depth observation the analysis actually consumes inherited only the
+   * profile's own flags, so a profile whose warm levels had failed the gross-range check
+   * produced a confidently wrong interface depth that the analysis assimilated with a small
+   * error bar. Quality control changed what the surface said and nothing about what was
+   * computed.
+   *
+   * A profile a declared fraction of whose levels failed a check is not trusted at any depth.
+   * `outside-record` does not count: it says the truth record stopped, not that the instrument
+   * lied, and every XBT that overshoots the record carries one.
+   */
+  const QUALITY_CODES = ['gross-range', 'climatology-departure', 'vertical-inversion', 'argo-flagged'];
+  const failing = levels.filter((level) =>
+    level.flags.some((flag) => !flag.usable && QUALITY_CODES.includes(flag.code)),
+  );
+  const fraction = context.config.instruments.qualityControl.profileRejectionFraction;
+  if (levels.length > 0 && failing.length / levels.length > fraction) {
+    const code = (failing[0] as ObservationLevel).flags.find(
+      (flag) => !flag.usable && QUALITY_CODES.includes(flag.code),
+    );
+    flags.push({
+      code: code?.code ?? 'unresolved',
+      detail:
+        `${String(failing.length)} of ${String(levels.length)} levels in this profile failed a ` +
+        `declared check, past the declared ${String(fraction * 100)} per cent, so the interface ` +
+        'depth derived from it is not trusted at any depth',
+      usable: false,
+    });
+  }
+
   if (estimate.depthMetres === null) {
     flags.push({
       code: 'unresolved',

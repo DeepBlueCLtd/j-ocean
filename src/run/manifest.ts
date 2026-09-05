@@ -1,3 +1,4 @@
+import type { Edit } from '../instruments/edits.js';
 import type { ClockConfiguration } from '../ports/clock.js';
 
 /**
@@ -13,7 +14,7 @@ import type { ClockConfiguration } from '../ports/clock.js';
  * anything, since a snapshot compared with itself proves nothing.
  */
 
-export const MANIFEST_FORMAT_VERSION = 2;
+export const MANIFEST_FORMAT_VERSION = 3;
 
 export interface RunManifest {
   readonly formatVersion: number;
@@ -38,10 +39,11 @@ export interface RunManifest {
   /** FR-012: false once a reader has asked for a new run. */
   readonly recordedCase: boolean;
   /**
-   * FR-34, feature 010. Empty here, and present here rather than added later so that a
-   * manifest exported by beat 001 and one exported by beat 010 have the same shape.
+   * FR-34, beat 010. The reader's edits, in order. Empty for the recorded case -- and the
+   * slot was present from beat 001 rather than added here, so a manifest exported before the
+   * counterfactuals existed and one exported after have the same shape.
    */
-  readonly counterfactual: null;
+  readonly counterfactual: readonly Edit[];
 }
 
 /** Raised when a manifest cannot be honoured. Every message names both values compared. */
@@ -90,10 +92,8 @@ export function parseManifest(text: string): RunManifest {
   if (!isRecord(clock) || typeof clock['epoch'] !== 'string' || typeof clock['timestepSeconds'] !== 'number') {
     throw new ManifestError('the manifest clock configuration is malformed');
   }
-  if (value['counterfactual'] !== null) {
-    throw new ManifestError(
-      'this manifest carries a counterfactual, which no code before feature 010 can honour',
-    );
+  if (!Array.isArray(value['counterfactual'])) {
+    throw new ManifestError('the manifest counterfactual slot is not a list of edits');
   }
   return value as unknown as RunManifest;
 }

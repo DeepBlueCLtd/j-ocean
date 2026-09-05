@@ -22,7 +22,7 @@ records with the drift gate over them, the one-and-a-half layer reduced-gravity 
 simulated instruments that are the only way truth reaches it, optimal interpolation with the
 attribution that is its own gain, skill against two references with provenance on every
 figure, the horizon row that is the primary surface, the observation footprint drawn over it, and the
-shore forecast on two axes.
+shore forecast on two axes, and the counterfactuals.
 **All seven gates now run**, each watched failing against a planted violation.
 
 Three things the tree reports rather than hides. Beat 009 found that the analysis had been
@@ -30,7 +30,9 @@ reading observations from **after** its own issue instant, so three beats of ski
 were optimistic; corrected, the model is roughly no better than persistence. It is **worse
 than climatology at every horizon**, for a reason beat 006's note traces to two declared
 numbers that disagree. And the attribution the row draws is **one analysis shown on six
-panels** until the forecast cycles. Beat 010, the counterfactuals, is next.
+panels** until the forecast cycles. Beat 010 added a fourth: quality control had never excluded anything, because its flags
+stopped at the levels and never reached the observation the analysis consumed. Beat 011,
+manifest replay, is next.
 
 ## Running it
 

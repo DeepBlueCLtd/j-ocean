@@ -110,6 +110,25 @@ test('the two axes', async ({ page }) => {
   await page.getByTestId('skill-inset').screenshot({ path: `${IMAGES}009-skill-inset.png` });
 });
 
+test('the counterfactuals', async ({ page }) => {
+  test.setTimeout(240_000);
+  await page.setViewportSize({ width: REFERENCE_WIDTH, height: 1100 });
+  await page.goto('/');
+  await page.getByTestId('build-row').click();
+  await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+
+  await page.getByTestId('enlarge-24').click();
+  await page.getByTestId('needle-elevation').locator('[data-kind="drop"]').first().click();
+  await expect(page.getByTestId('profile-editor')).toBeVisible();
+  await page.getByTestId('observation-hover').screenshot({ path: `${IMAGES}010-profile-editor.png` });
+
+  await page.getByTestId('withhold-mark').click();
+  await expect(page.getByTestId('run-status')).toContainText('withheld', { timeout: 120_000 });
+  await page.getByTestId('toggle-difference').click();
+  await page.getByTestId('horizon-row-panel').screenshot({ path: `${IMAGES}010-difference.png` });
+  await page.getByTestId('run-status').screenshot({ path: `${IMAGES}010-run-status.png` });
+});
+
 test('what the forecast was worth', async ({ page }) => {
   await page.goto('/');
   await page.getByTestId('score-run').click();

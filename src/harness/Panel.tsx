@@ -41,6 +41,23 @@ export interface PanelProps {
   readonly briefScore: Score | null;
   /** Present exactly when there is no field. FR-027: said, never extrapolated. */
   readonly refusal: string | null;
+  /** FR-005 of beat 010: the panel is showing edited minus recorded rather than a forecast. */
+  readonly showDifference: boolean;
+  /** A difference above this is outlined, so "where the edit went" is a region and not a hue. */
+  readonly differenceOutlineMetres: number;
+  readonly differenceMagnitude: Float64Array | null;
+  /** Beat 010: how a mark's own counterfactuals are applied, from the panel that drew it. */
+  readonly counterfactualFor: (markId: string) => {
+    readonly withheld: boolean;
+    readonly edited: boolean;
+    readonly ghost: readonly { readonly depthMetres: number; readonly value: number }[] | null;
+    readonly onWithhold: (withheld: boolean) => void;
+    readonly onEditProfile: (levels: readonly { depthMetres: number; value: number }[] | null) => void;
+  } | null;
+  /** FR-008: the track's waypoints, draggable in the enlarged panel and nowhere else. */
+  readonly waypoints: readonly { readonly x: number; readonly y: number }[] | null;
+  readonly onDragWaypoint: (index: number, x: number, y: number) => void;
+  readonly onDropWaypoint: () => void;
   /** What was actually asked of the model: the valid instant less the issue instant. */
   readonly leadFromIssueHours: number;
   readonly markers: readonly Marker[];
@@ -130,6 +147,16 @@ export function Panel(props: PanelProps) {
       ) : (
       <FieldView
         values={showAttribution ? props.observationWeight : (props.field as Float64Array)}
+        {...(props.showDifference && !showAttribution && props.differenceMagnitude !== null
+          ? {
+              // FR-029's second channel. The region where the edit moved the field by more
+              // than the declared magnitude is outlined, so a reader sees an extent rather
+              // than a colour -- and sees it without colour at all.
+              hatch: props.differenceMagnitude as Float64Array,
+              hatchThreshold: props.differenceOutlineMetres,
+              hatchLabel: `moved by more than ${String(props.differenceOutlineMetres)} m`,
+            }
+          : {})}
         nx={props.nx}
         ny={props.ny}
         limit={showAttribution ? 1 : props.limit}
@@ -145,12 +172,21 @@ export function Panel(props: PanelProps) {
         label={
           showAttribution
             ? `Weight carried by observations, valid ${validInstant}`
-            : `Interface depth anomaly, valid ${validInstant}`
+            : props.showDifference
+              ? `Edited minus recorded interface depth, valid ${validInstant}`
+              : `Interface depth anomaly, valid ${validInstant}`
         }
         testId={`panel-field-${String(leadHours)}`}
         markers={props.markers}
         onSelect={props.onSelectCell}
         onHoverMark={setHoveredId}
+        {...(enlarged && props.waypoints !== null
+          ? {
+              waypoints: props.waypoints,
+              onDragWaypoint: props.onDragWaypoint,
+              onDropWaypoint: props.onDropWaypoint,
+            }
+          : {})}
         caption={false}
       />
       )}
@@ -182,6 +218,10 @@ export function Panel(props: PanelProps) {
               : props.derivedProfileAt(hovered.lonDeg, hovered.latDeg)
           }
           qualityControlEnabled={props.footprint.qualityControlEnabled}
+          {...(() => {
+            const counterfactual = props.counterfactualFor(hovered.id);
+            return counterfactual === null ? {} : { counterfactual };
+          })()}
         />
       )}
 

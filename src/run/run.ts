@@ -1,4 +1,5 @@
 import type { Configuration } from '../config/schema.js';
+import type { Edit } from '../instruments/edits.js';
 import type { ModelKernel, ModelState } from '../ports/kernel.js';
 import type { RandomStream } from '../ports/rng.js';
 import type { ClockControl, SimulationClock } from '../ports/clock.js';
@@ -80,6 +81,8 @@ export class Run {
    * why it can be set after construction and why the manifest has to record it.
    */
   issueInstantMs: number;
+  /** FR-002: the edits this run was made with, so an edited run replays. */
+  counterfactual: readonly Edit[] = [];
   readonly domainId: string;
   /** FR-003: the computed stability limit beside the declared timestep. */
   readonly stability: StabilityAssessment;
@@ -152,6 +155,11 @@ export class Run {
     this.issueInstantMs = instantMs;
   }
 
+  /** Record the reader's edits (FR-002). Like the issue instant, a choice and not a state. */
+  setCounterfactual(edits: readonly Edit[]): void {
+    this.counterfactual = edits;
+  }
+
   /** Everything needed to rebuild this run, and nothing of its state (FR-005). */
   exportManifest(): RunManifest {
     return {
@@ -165,7 +173,7 @@ export class Run {
       steps: this.steps,
       issueInstantMs: this.issueInstantMs,
       recordedCase: this.recordedCase,
-      counterfactual: null,
+      counterfactual: this.counterfactual,
     };
   }
 }

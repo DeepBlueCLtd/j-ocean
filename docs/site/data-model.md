@@ -61,7 +61,7 @@ Everything needed to rebuild a run, and none of its state.
 | `steps` | How far the run had got. |
 | `issueInstantMs` | The instant the shore forecast was issued. A reader's choice rather than a property of the integration, so a manifest that did not record it could not rebuild the fields it describes. |
 | `recordedCase` | False once a reader has asked for a new run. |
-| `counterfactual` | The reader's edits. Empty until the counterfactuals beat; present from the first beat so the shape never changes. |
+| `counterfactual` | The reader's edits, in order. Empty for the recorded case; the slot was present from beat 001, so a manifest exported before the counterfactuals existed and one after have the same shape. |
 
 **Replay is re-computation, not the restoration of a snapshot.** That is why the manifest
 holds no state: a snapshot compared with itself would prove nothing, whereas a rebuilt run
@@ -392,6 +392,34 @@ One module, `field-surface.ts`, owns every palette and shader. It reports the su
 — `webgl2` where the browser has it, `canvas2d` where it does not — on the canvas itself, and
 both paths are exercised by tests: headless Chromium here has WebGL2, so a test refuses it in
 an init script to make the fallback actually run.
+
+## The counterfactuals
+
+An edit is a value, not a mutation: it lives in the manifest, it is applied in order to a fresh
+run, and reverting is removing it. That is why byte-identical revert is structural.
+
+| Edit | What it changes | Applied |
+|---|---|---|
+| `withhold` | One observation leaves the analysis and stays in the record, drawn struck through. | after sampling |
+| `profile` | A measured profile's values, through the **same** observation operator, with the measurement kept as a ghost. | after sampling |
+| `bias` | An instrument's declared bias, added after noise and before the checks. | to the configuration |
+| `quality-control` | Whether the declared checks run at all. | to the configuration |
+| `track` | The waypoints. The instruments resample truth where the reader put them, through the same instruments and named streams. | to the configuration |
+
+A track edit is checked against `instruments.track.vesselSpeedKnots`, and the declared rule is
+to **stretch** the instants rather than refuse the edit — a reader dragging a waypoint is asking
+what if we had gone there, not whether we could have got there by Tuesday. The stretch is
+stated.
+
+Two things a reader should know about the checks, both measured in beat 010:
+
+- A profile more than `instruments.qualityControl.profileRejectionFraction` of whose levels
+  failed a check is not trusted at any depth, and the interface derived from it is flagged.
+  Before this the flags stopped at the levels and the observation the analysis consumed never
+  learned it was suspect.
+- A bias large enough to trip the gross-range check is also large enough for the observation
+  operator to refuse the profile, so for a warm bias the operator, not the check, is what
+  excludes it — identically whether or not quality control is running.
 
 ## The forecast, on two axes
 

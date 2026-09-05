@@ -100,7 +100,7 @@ const domainSchema = z
 
 export const configurationSchema = z
   .object({
-    schemaVersion: z.literal(5),
+    schemaVersion: z.literal(6),
 
     run: z.object({
       /**
@@ -189,6 +189,30 @@ export const configurationSchema = z
          * extent line already does.
          */
         levelTickLimit: z.number().int().positive(),
+      }),
+    }),
+
+    /**
+     * Beat 010. The thresholds the counterfactuals are judged against, declared so that
+     * "the edit propagated" and "the measurement was worth something" are measurements
+     * against a stated bar rather than impressions (AT-03, AT-06).
+     */
+    counterfactual: z.object({
+      /** A difference above this is outlined on the difference field (FR-029). */
+      differenceOutlineMetres: z.number().positive(),
+      differenceLimitMetres: z.number().positive(),
+      at06: z.object({
+        nearHorizonHours: z.number().nonnegative(),
+        farHorizonHours: z.number().positive(),
+        /** The near horizon must move by at least this, or the edit did nothing visible. */
+        minimumNearChangeMetres: z.number().positive(),
+        /** And the far horizon by at most this fraction of it, or nothing decayed. */
+        maximumFarFractionOfNear: z.number().positive().max(1),
+      }),
+      at03: z.object({
+        regionRadiusKm: z.number().positive(),
+        minimumInsideSkillDrop: z.number().positive(),
+        outsideSkillTolerance: z.number().positive(),
       }),
     }),
 
@@ -304,6 +328,13 @@ export const configurationSchema = z
         grossRange: z.object({ minimumDegC: z.number(), maximumDegC: z.number() }),
         climatologyDepartureStandardDeviations: z.number().positive(),
         verticalInversionToleranceDegC: z.number().nonnegative(),
+        /**
+         * Beat 010. A profile this fraction of whose levels failed a declared check is not
+         * trusted at any depth, and the interface depth derived from it is flagged so the
+         * analysis excludes it. Without this the flags stopped at the levels and the
+         * observation the analysis actually consumes never learned it was suspect.
+         */
+        profileRejectionFraction: z.number().positive().max(1),
       }),
       argo: z.object({
         /** ADR-0007, review R-3. The author's to set false; no code changes if they do. */
@@ -318,6 +349,12 @@ export const configurationSchema = z
       }),
       track: z.object({
         sampleIntervalHours: z.number().positive(),
+        /**
+         * Beat 010, FR-009. A redrawn track has to be sailable: legs are checked against
+         * this and, by the declared rule, the instants are stretched rather than the edit
+         * refused -- an edit a reader cannot make is worse than one the surface explains.
+         */
+        vesselSpeedKnots: z.number().positive(),
         waypoints: z.array(waypointSchema).min(2),
       }),
       drops: z.array(waypointSchema).min(1),
@@ -404,6 +441,15 @@ export const configurationSchema = z
     error: 'forecast.validityWindowHours is shorter than the longest declared horizon',
     path: ['forecast', 'validityWindowHours'],
   })
+  .refine(
+    (c) =>
+      c.horizons.leadHours.includes(c.counterfactual.at06.nearHorizonHours) &&
+      c.horizons.leadHours.includes(c.counterfactual.at06.farHorizonHours),
+    {
+      error: 'counterfactual.at06 names horizons that are not declared',
+      path: ['counterfactual', 'at06'],
+    },
+  )
   .refine((c) => c.forecast.quaysideOffsetHours <= c.forecast.spinUpHours, {
     error: 'forecast.quaysideOffsetHours must not be after the default issue time',
     path: ['forecast', 'quaysideOffsetHours'],
