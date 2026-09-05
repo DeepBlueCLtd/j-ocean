@@ -3,6 +3,10 @@ import configUrl from '../../config/j-ocean.json?url';
 import { ConfigurationError, fetchConfiguration, type LoadedConfiguration } from '../config/load.js';
 import { createRun, type Run } from '../run/run.js';
 import { serialiseManifest } from '../run/manifest.js';
+import { loadClimatology, loadObservations, loadTruth } from './artefacts.js';
+import { flaggedLevelCount, levelCount, type ObservationRecord } from '../truth/observations.js';
+import type { ArtefactTruthSource } from '../truth/artefact-truth-source.js';
+import type { FieldContainer } from '../truth/container.js';
 import { drawRootSeed } from './seed-provisioning.js';
 import { measure, overBudget } from './timing.js';
 
@@ -54,10 +58,18 @@ const viewOf = (run: Run, lastStepMs: number | null): RunView => ({
   lastStepMs,
 });
 
+interface Record002 {
+  readonly domainId: string;
+  readonly truth: ArtefactTruthSource;
+  readonly climatology: FieldContainer;
+  readonly observations: ObservationRecord;
+}
+
 export function App() {
   const [loaded, setLoaded] = useState<LoadedConfiguration | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [view, setView] = useState<RunView | null>(null);
+  const [record, setRecord] = useState<Record002 | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -81,6 +93,24 @@ export function App() {
       live = false;
     };
   }, []);
+
+  // The committed record for the default domain. It is loaded after the configuration has
+  // validated, because which artefact to load is a declared value like any other.
+  useEffect(() => {
+    if (loaded === null) return () => undefined;
+    let live = true;
+    const domainId = loaded.config.domains.defaultId;
+    Promise.all([loadTruth(domainId), loadClimatology(domainId), loadObservations(domainId)])
+      .then(([truth, climatology, observations]) => {
+        if (live) setRecord({ domainId, truth, climatology, observations });
+      })
+      .catch((error: unknown) => {
+        if (live) setFailure(error instanceof Error ? error.message : String(error));
+      });
+    return () => {
+      live = false;
+    };
+  }, [loaded]);
 
   const advance = useCallback(() => {
     setView((current) => {
@@ -236,6 +266,86 @@ export function App() {
               </dd>
             </dl>
           </section>
+
+          {record !== null && (
+            <section data-testid="truth-panel">
+              <h2>The record this run is scored against</h2>
+              <p className="aside">
+                Two derived artefacts, regenerated from a digest-verified raw subset by
+                gate G-01. Nothing here was edited by hand; a file that had been would fail
+                the build.
+              </p>
+              <dl>
+                <dt>Domain</dt>
+                <dd data-testid="truth-domain">
+                  <Declared>{record.domainId}</Declared>
+                </dd>
+
+                <dt>Truth source</dt>
+                <dd data-testid="truth-source">
+                  {String((record.truth.provenance()['sourceLabel'] as string | undefined) ?? '')}
+                </dd>
+
+                <dt>Native resolution</dt>
+                <dd>
+                  <Declared>{record.truth.nativeResolutionDegrees}&deg;</Declared>, which is{' '}
+                  <Declared>
+                    {loaded.config.domains.list.find((d) => d.id === record.domainId)
+                      ?.truthToModelResolutionRatio}
+                    &times;
+                  </Declared>{' '}
+                  coarser than the model grid. Scoring will decline to resolve below it.
+                </dd>
+
+                <dt>Instants</dt>
+                <dd data-testid="truth-instants">
+                  <Computed>{record.truth.instantsMs().length}</Computed>, spaced{' '}
+                  <Computed>
+                    {(record.truth.provenance()['instantSpacingHours'] as number[] | undefined)?.join(
+                      ' and ',
+                    )}
+                  </Computed>{' '}
+                  hours apart. The source is missing occasional snapshots; the record carries
+                  its instants as they are and interpolates nothing at build time.
+                </dd>
+
+                <dt>Depth levels</dt>
+                <dd>
+                  <Declared>{record.truth.depthLevelsMetres().join(', ')} m</Declared> &mdash;
+                  exact levels of the source, so no build-time vertical interpolation.
+                </dd>
+
+                <dt>Argo profiles</dt>
+                <dd data-testid="observation-count">
+                  <Computed>{record.observations.profiles.length}</Computed> profiles,{' '}
+                  <Computed>{levelCount(record.observations)}</Computed> levels, of which{' '}
+                  <Computed>{flaggedLevelCount(record.observations)}</Computed> carry a flag
+                  the analysis will not treat as usable. Flagged levels are kept and will be
+                  drawn as flagged, never omitted.
+                </dd>
+
+                <dt>Climatology</dt>
+                <dd data-testid="climatology-overlap">
+                  Averaged over{' '}
+                  <Declared>
+                    {String(
+                      (record.climatology.header.provenance['window'] as { start: string })?.start,
+                    )}
+                  </Declared>{' '}
+                  to{' '}
+                  <Declared>
+                    {String((record.climatology.header.provenance['window'] as { end: string })?.end)}
+                  </Declared>
+                  , which overlaps this run's period by{' '}
+                  <Computed>
+                    {String(record.climatology.header.provenance['overlapWithRunPeriodDays'])}
+                  </Computed>{' '}
+                  days. Skill against this reference is therefore not a fully independent
+                  measure, and the surface will say so beside every such score.
+                </dd>
+              </dl>
+            </section>
+          )}
 
           <section data-testid="manifest-panel">
             <h2>The manifest this run replays from</h2>

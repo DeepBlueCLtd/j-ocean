@@ -1,0 +1,264 @@
+{
+  "files": {
+    "clim/gulf-stream-front/surf_el.nc": {
+      "bytes": 156525,
+      "sha256": "e1f16dd540e503a77a4c56c804a2e15acdce1c5c7c80c33e9019789de0ea32bd",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=surf_el&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4"
+    },
+    "clim/gulf-stream-front/water_temp-0m.nc": {
+      "bytes": 191875,
+      "sha256": "2248947a7f1cc45055d05a4836b8c022bf8bb65f49228dd51519154f828c9555",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4&vertCoord=0"
+    },
+    "clim/gulf-stream-front/water_temp-100m.nc": {
+      "bytes": 193428,
+      "sha256": "80ccbc9693b4aa00d8c0d66c380fe59efc733568e0775521f0d2b25ebe424ebe",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4&vertCoord=100"
+    },
+    "clim/gulf-stream-front/water_temp-200m.nc": {
+      "bytes": 183540,
+      "sha256": "74d2cfde8019fdb3e51ae95d27793d30d8cb4d8870db9f3f1b4b74967cb2d5ee",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4&vertCoord=200"
+    },
+    "clim/gulf-stream-front/water_temp-400m.nc": {
+      "bytes": 186907,
+      "sha256": "1d0424fd1c37de56a94ed5853bea95f3ebeaee48cdd8072029fa02deec3bbe90",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4&vertCoord=400"
+    },
+    "clim/gulf-stream-front/water_temp-50m.nc": {
+      "bytes": 208265,
+      "sha256": "97e734656be4d705355c5933bdb75da7c73922093f347c23b1d9c8180af7fd62",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4&vertCoord=50"
+    },
+    "clim/gulf-stream-front/water_temp-700m.nc": {
+      "bytes": 185207,
+      "sha256": "fb5c7fa78a4194d20ffc38eaf733418b9aaedb787119a67dc5fbe1ad78839545",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4&vertCoord=700"
+    },
+    "clim/open-gyre/surf_el.nc": {
+      "bytes": 128917,
+      "sha256": "c6b777e9b65a84ccab1cc028c51e616709abe97610afaf60a86930d682237e0d",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=surf_el&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4"
+    },
+    "clim/open-gyre/water_temp-0m.nc": {
+      "bytes": 167953,
+      "sha256": "226cfc8d4a6eb3b4d28a2a2cf6e2f32c00d4812ff0c979e0f7d4c3e28dbe0538",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4&vertCoord=0"
+    },
+    "clim/open-gyre/water_temp-100m.nc": {
+      "bytes": 184036,
+      "sha256": "e76884b0027346155d668ff9bca4e01d40253f00e8484012c3b11409e663380a",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4&vertCoord=100"
+    },
+    "clim/open-gyre/water_temp-200m.nc": {
+      "bytes": 174738,
+      "sha256": "ac8cac7c496647eda8ce8c80ff0935ed748cc82d9d1620dc47ebdfc21498e349",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4&vertCoord=200"
+    },
+    "clim/open-gyre/water_temp-400m.nc": {
+      "bytes": 174675,
+      "sha256": "686961a3b3ae707a77910bb1b237ed7325045ffa406c1e7a638fb0f451491777",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4&vertCoord=400"
+    },
+    "clim/open-gyre/water_temp-50m.nc": {
+      "bytes": 184918,
+      "sha256": "bd8d616ef929ae4f4c914f08bc91accec915a2bbf9f29fe4f15a2ee86255ba5f",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4&vertCoord=50"
+    },
+    "clim/open-gyre/water_temp-700m.nc": {
+      "bytes": 174380,
+      "sha256": "05243e30aa609cf0add07c5dcec8f955d64c37c46121cc2c656833309340198a",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4&vertCoord=700"
+    },
+    "obs/gulf-stream-front/aoml_1901584_profiles_D1901584_054.nc": {
+      "bytes": 20736,
+      "sha256": "4261ecb12871d4ff83091876954a34174a9d7d4ec936a935900da5855669ff44",
+      "url": "https://data-argo.ifremer.fr/dac/aoml/1901584/profiles/D1901584_054.nc"
+    },
+    "obs/gulf-stream-front/aoml_1901584_profiles_D1901584_055.nc": {
+      "bytes": 20676,
+      "sha256": "e602d71cb8fde9c0e145b5ef1443f341460a7a93eb5ff7b4dfb7e66845510679",
+      "url": "https://data-argo.ifremer.fr/dac/aoml/1901584/profiles/D1901584_055.nc"
+    },
+    "obs/gulf-stream-front/aoml_4901461_profiles_D4901461_010.nc": {
+      "bytes": 21420,
+      "sha256": "618ac244b5817668ccb9d38aef5173d3c17ddbbad9473f7db772ea46f624656a",
+      "url": "https://data-argo.ifremer.fr/dac/aoml/4901461/profiles/D4901461_010.nc"
+    },
+    "obs/gulf-stream-front/aoml_4901524_profiles_R4901524_097.nc": {
+      "bytes": 19512,
+      "sha256": "80442a73aa7d20b4207ffffe768ff4200baf016dca2a0c3da877fa112cbb0572",
+      "url": "https://data-argo.ifremer.fr/dac/aoml/4901524/profiles/R4901524_097.nc"
+    },
+    "obs/gulf-stream-front/aoml_4901524_profiles_R4901524_098.nc": {
+      "bytes": 19512,
+      "sha256": "13dc4bd4d0dd8477f763d361eb52ca8ea6b637e89979690fbe0bc4d1affc1ac3",
+      "url": "https://data-argo.ifremer.fr/dac/aoml/4901524/profiles/R4901524_098.nc"
+    },
+    "obs/gulf-stream-front/aoml_4901524_profiles_R4901524_099.nc": {
+      "bytes": 19512,
+      "sha256": "bad6b2e32ac3266971c20e019010d7b76ef1678a565530ea0a153be1a099b707",
+      "url": "https://data-argo.ifremer.fr/dac/aoml/4901524/profiles/R4901524_099.nc"
+    },
+    "obs/gulf-stream-front/aoml_4901525_profiles_R4901525_098.nc": {
+      "bytes": 19476,
+      "sha256": "7cd9bfa468af4152db0327ad0afbbee28fb98099d38389cc4d8f283ef0299dcd",
+      "url": "https://data-argo.ifremer.fr/dac/aoml/4901525/profiles/R4901525_098.nc"
+    },
+    "obs/gulf-stream-front/aoml_4901525_profiles_R4901525_099.nc": {
+      "bytes": 19512,
+      "sha256": "646f7e8ebb7002a463192de284be41e1d0c8fef656fd23b5eba40957411bf209",
+      "url": "https://data-argo.ifremer.fr/dac/aoml/4901525/profiles/R4901525_099.nc"
+    },
+    "obs/gulf-stream-front/aoml_5903997_profiles_D5903997_120.nc": {
+      "bytes": 171784,
+      "sha256": "e7ac136ecbc690c60d2d610692bbd15c5ea43419a2349615f937f90a22f627dc",
+      "url": "https://data-argo.ifremer.fr/dac/aoml/5903997/profiles/D5903997_120.nc"
+    },
+    "obs/gulf-stream-front/aoml_5903997_profiles_D5903997_121.nc": {
+      "bytes": 170760,
+      "sha256": "7ff2e7b2af5515980d4d5278d5ce6c4b7f8c83d6a80d0749f025586d04f9cb0e",
+      "url": "https://data-argo.ifremer.fr/dac/aoml/5903997/profiles/D5903997_121.nc"
+    },
+    "obs/gulf-stream-front/aoml_5903997_profiles_D5903997_122.nc": {
+      "bytes": 39272,
+      "sha256": "4f676d1c8f53e2f055662465668adafe7f0dd8f748302453d2ecb18fd194966c",
+      "url": "https://data-argo.ifremer.fr/dac/aoml/5903997/profiles/D5903997_122.nc"
+    },
+    "obs/gulf-stream-front/aoml_5903997_profiles_D5903997_123.nc": {
+      "bytes": 171432,
+      "sha256": "ddc8e97306b0786a745370e5a4092b5bfc00f12ef2e455fc4a2d2ee780177a97",
+      "url": "https://data-argo.ifremer.fr/dac/aoml/5903997/profiles/D5903997_123.nc"
+    },
+    "obs/gulf-stream-front/aoml_5903997_profiles_D5903997_124.nc": {
+      "bytes": 167928,
+      "sha256": "735e5a8d7e0eec4a34e18134e4ff8600c1ba9107f1684a0fba21ccb9c4b8b3cd",
+      "url": "https://data-argo.ifremer.fr/dac/aoml/5903997/profiles/D5903997_124.nc"
+    },
+    "obs/gulf-stream-front/aoml_5903997_profiles_D5903997_125.nc": {
+      "bytes": 173128,
+      "sha256": "f155f95aa774d13c1f6f0e7cc8dbd9e15c226c80aa09eee74b52eccc438ed240",
+      "url": "https://data-argo.ifremer.fr/dac/aoml/5903997/profiles/D5903997_125.nc"
+    },
+    "obs/gulf-stream-front/index.json": {
+      "bytes": 2344,
+      "sha256": "305aeff1ff0bacc1888c634bbde326fae978e3b1d97ed416f4140e0c56132762",
+      "url": "https://data-argo.ifremer.fr/ar_index_global_prof.txt.gz"
+    },
+    "obs/gulf-stream-front/meds_4901140_profiles_D4901140_123.nc": {
+      "bytes": 21484,
+      "sha256": "b391c61f4294d50fb5569c7da12f2fc0eb0b4a6e5fb4e869412222a0b7660f45",
+      "url": "https://data-argo.ifremer.fr/dac/meds/4901140/profiles/D4901140_123.nc"
+    },
+    "obs/open-gyre/aoml_4901058_profiles_D4901058_111.nc": {
+      "bytes": 20712,
+      "sha256": "053d9bd4850057caa20daf27b15ee98b76750f1aa2d619ba47066d5c0e723cac",
+      "url": "https://data-argo.ifremer.fr/dac/aoml/4901058/profiles/D4901058_111.nc"
+    },
+    "obs/open-gyre/aoml_4901063_profiles_D4901063_116.nc": {
+      "bytes": 21264,
+      "sha256": "dc96e6795b8b3bcaab0cade8a141416bd101edbaea4f9ef46a44d8f8e1f4580f",
+      "url": "https://data-argo.ifremer.fr/dac/aoml/4901063/profiles/D4901063_116.nc"
+    },
+    "obs/open-gyre/aoml_4901063_profiles_D4901063_117.nc": {
+      "bytes": 21264,
+      "sha256": "7b4a8a38a09443a7d6b7b3b19d334e7ae13fb7c9745c03748aa34f80d20cbd3b",
+      "url": "https://data-argo.ifremer.fr/dac/aoml/4901063/profiles/D4901063_117.nc"
+    },
+    "obs/open-gyre/aoml_4901211_profiles_D4901211_109.nc": {
+      "bytes": 37284,
+      "sha256": "c498099f309406ccdc08572a582e388365b154f9efeb4962a425ed7fe42af9c4",
+      "url": "https://data-argo.ifremer.fr/dac/aoml/4901211/profiles/D4901211_109.nc"
+    },
+    "obs/open-gyre/aoml_5904008_profiles_D5904008_063.nc": {
+      "bytes": 167400,
+      "sha256": "f4fc520c11beac3c49f922cad257202f3214d515e4ac5c7e8cbd9a9ebbac34f1",
+      "url": "https://data-argo.ifremer.fr/dac/aoml/5904008/profiles/D5904008_063.nc"
+    },
+    "obs/open-gyre/aoml_5904018_profiles_D5904018_059.nc": {
+      "bytes": 168744,
+      "sha256": "4c12cab713459251ddd3941910c2e19999319f75e29f4da8b535d66165ace6b4",
+      "url": "https://data-argo.ifremer.fr/dac/aoml/5904018/profiles/D5904018_059.nc"
+    },
+    "obs/open-gyre/aoml_5904018_profiles_D5904018_060.nc": {
+      "bytes": 171960,
+      "sha256": "e81f1ca524b1057e8aaccb8fa883f440f7a2c6f309de14d79c7da5aa666e8743",
+      "url": "https://data-argo.ifremer.fr/dac/aoml/5904018/profiles/D5904018_060.nc"
+    },
+    "obs/open-gyre/index.json": {
+      "bytes": 1136,
+      "sha256": "56eb196f0aafda1b2bb8023157c1b34ee259b582bf68e073309b4d34dddab2d2",
+      "url": "https://data-argo.ifremer.fr/ar_index_global_prof.txt.gz"
+    },
+    "truth/gulf-stream-front/surf_el.nc": {
+      "bytes": 273407,
+      "sha256": "65ac879564ce11cb0476f1d69ff9b325158a31056dfbe7fb1113cc5c5d97d82f",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=surf_el&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4"
+    },
+    "truth/gulf-stream-front/water_temp-0m.nc": {
+      "bytes": 324851,
+      "sha256": "f0a9ae717962a93bc3a15f1e7178fca09d1d94ce328acc582e6cc203be9747c0",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=0"
+    },
+    "truth/gulf-stream-front/water_temp-100m.nc": {
+      "bytes": 332743,
+      "sha256": "969aa1117d90cb6595534cda52914f9bc30f81a871bbc9d23dcf7921e1b5ed7a",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=100"
+    },
+    "truth/gulf-stream-front/water_temp-200m.nc": {
+      "bytes": 314244,
+      "sha256": "2056cf5896c9ae95bb3c2ae2a3487cf704cb693b438502d17fe46618ac02611d",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=200"
+    },
+    "truth/gulf-stream-front/water_temp-400m.nc": {
+      "bytes": 319924,
+      "sha256": "e730b03df1cfa3d3350485797e7403572e087b711aa90c35a06eabbed2b16d65",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=400"
+    },
+    "truth/gulf-stream-front/water_temp-50m.nc": {
+      "bytes": 360529,
+      "sha256": "d1f3a1dfe2413a14487afddc249cb49524a7f97fa1d662ebd3fd2f67d8c14c25",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=50"
+    },
+    "truth/gulf-stream-front/water_temp-700m.nc": {
+      "bytes": 314375,
+      "sha256": "77be314cb9c041bc7a4ee104c14e78708caee568f3379bdcfaf2fdbc07615626",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=700"
+    },
+    "truth/open-gyre/surf_el.nc": {
+      "bytes": 215595,
+      "sha256": "88540356780fd44dae5c3748a69b007971b6467423ec1f2e4f1c2c8f777997d1",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=surf_el&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4"
+    },
+    "truth/open-gyre/water_temp-0m.nc": {
+      "bytes": 288497,
+      "sha256": "58677d4eecd2b38353beaa2141da5e56045160277c8a8c5133dfd8e226e5d03d",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=0"
+    },
+    "truth/open-gyre/water_temp-100m.nc": {
+      "bytes": 316136,
+      "sha256": "796445764ebee0081d78c7f4d5e7b4b65f3f77c8f25ace24f41fd9d8d054c463",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=100"
+    },
+    "truth/open-gyre/water_temp-200m.nc": {
+      "bytes": 301507,
+      "sha256": "27b0ce5dc3eecc759b51cf51b4835d17c888ccc8a33d30b89061fbdfcb413f71",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=200"
+    },
+    "truth/open-gyre/water_temp-400m.nc": {
+      "bytes": 298998,
+      "sha256": "437a9126b88b70811bcd75f2354bb31b14ac10c84ffe516dd4793bf17af5c18d",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=400"
+    },
+    "truth/open-gyre/water_temp-50m.nc": {
+      "bytes": 320892,
+      "sha256": "0798286d06f1f0b5e94808afdf7456eb0cbcfd87b20e620ad86b9a89f3ddf5a9",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=50"
+    },
+    "truth/open-gyre/water_temp-700m.nc": {
+      "bytes": 299221,
+      "sha256": "c001d36e93b09872d3e596033194638ba58db594300219aebc9b2cab687b9200",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=700"
+    }
+  }
+}

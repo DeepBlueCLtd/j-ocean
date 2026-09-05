@@ -16,11 +16,11 @@ constitution → specify → plan → tasks → analyze → implement.
 
 ## Where the tree is
 
-Beat **001, foundation and ports**, has landed: the toolchain, the four ports and their
-contract tests, seeded streams, the run manifest and its byte-identical replay, the static
-shell, and three of the seven gates. There is no ocean in it yet. Beat 002 (truth and
-observation records) and beat 003 (the reduced-gravity model) are next and may proceed in
-parallel — see the plan.
+Beats **001 (foundation and ports)** and **002 (truth and observation records)** have
+landed: the toolchain, the four ports and their contract tests, seeded streams, the run
+manifest and its byte-identical replay, the static shell, the committed HYCOM and Argo
+records with the drift gate over them, and four of the seven gates. There is no ocean in it
+yet — beat 003, the reduced-gravity model, is next.
 
 ## Running it
 
@@ -48,6 +48,16 @@ Individually:
 The shell test needs a Chromium. `pnpm exec playwright install chromium` fetches one; on a
 machine that already has one, set `J_OCEAN_CHROMIUM` to its executable instead.
 
+Gate G-01 regenerates the committed data artefacts, so it needs the build step's Python:
+
+```sh
+python3 -m pip install -r data/scripts/requirements.txt
+```
+
+A machine without it sees G-01 **fail**, not skip, because a skipped gate is not a passed
+gate. Set `J_OCEAN_PYTHON` if the interpreter is not `python3`. See
+[`data/scripts/README.md`](data/scripts/README.md) for the pipeline itself.
+
 ## Published
 
 Every push to `main` publishes to the `gh-pages` branch:
@@ -69,7 +79,7 @@ while a gate that is present but did not run is a hole that looks like a pass.
 
 | Gate | Holds | Landed |
 |---|---|---|
-| G-01 | artefacts regenerate identically | beat 002 |
+| G-01 | artefacts regenerate identically | **002** |
 | G-02 | truth reaches the analysis only through an instrument | beat 004 |
 | G-03 | the model imports no rendering module | **001** |
 | G-04 | no host clock, no unseeded randomness | **001** |
@@ -87,9 +97,13 @@ fixture and requires it to fail. A check that has never been seen to fail is wor
 
 ```text
 config/            declared values, validated at startup (Principle X)
+data/scripts/      the build step: fetch (network) and convert (pure), and nothing else
+data/raw/          the committed raw subsets and their digests
+data/truth,clim,obs/  the committed derived artefacts, held honest by gate G-01
 src/config/        the one loader, the schema, the configuration digest
 src/ports/         the four ports and nothing else (Principle VIII)
 src/model/         kernel, grid, state; imports nothing above it (Principle III)
+src/truth/         the truth-source port over the committed artefacts
 src/run/           seeds, the manifest, the run that owns the clock (Principle I)
 src/harness/       the React shell, and the two bounded host-time exemptions
 scripts/gates/     the gates, their word list and their planted violations

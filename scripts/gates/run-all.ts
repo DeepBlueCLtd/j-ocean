@@ -1,3 +1,4 @@
+import { checkArtefactDrift } from './check-artefact-drift.js';
 import { checkHostTime } from './check-host-time.js';
 import { checkModelImports } from './check-model-imports.js';
 import { checkVocabulary } from './check-vocabulary.js';
@@ -25,7 +26,7 @@ interface NotYetLanded {
 }
 
 const GATES: readonly (Landed | NotYetLanded)[] = [
-  { name: 'G-01 artefact drift', beat: '002', holds: 'truth and observation artefacts regenerate identically' },
+  { run: () => checkArtefactDrift([]) },
   { name: 'G-02 truth boundary', beat: '004', holds: 'no truth value reaches the analysis except through an instrument' },
   { run: checkModelImports },
   { run: checkHostTime },

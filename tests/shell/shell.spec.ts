@@ -102,6 +102,29 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('not-operational')).toBeVisible();
   });
 
+  test('states what the run is scored against, and what that record costs', async ({ page }) => {
+    await page.goto('/');
+    const panel = page.getByTestId('truth-panel');
+    await expect(panel).toBeVisible();
+    await expect(page.getByTestId('truth-source')).toContainText('HYCOM');
+
+    // Review R-2: the truth is coarser than the model, and the surface says so rather than
+    // leaving a reader to assume otherwise.
+    await expect(panel).toContainText('coarser than the model grid');
+
+    // The gaps in the source are stated, not smoothed over.
+    await expect(page.getByTestId('truth-instants')).toContainText('interpolates nothing at build time');
+
+    // FR-24: flagged levels are kept, and the surface says they will be drawn as flagged.
+    await expect(page.getByTestId('observation-count')).toContainText('drawn as flagged, never omitted');
+
+    // ADR-0008: the climatology's dependence on the same subset is on the surface, not in a
+    // document the surface does not carry.
+    await expect(page.getByTestId('climatology-overlap')).toContainText(
+      'not a fully independent measure',
+    );
+  });
+
   test('states the declared values, so that no figure on the page is unattributed', async ({
     page,
   }) => {

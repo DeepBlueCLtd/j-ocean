@@ -8,7 +8,7 @@ const raw = (): Record<string, unknown> => JSON.parse(readFileSync(CONFIG_PATH, 
 describe('the configuration loader', () => {
   it('loads the declared configuration and digests it', () => {
     const { config, digest } = declaredConfiguration();
-    expect(config.schemaVersion).toBe(1);
+    expect(config.schemaVersion).toBe(2);
     expect(config.grid.nx).toBe(100);
     expect(config.grid.ny).toBe(100);
     expect(digest).toMatch(/^[0-9a-f]{64}$/);
@@ -63,13 +63,71 @@ describe('the configuration loader', () => {
       ...raw(),
       domains: {
         defaultId: 'a',
-        list: [{ id: 'a', label: 'A', west: -70, east: -75, south: 34, north: 39, character: 'bland' }],
+        list: [
+          {
+            id: 'a',
+            label: 'A',
+            west: -70,
+            east: -75,
+            south: 34,
+            north: 39,
+            character: 'bland',
+            nativeResolutionDegrees: 0.08,
+            truthToModelResolutionRatio: 1.6,
+          },
+        ],
       },
     };
     expect(() => validateConfiguration(broken)).toThrow(/east must be greater than west/);
   });
 
+  describe('the arithmetic the schema does rather than trusts', () => {
+    it('rejects a truth period too short for the last issue time plus the longest horizon', () => {
+      const current = raw()['truth'] as Record<string, unknown>;
+      const broken = {
+        ...raw(),
+        truth: { ...current, period: { start: '2013-09-01T00:00:00Z', end: '2013-09-05T00:00:00Z', strideHours: 6 } },
+      };
+      expect(() => validateConfiguration(broken)).toThrow(/truth\.period is too short/);
+    });
+
+    it('rejects a first issue time inside spin-up', () => {
+      const broken = {
+        ...raw(),
+        forecast: { spinUpHours: 48, issueTimes: { firstOffsetHours: 24, lastOffsetHours: 168, strideHours: 12 } },
+      };
+      expect(() => validateConfiguration(broken)).toThrow(/at or after the end of spin-up/);
+    });
+
+    it('rejects a clock epoch that is not the start of the truth period', () => {
+      const current = raw()['clock'] as Record<string, unknown>;
+      const broken = { ...raw(), clock: { ...current, epoch: '2019-06-01T00:00:00Z' } };
+      expect(() => validateConfiguration(broken)).toThrow(/clock epoch must be the instant/);
+    });
+
+    it('rejects a declared resolution ratio the box and grid do not imply (review R-2)', () => {
+      const current = raw()['domains'] as { defaultId: string; list: Record<string, unknown>[] };
+      const broken = {
+        ...raw(),
+        domains: {
+          ...current,
+          list: current.list.map((d, i) => (i === 0 ? { ...d, truthToModelResolutionRatio: 1 } : d)),
+        },
+      };
+      expect(() => validateConfiguration(broken)).toThrow(/does not match the box, the grid/);
+    });
+
+    it('rejects a stride the three-hourly source cannot supply', () => {
+      const current = raw()['truth'] as { period: Record<string, unknown> };
+      const broken = {
+        ...raw(),
+        truth: { ...current, period: { ...current.period, strideHours: 5 } },
+      };
+      expect(() => validateConfiguration(broken)).toThrow(/three-hourly/);
+    });
+  });
+
   it('rejects a schema version it does not know', () => {
-    expect(() => validateConfiguration({ ...raw(), schemaVersion: 2 })).toThrow(/schemaVersion/);
+    expect(() => validateConfiguration({ ...raw(), schemaVersion: 3 })).toThrow(/schemaVersion/);
   });
 });

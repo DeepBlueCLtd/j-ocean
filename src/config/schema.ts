@@ -26,6 +26,28 @@ const instantSchema = z
   )
   .refine((s) => Number.isFinite(Date.parse(s)), 'the instant is not a real date');
 
+const windowSchema = z
+  .object({
+    start: instantSchema,
+    end: instantSchema,
+    /** A multiple of the source product's own three-hourly resolution. */
+    strideHours: z.number().int().positive().refine((h) => h % 3 === 0, 'the source is three-hourly'),
+    /**
+     * The reanalysis has occasional missing snapshots, so a stride of six hours can land on
+     * a nine-hour step. The build step records every gap and refuses any that exceeds this
+     * figure, naming the instants: a gap is never silently interpolated at build time, and
+     * how large a gap is tolerable is declared rather than judged at review (Principle X).
+     */
+    maxInstantGapHours: z.number().positive().optional(),
+  })
+  .refine((w) => Date.parse(w.end) > Date.parse(w.start), {
+    error: 'a window ends after it starts',
+    path: ['end'],
+  });
+
+const hoursIn = (window: { start: string; end: string }): number =>
+  (Date.parse(window.end) - Date.parse(window.start)) / 3_600_000;
+
 const domainSchema = z
   .object({
     id: z.string().min(1),
@@ -42,13 +64,21 @@ const domainSchema = z
      * test checks the declaration and would have nothing to check if the code inferred it.
      */
     character: z.enum(['eventful', 'bland']),
+    /** Recorded from the first artefact, never inferred (review R-2). */
+    nativeResolutionDegrees: z.number().positive(),
+    /**
+     * How much coarser the truth record is than the model grid. Declared here and checked
+     * below against the box and the grid, so that it is a claim the schema can refuse
+     * rather than a number nobody rereads.
+     */
+    truthToModelResolutionRatio: z.number().positive(),
   })
   .refine((d) => d.east > d.west, { error: 'east must be greater than west' })
   .refine((d) => d.north > d.south, { error: 'north must be greater than south' });
 
 export const configurationSchema = z
   .object({
-    schemaVersion: z.literal(1),
+    schemaVersion: z.literal(2),
 
     run: z.object({
       /**
@@ -96,6 +126,49 @@ export const configurationSchema = z
       defaultId: z.string().min(1),
       list: z.array(domainSchema).min(1),
     }),
+
+    /**
+     * Beat 009 owns issue times; they are declared here because FR-011 asks the schema to
+     * enforce that the truth period is long enough to carry them, and it cannot check an
+     * arithmetic whose terms live somewhere else.
+     */
+    forecast: z.object({
+      spinUpHours: z.number().nonnegative(),
+      issueTimes: z.object({
+        firstOffsetHours: z.number().nonnegative(),
+        lastOffsetHours: z.number().positive(),
+        strideHours: z.number().positive(),
+      }),
+    }),
+
+    truth: z.object({
+      source: z.object({
+        id: z.string().min(1),
+        label: z.string().min(1),
+        /** How the subset is taken. See ADR-0004 for why it is not the DAP protocol. */
+        service: z.enum(['ncss', 'dap']),
+        baseUrl: z.string().url(),
+        nativeResolutionDegrees: z.number().positive(),
+      }),
+      period: windowSchema,
+      /** Exact levels of the source product, so the build step interpolates nothing. */
+      depthLevelsMetres: z.array(z.number().nonnegative()).min(2),
+      contrast: z.object({
+        /** FR-11: the eventful domain must beat the bland one by at least this much. */
+        minimumEventfulToBlandVarianceRatio: z.number().positive(),
+      }),
+    }),
+
+    climatology: z.object({ window: windowSchema }),
+
+    observations: z.object({
+      source: z.object({
+        id: z.string().min(1),
+        label: z.string().min(1),
+        indexUrl: z.string().url(),
+        profileBaseUrl: z.string().url(),
+      }),
+    }),
   })
   .refine((c) => c.domains.list.some((d) => d.id === c.domains.defaultId), {
     error: 'domains.defaultId must name one of domains.list',
@@ -108,6 +181,59 @@ export const configurationSchema = z
   .refine(
     (c) => c.horizons.leadHours.every((h, i, all) => i === 0 || h > (all[i - 1] as number)),
     { error: 'horizons.leadHours must be strictly increasing', path: ['horizons', 'leadHours'] },
+  )
+  .refine(
+    (c) =>
+      c.truth.depthLevelsMetres.every((d, i, all) => i === 0 || d > (all[i - 1] as number)),
+    { error: 'truth.depthLevelsMetres must be strictly increasing', path: ['truth', 'depthLevelsMetres'] },
+  )
+  /**
+   * FR-011, and the reason the forecast block is declared this early. The truth period has
+   * to carry the whole experiment: spin-up, then issue times, then the longest horizon from
+   * the last issue time. Getting this wrong is the kind of mistake that surfaces as an
+   * unexplained empty panel three beats later, so the schema does the arithmetic.
+   */
+  .refine(
+    (c) =>
+      hoursIn(c.truth.period) >=
+      c.forecast.issueTimes.lastOffsetHours +
+        Math.max(...c.horizons.leadHours),
+    {
+      error:
+        'truth.period is too short: it must cover the last issue time plus the longest horizon',
+      path: ['truth', 'period'],
+    },
+  )
+  .refine((c) => c.forecast.spinUpHours <= c.forecast.issueTimes.firstOffsetHours, {
+    error: 'the first issue time must be at or after the end of spin-up',
+    path: ['forecast', 'issueTimes', 'firstOffsetHours'],
+  })
+  .refine(
+    (c) => Date.parse(c.clock.epoch) === Date.parse(c.truth.period.start),
+    { error: 'the clock epoch must be the instant the truth period starts', path: ['clock', 'epoch'] },
+  )
+  .refine(
+    (c) =>
+      c.domains.list.every(
+        (d) => Math.abs(d.nativeResolutionDegrees - c.truth.source.nativeResolutionDegrees) < 1e-9,
+      ),
+    { error: 'a domain records a native resolution the truth source does not have', path: ['domains', 'list'] },
+  )
+  /**
+   * Review R-2 in one line of arithmetic: the declared ratio has to be the ratio the box
+   * and the grid actually imply, or it is a number nobody rereads.
+   */
+  .refine(
+    (c) =>
+      c.domains.list.every((d) => {
+        const modelCellDegrees = (d.east - d.west) / c.grid.nx;
+        return Math.abs(d.truthToModelResolutionRatio - d.nativeResolutionDegrees / modelCellDegrees) < 1e-6;
+      }),
+    {
+      error:
+        'truthToModelResolutionRatio does not match the box, the grid and the native resolution',
+      path: ['domains', 'list'],
+    },
   );
 
 export type Configuration = z.infer<typeof configurationSchema>;

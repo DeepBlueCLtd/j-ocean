@@ -21,6 +21,12 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Python is the one permitted second runtime and is a build step. CI installs it for
+      # gate G-01 alone, which regenerates the committed artefacts and compares them.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python3 -m pip install -r data/scripts/requirements.txt
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test

@@ -6,7 +6,8 @@
     "terms: plaintext, the tracked-entity vocabulary. Ordinary English with nothing to conceal, so the documents whose subject is the prohibition may name it; those are listed in plaintextExemptPaths and are reviewed with this file.",
     "hashedTerms: salted SHA-256 of customer, project and bid material, which must appear nowhere at all and therefore cannot be written here either. No exemption applies to these.",
     "Add a hashed term with: pnpm exec tsx scripts/gates/check-vocabulary.ts --hash \"<term>\"",
-    "The ordinary navigational word for the path a vessel has travelled is deliberately absent from both halves."
+    "The ordinary navigational word for the path a vessel has travelled is deliberately absent from both halves.",
+    "derivedArtefactPaths are excluded from both halves: they are build outputs, not writing. Gate G-01 regenerates each of them from digest-verified public inputs and fails on any byte difference, so a hand-written file placed among them fails that gate rather than hiding from this one."
   ],
   "terms": [
     {
@@ -33,5 +34,11 @@
     ".specify/templates",
     ".claude",
     "scripts/gates/gate-lib.ts"
+  ],
+  "derivedArtefactPaths": [
+    "data/raw",
+    "data/truth",
+    "data/clim",
+    "data/obs"
   ]
 }

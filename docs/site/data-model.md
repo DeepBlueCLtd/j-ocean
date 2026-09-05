@@ -85,6 +85,77 @@ and window it covers; and `nativeResolutionDegrees`, recorded from the artefact 
 inferred, because scoring refuses to make claims below it and a refusal cannot rest on a
 number the code guessed.
 
+## The committed field container
+
+One file per field artefact — a domain's truth record, a domain's climatology. Deliberately
+small enough to read with `DataView`, `TextDecoder` and a typed array, because an artefact
+format that needs a parser is one a reader cannot check by hand.
+
+```text
+bytes 0..7      magic, ASCII "JOCEAN01"
+bytes 8..11     uint32 little-endian: the header length in bytes
+bytes 12..      the header, UTF-8 JSON, exactly that many bytes
+                zero padding to the next multiple of 4
+then            the payload: each variable at the byte offset the header declares
+```
+
+The header carries:
+
+| Field | Meaning |
+|---|---|
+| `kind` | `truth` or `climatology` |
+| `domain` | Which declared domain this is |
+| `nativeResolutionDegrees` | The source's own resolution, recorded from the artefact and never inferred |
+| `coordinates` | `timeMs` (absent for a climatology), `depthMetres`, `latDegrees`, `lonDegrees` |
+| `variables[]` | Per variable: `dims`, `shape`, `dtype`, `scaleFactor`, `addOffset`, `fillValue`, `byteOffset`, `byteLength` |
+| `provenance` | Source, service, every raw input with its digest and URL, and the window |
+
+**The payload is `int16` with a declared scale and offset**, which is exactly how the source
+product stores these fields. Widening to `float32` would double the artefact in order to
+invent precision the source does not have. Land carries the declared fill value, and the
+reader turns it into `NaN` rather than into a plausible number.
+
+### What the truth record's provenance says about itself
+
+Two things are recorded because they would otherwise be assumed:
+
+- **The instants are not evenly spaced.** The reanalysis is missing occasional snapshots, so
+  a six-hourly stride lands on a nine-hour step twice in a fortnight. The record carries the
+  instants as the source has them, `instantSpacingHours` states which spacings occur, and the
+  build refuses any gap larger than the declared maximum, naming the instants. Nothing is
+  interpolated at build time.
+- **The truth is coarser than the model.** At 1/12° on a five-degree box the record is about
+  64 x 64 while the model grid is 100 x 100 — a ratio of 1.6, declared in configuration and
+  checked by the schema against the box and the grid. Scoring declines to resolve below the
+  truth's own resolution.
+
+## The observation record
+
+Argo profiles, as JSON rather than as the binary container: profiles are ragged, different
+floats report different numbers of levels, and a ragged binary layout is a parser.
+
+```jsonc
+{
+  "format": "j-ocean/observations",
+  "domain": "gulf-stream-front",
+  "provenance": { "source": "...", "flagNote": "...", "levelsInRaw": 9058, "temperatureFlagCountsInRaw": { "1": 5082, "4": 3976 } },
+  "profiles": [
+    {
+      "platform": "1901584", "cycle": 54,
+      "instant": "2013-09-02T...Z",       // as reported; a float drifts through its cycle
+      "latDegrees": 36.1, "lonDegrees": -72.4,
+      "levels": [ { "pressureDbar": 4.9, "pressureFlag": 1, "temperatureDegC": 26.3, "temperatureFlag": 1 } ]
+    }
+  ]
+}
+```
+
+**A quality flag is carried through at every level and is never used to drop one.** A flagged
+observation is drawn as flagged, not omitted — a reader who cannot see the flagged ones
+cannot see what the analysis chose to ignore. The provenance carries a flag histogram
+computed from the raw NetCDF arrays *before* conversion, so a test can count the same thing
+from the committed record and compare: two independent computations of one fact.
+
 ## The figure kinds
 
 Not a type but a discipline, and the surface enforces it typographically.

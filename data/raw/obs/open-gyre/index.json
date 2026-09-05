@@ -1,0 +1,48 @@
+{
+  "domain": "open-gyre",
+  "profiles": [
+    {
+      "instant": "2013-09-04T14:00:09Z",
+      "lat": 25.706,
+      "lon": -41.749,
+      "path": "aoml/4901063/profiles/D4901063_116.nc"
+    },
+    {
+      "instant": "2013-09-05T15:38:29Z",
+      "lat": 25.382,
+      "lon": -40.403,
+      "path": "aoml/5904018/profiles/D5904018_059.nc"
+    },
+    {
+      "instant": "2013-09-07T11:54:51Z",
+      "lat": 28.08,
+      "lon": -41.283,
+      "path": "aoml/4901211/profiles/D4901211_109.nc"
+    },
+    {
+      "instant": "2013-09-07T15:48:54Z",
+      "lat": 27.036,
+      "lon": -44.094,
+      "path": "aoml/5904008/profiles/D5904008_063.nc"
+    },
+    {
+      "instant": "2013-09-08T10:07:33Z",
+      "lat": 29.493,
+      "lon": -40.686,
+      "path": "aoml/4901058/profiles/D4901058_111.nc"
+    },
+    {
+      "instant": "2013-09-13T15:13:11Z",
+      "lat": 25.31,
+      "lon": -40.475,
+      "path": "aoml/5904018/profiles/D5904018_060.nc"
+    },
+    {
+      "instant": "2013-09-14T13:53:21Z",
+      "lat": 25.744,
+      "lon": -41.971,
+      "path": "aoml/4901063/profiles/D4901063_117.nc"
+    }
+  ],
+  "source": "argo-core-ifremer"
+}

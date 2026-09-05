@@ -1,0 +1,96 @@
+{
+  "domain": "gulf-stream-front",
+  "profiles": [
+    {
+      "instant": "2013-09-02T12:57:55Z",
+      "lat": 36.201,
+      "lon": -71.37,
+      "path": "aoml/1901584/profiles/D1901584_054.nc"
+    },
+    {
+      "instant": "2013-09-03T10:01:22Z",
+      "lat": 34.299,
+      "lon": -70.06,
+      "path": "aoml/5903997/profiles/D5903997_120.nc"
+    },
+    {
+      "instant": "2013-09-03T13:54:51Z",
+      "lat": 38.706,
+      "lon": -71.11,
+      "path": "aoml/4901524/profiles/R4901524_097.nc"
+    },
+    {
+      "instant": "2013-09-03T23:57:41Z",
+      "lat": 34.079,
+      "lon": -70.974,
+      "path": "aoml/4901525/profiles/R4901525_098.nc"
+    },
+    {
+      "instant": "2013-09-05T05:11:00Z",
+      "lat": 34.174,
+      "lon": -73.934,
+      "path": "meds/4901140/profiles/D4901140_123.nc"
+    },
+    {
+      "instant": "2013-09-05T10:00:27Z",
+      "lat": 34.393,
+      "lon": -70.262,
+      "path": "aoml/5903997/profiles/D5903997_121.nc"
+    },
+    {
+      "instant": "2013-09-07T10:02:51Z",
+      "lat": 34.46,
+      "lon": -70.47,
+      "path": "aoml/5903997/profiles/D5903997_122.nc"
+    },
+    {
+      "instant": "2013-09-07T13:54:12Z",
+      "lat": 38.727,
+      "lon": -71.128,
+      "path": "aoml/4901524/profiles/R4901524_098.nc"
+    },
+    {
+      "instant": "2013-09-07T17:45:29Z",
+      "lat": 36.28,
+      "lon": -70.8,
+      "path": "aoml/4901461/profiles/D4901461_010.nc"
+    },
+    {
+      "instant": "2013-09-08T00:03:24Z",
+      "lat": 34.063,
+      "lon": -70.851,
+      "path": "aoml/4901525/profiles/R4901525_099.nc"
+    },
+    {
+      "instant": "2013-09-09T10:17:18Z",
+      "lat": 34.627,
+      "lon": -70.627,
+      "path": "aoml/5903997/profiles/D5903997_123.nc"
+    },
+    {
+      "instant": "2013-09-11T09:45:07Z",
+      "lat": 34.833,
+      "lon": -70.772,
+      "path": "aoml/5903997/profiles/D5903997_124.nc"
+    },
+    {
+      "instant": "2013-09-11T13:55:05Z",
+      "lat": 38.74,
+      "lon": -71.376,
+      "path": "aoml/4901524/profiles/R4901524_099.nc"
+    },
+    {
+      "instant": "2013-09-12T14:28:00Z",
+      "lat": 35.756,
+      "lon": -72.021,
+      "path": "aoml/1901584/profiles/D1901584_055.nc"
+    },
+    {
+      "instant": "2013-09-13T09:54:01Z",
+      "lat": 35.11,
+      "lon": -71.031,
+      "path": "aoml/5903997/profiles/D5903997_125.nc"
+    }
+  ],
+  "source": "argo-core-ifremer"
+}

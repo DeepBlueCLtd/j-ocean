@@ -30,6 +30,12 @@ test('the shell, after advancing the run', async ({ page }) => {
   await page.screenshot({ path: `${IMAGES}001-shell-advanced.png`, fullPage: true });
 });
 
+test('the record the run is scored against', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('truth-panel')).toBeVisible();
+  await page.getByTestId('truth-panel').screenshot({ path: `${IMAGES}002-truth-record.png` });
+});
+
 test('the shell, refusing an invalid configuration', async ({ page }) => {
   await page.route(/j-ocean.*\.json$/, (route) =>
     route.fulfill({

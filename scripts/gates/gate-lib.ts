@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative, sep } from 'node:path';
+import { join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -163,7 +163,8 @@ export function rootFromArgv(argv: readonly string[]): string {
   if (index === -1) return REPO_ROOT;
   const value = argv[index + 1];
   if (value === undefined) throw new Error('--root needs a directory');
-  return join(REPO_ROOT, value);
+  // `resolve`, not `join`: an absolute path given on the command line means that path.
+  return resolve(REPO_ROOT, value);
 }
 
 /** Print a result the way every gate prints it, and return the process exit code. */

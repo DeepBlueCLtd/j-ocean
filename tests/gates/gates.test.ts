@@ -1,5 +1,9 @@
 import { execFileSync } from 'node:child_process';
-import { describe, expect, it } from 'vitest';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, describe, expect, it } from 'vitest';
+import { checkArtefactDrift } from '../../scripts/gates/check-artefact-drift.js';
 import { checkHostTime } from '../../scripts/gates/check-host-time.js';
 import { checkModelImports } from '../../scripts/gates/check-model-imports.js';
 import { checkVocabulary } from '../../scripts/gates/check-vocabulary.js';
@@ -69,6 +73,37 @@ describe('the gates fail on their planted violations', () => {
   });
 });
 
+/**
+ * G-01 (constitution Principle IX). Its planted violation is one changed byte in a committed
+ * artefact, and the fixture is built here rather than committed: a second copy of ten
+ * megabytes of derived data in the tree would be a fixture of a fixture, and the gate takes
+ * the directory to compare against precisely so it does not need one.
+ */
+describe('G-01 fails on a planted byte in a committed artefact', () => {
+  const planted = mkdtempSync(join(tmpdir(), 'j-ocean-planted-'));
+  afterAll(() => {
+    rmSync(planted, { recursive: true, force: true });
+  });
+
+  it('names the artefact and the first differing offset', () => {
+    for (const directory of ['truth', 'clim', 'obs']) {
+      cpSync(join(REPO_ROOT, 'data', directory), join(planted, directory), { recursive: true });
+    }
+    const victim = join(planted, 'truth/gulf-stream-front.jocean');
+    const bytes = readFileSync(victim);
+    const offset = Math.floor(bytes.length / 2);
+    bytes[offset] = ((bytes[offset] as number) + 1) % 256;
+    writeFileSync(victim, bytes);
+
+    const result = checkArtefactDrift(['--committed', planted]);
+    expect(result.violations.length).toBeGreaterThan(0);
+    const reported = result.violations.map((v) => `${v.file} ${v.text} ${v.message}`).join('\n');
+    expect(reported).toContain('truth/gulf-stream-front.jocean');
+    expect(reported).toContain(`first difference at byte ${String(offset)}`);
+    expect(reported).toMatch(/edited by hand/);
+  });
+});
+
 describe('the gates pass what they should pass', () => {
   it('lets the navigational use of a vessel path through, on every gate', () => {
     for (const gate of ['check-host-time', 'check-model-imports', 'check-vocabulary']) {
@@ -82,6 +117,7 @@ describe('the gates pass what they should pass', () => {
       checkHostTime(REPO_ROOT),
       checkModelImports(REPO_ROOT),
       checkVocabulary(REPO_ROOT),
+      checkArtefactDrift([]),
     ]) {
       expect(result.violations, `${result.gate} must pass the tree`).toEqual([]);
     }
