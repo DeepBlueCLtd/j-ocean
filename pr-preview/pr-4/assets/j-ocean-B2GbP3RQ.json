@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 2,
+  "run": {
+    "defaultSeed": "6a09e667f3bcc908",
+    "recordedCaseLabel": "the recorded case"
+  },
+  "clock": {
+    "epoch": "2013-09-01T00:00:00Z",
+    "timestepSeconds": 600,
+    "stabilityCriterionCfl": 0.5
+  },
+  "grid": {
+    "nx": 100,
+    "ny": 100,
+    "cellSizeMetres": 5500
+  },
+  "horizons": {
+    "leadHours": [
+      0,
+      12,
+      24,
+      48,
+      72,
+      96
+    ]
+  },
+  "budget": {
+    "frameBudgetMs": 33
+  },
+  "forecast": {
+    "spinUpHours": 24,
+    "issueTimes": {
+      "firstOffsetHours": 24,
+      "lastOffsetHours": 168,
+      "strideHours": 12
+    }
+  },
+  "domains": {
+    "defaultId": "gulf-stream-front",
+    "list": [
+      {
+        "id": "gulf-stream-front",
+        "label": "Gulf Stream front",
+        "west": -75,
+        "east": -70,
+        "south": 34,
+        "north": 39,
+        "character": "eventful",
+        "nativeResolutionDegrees": 0.08,
+        "truthToModelResolutionRatio": 1.6
+      },
+      {
+        "id": "open-gyre",
+        "label": "Open gyre",
+        "west": -45,
+        "east": -40,
+        "south": 25,
+        "north": 30,
+        "character": "bland",
+        "nativeResolutionDegrees": 0.08,
+        "truthToModelResolutionRatio": 1.6
+      }
+    ]
+  },
+  "truth": {
+    "source": {
+      "id": "hycom-glbv0.08-expt_53.X",
+      "label": "HYCOM GOFS 3.1 GLBv0.08 expt_53.X reanalysis",
+      "service": "ncss",
+      "baseUrl": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data",
+      "nativeResolutionDegrees": 0.08
+    },
+    "period": {
+      "start": "2013-09-01T00:00:00Z",
+      "end": "2013-09-15T00:00:00Z",
+      "strideHours": 6,
+      "maxInstantGapHours": 12
+    },
+    "depthLevelsMetres": [
+      0,
+      50,
+      100,
+      200,
+      400,
+      700
+    ],
+    "contrast": {
+      "minimumEventfulToBlandVarianceRatio": 4
+    }
+  },
+  "climatology": {
+    "window": {
+      "start": "2013-08-01T00:00:00Z",
+      "end": "2013-09-30T00:00:00Z",
+      "strideHours": 48
+    }
+  },
+  "observations": {
+    "source": {
+      "id": "argo-core-ifremer",
+      "label": "Argo core profiles, Ifremer mirror",
+      "indexUrl": "https://data-argo.ifremer.fr/ar_index_global_prof.txt.gz",
+      "profileBaseUrl": "https://data-argo.ifremer.fr/dac"
+    }
+  }
+}
