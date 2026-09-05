@@ -42,9 +42,24 @@ Individually:
 | `pnpm test` | vitest: ports, run, replay, headless model, gates |
 | `pnpm test:shell` | Playwright against the built static site |
 | `pnpm gates` | every gate that has landed, and the name of every one that has not |
+| `pnpm site` | the documentation site, into `dist-site/` |
+| `pnpm screenshots` | the documentation site's figures, captured from the real application |
 
 The shell test needs a Chromium. `pnpm exec playwright install chromium` fetches one; on a
 machine that already has one, set `J_OCEAN_CHROMIUM` to its executable instead.
+
+## Published
+
+Every push to `main` publishes to the `gh-pages` branch:
+
+| Path | What is there |
+|---|---|
+| `/` | The [documentation site](https://deepbluecltd.github.io/j-ocean/): overview, architecture, data model, glossary, and one engineering note per beat |
+| `/app/` | The application, built from `main` |
+| `/pr-preview/pr-N/` | A static instance of the application for each open pull request, linked from the pull request itself |
+
+The site's figures are captured from the real application by `pnpm screenshots`, so a
+screenshot cannot show something the shell does not do.
 
 ## The gates
 

@@ -1,0 +1,168 @@
+:root {
+  --ink: #10171d;
+  --paper: #f7f6f2;
+  --rule: #c9c6bd;
+  --declared: #1f4f7a;
+  --computed: #10171d;
+  --derived: #6b5a2e;
+  --host: #6d6a63;
+  --alarm: #8a1f1f;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 16px/1.6 ui-serif, Georgia, "Times New Roman", serif;
+}
+
+.masthead {
+  border-bottom: 2px solid var(--ink);
+  padding: 1.25rem 1.25rem 0.75rem;
+  max-width: 52rem;
+  margin: 0 auto;
+}
+
+.wordmark {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.disclaimer {
+  margin: 0.15rem 0 0.75rem;
+  color: var(--alarm);
+  font-size: 0.9rem;
+}
+
+.masthead nav { display: flex; flex-wrap: wrap; gap: 0 1.1rem; }
+
+.masthead nav a {
+  color: var(--host);
+  text-decoration: none;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid transparent;
+}
+
+.masthead nav a:hover { color: var(--ink); }
+.masthead nav a.active { color: var(--ink); border-bottom-color: var(--ink); }
+.masthead nav a.external { margin-left: auto; }
+
+main {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 3rem;
+}
+
+h1 { font-size: 1.9rem; line-height: 1.2; margin: 1.25rem 0 0.5rem; }
+
+h2 {
+  font-size: 1.15rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 2.25rem 0 0.6rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+h3 { font-size: 1.02rem; margin: 1.5rem 0 0.4rem; }
+
+.lede { font-size: 1.08rem; color: var(--host); }
+
+a { color: var(--declared); }
+
+/* The same four figure kinds the shell draws, so a reader learns the convention once. */
+.declared { color: var(--declared); border-bottom: 1px dotted var(--declared); }
+.computed { color: var(--computed); font-weight: 600; }
+.derived { color: var(--derived); font-style: italic; border-bottom: 1px dashed var(--derived); }
+.host-time { color: var(--host); font-style: italic; }
+
+code, pre, .mono {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.85em;
+}
+
+code { background: #fff; border: 1px solid var(--rule); padding: 0 0.25em; border-radius: 2px; }
+
+pre {
+  background: #fff;
+  border: 1px solid var(--rule);
+  padding: 0.8rem 0.9rem;
+  overflow-x: auto;
+  line-height: 1.45;
+}
+
+pre code { background: none; border: none; padding: 0; }
+
+table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.92rem; }
+
+th, td {
+  border-bottom: 1px solid var(--rule);
+  padding: 0.4rem 0.6rem 0.4rem 0;
+  text-align: left;
+  vertical-align: top;
+}
+
+th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--host); }
+
+blockquote {
+  margin: 1rem 0;
+  padding: 0.1rem 0 0.1rem 1rem;
+  border-left: 3px solid var(--rule);
+  color: var(--host);
+}
+
+figure { margin: 1.5rem 0; }
+
+figure img {
+  max-width: 100%;
+  border: 1px solid var(--rule);
+  background: #fff;
+  display: block;
+}
+
+figcaption { color: var(--host); font-size: 0.85rem; margin-top: 0.4rem; }
+
+img { max-width: 100%; }
+
+.post-list { list-style: none; padding: 0; }
+
+.post-list li { border-bottom: 1px solid var(--rule); padding: 0.9rem 0; }
+
+.post-list a { font-size: 1.1rem; text-decoration: none; }
+.post-list a:hover { text-decoration: underline; }
+.post-list time, .post-date { color: var(--host); font-size: 0.85rem; margin-left: 0.6rem; }
+.post-list p { margin: 0.25rem 0 0; color: var(--host); font-size: 0.92rem; }
+.post-date { margin: 0 0 1rem; display: block; }
+
+dl.entries { margin: 0; }
+dl.entries dt { font-weight: 700; margin-top: 1.1rem; }
+dl.entries dd { margin: 0.2rem 0 0; }
+
+footer {
+  border-top: 1px solid var(--rule);
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 1rem 1.25rem 3rem;
+  color: var(--host);
+  font-size: 0.85rem;
+}
+
+.banner {
+  border: 2px solid var(--ink);
+  background: #fff;
+  padding: 0.9rem 1.1rem;
+  margin: 1.25rem 0;
+}
+
+.banner.warn { border-color: var(--alarm); }
+.banner p:last-child { margin-bottom: 0; }
+.banner p:first-child { margin-top: 0; }

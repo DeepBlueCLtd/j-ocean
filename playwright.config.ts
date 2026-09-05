@@ -23,12 +23,26 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
+      testMatch: '**/*.spec.ts',
       use: {
         ...devices['Desktop Chrome'],
         // Ordinarily Playwright's own browser, installed with `pnpm exec playwright
         // install`. Where a machine already carries a Chromium — a CI image, or this
         // project's remote environment — J_OCEAN_CHROMIUM points at it, so the shell test
         // does not need a second copy downloaded to run.
+        ...(chromium === undefined ? {} : { launchOptions: { executablePath: chromium } }),
+      },
+    },
+    {
+      // `pnpm screenshots`. Separate from the test project because these write into the
+      // tree: the documentation site's figures are captured from the real application, so
+      // a screenshot can never show something the shell does not do.
+      name: 'screenshots',
+      testMatch: '**/*.shots.ts',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1200, height: 900 },
+        deviceScaleFactor: 2,
         ...(chromium === undefined ? {} : { launchOptions: { executablePath: chromium } }),
       },
     },

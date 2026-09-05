@@ -148,3 +148,5 @@ dist/
 test-results/
 playwright-report/
 .vite/
+dist-site/
+.gh-pages/

@@ -26,6 +26,7 @@ jobs:
       - run: pnpm test
       - run: pnpm gates
       - run: pnpm build
+      - run: pnpm site
 
   shell:
     name: the shell, in a browser
