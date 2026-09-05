@@ -1,0 +1,37 @@
+{
+  "reviewed": "2026-09-05",
+  "salt": "j-ocean/vocabulary/1",
+  "about": [
+    "Constitution Principle VII. Two halves, for two different reasons.",
+    "terms: plaintext, the tracked-entity vocabulary. Ordinary English with nothing to conceal, so the documents whose subject is the prohibition may name it; those are listed in plaintextExemptPaths and are reviewed with this file.",
+    "hashedTerms: salted SHA-256 of customer, project and bid material, which must appear nowhere at all and therefore cannot be written here either. No exemption applies to these.",
+    "Add a hashed term with: pnpm exec tsx scripts/gates/check-vocabulary.ts --hash \"<term>\"",
+    "The ordinary navigational word for the path a vessel has travelled is deliberately absent from both halves."
+  ],
+  "terms": [
+    {
+      "term": "tracklet",
+      "why": "an entity whose position is inferred rather than known"
+    },
+    {
+      "term": "detections",
+      "why": "an entity whose position is inferred rather than known"
+    },
+    {
+      "term": "bearings-only",
+      "why": "the vocabulary of inferring a position rather than knowing one"
+    }
+  ],
+  "hashedTerms": [
+    {
+      "sha256": "472b2196361dbb9af26e6c514fb87a3fa15f3c7cf230521265a83ff4a712a4a8",
+      "why": "a synthetic term, held here so that the hashed half of this gate is exercised by scripts/gates/fixtures/vocabulary rather than merely asserted to work"
+    }
+  ],
+  "plaintextExemptPaths": [
+    ".specify/memory/constitution.md",
+    ".specify/templates",
+    ".claude",
+    "scripts/gates/gate-lib.ts"
+  ]
+}
