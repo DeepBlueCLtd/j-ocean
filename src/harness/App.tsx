@@ -4,6 +4,11 @@ import { ConfigurationError, fetchConfiguration, type LoadedConfiguration } from
 import { createRun, type Run } from '../run/run.js';
 import { serialiseManifest } from '../run/manifest.js';
 import { loadClimatology, loadObservations, loadTruth } from './artefacts.js';
+import { FieldView } from './FieldView.js';
+import { initialiseFromTruth, type InitialisationReport } from '../model/initialise.js';
+import { parametersFor } from '../model/parameters.js';
+import { createReducedGravityKernel } from '../model/reduced-gravity.js';
+import { publishResults, type ModelResults } from '../model/results.js';
 import { flaggedLevelCount, levelCount, type ObservationRecord } from '../truth/observations.js';
 import type { ArtefactTruthSource } from '../truth/artefact-truth-source.js';
 import type { FieldContainer } from '../truth/container.js';
@@ -23,7 +28,8 @@ import { measure, overBudget } from './timing.js';
  * came from a run that exists, or from configuration that was validated before it did.
  */
 
-const ADVANCE_STEPS = 100;
+/** How far the shell integrates when a reader asks. Twelve hours, in declared timesteps. */
+const ADVANCE_HOURS = 12;
 
 /** Principle V: declared, computed and derived are typographically distinct, always. */
 function Declared({ children }: { children: React.ReactNode }) {
@@ -48,15 +54,10 @@ interface RunView {
   readonly steps: number;
   readonly instant: string;
   readonly lastStepMs: number | null;
+  readonly results: ModelResults;
+  readonly initialisation: InitialisationReport;
+  readonly integrating: boolean;
 }
-
-const viewOf = (run: Run, lastStepMs: number | null): RunView => ({
-  run,
-  recordedCase: run.recordedCase,
-  steps: run.steps,
-  instant: run.clock.instantIso(),
-  lastStepMs,
-});
 
 interface Record002 {
   readonly domainId: string;
@@ -70,16 +71,16 @@ export function App() {
   const [failure, setFailure] = useState<string | null>(null);
   const [view, setView] = useState<RunView | null>(null);
   const [record, setRecord] = useState<Record002 | null>(null);
+  const [overBudgetNotice, setOverBudgetNotice] = useState<{ projectedMs: number } | null>(null);
 
   useEffect(() => {
     let live = true;
     fetchConfiguration(configUrl)
       .then((result) => {
         if (!live) return;
+        // Provisioned only once the configuration has validated. A failure below leaves the
+        // run untouched, which is what "provisions no run" means.
         setLoaded(result);
-        // Provisioned only once the configuration has validated. A failure below leaves
-        // this untouched, which is what "provisions no run" means.
-        setView(viewOf(createRun({ config: result.config, configDigest: result.digest }), null));
       })
       .catch((error: unknown) => {
         if (!live) return;
@@ -112,33 +113,119 @@ export function App() {
     };
   }, [loaded]);
 
-  const advance = useCallback(() => {
-    setView((current) => {
-      if (current === null) return current;
-      const timed = measure(() => {
-        current.run.advance(ADVANCE_STEPS);
+  const buildRun = useCallback(
+    (seed: string | undefined, recordedCase: boolean): RunView | null => {
+      if (loaded === null || record === null) return null;
+      const domain = loaded.config.domains.list.find((d) => d.id === record.domainId);
+      if (domain === undefined) return null;
+      const parameters = parametersFor(loaded.config, domain);
+      const kernel = createReducedGravityKernel(parameters);
+      const { state, report } = initialiseFromTruth(
+        kernel,
+        parameters,
+        record.truth,
+        domain,
+        Date.parse(loaded.config.truth.period.start),
+        'surface_elevation',
+      );
+      const run = createRun({
+        config: loaded.config,
+        configDigest: loaded.digest,
+        kernel,
+        initialState: state,
+        domainId: record.domainId,
+        recordedCase,
+        ...(seed === undefined ? {} : { seed }),
       });
-      void timed.value;
-      return viewOf(current.run, timed.elapsedMs / ADVANCE_STEPS);
-    });
-  }, []);
+      return {
+        run,
+        recordedCase: run.recordedCase,
+        steps: run.steps,
+        instant: run.clock.instantIso(),
+        lastStepMs: null,
+        results: publishResults(state, parameters, run.stability),
+        initialisation: report,
+        integrating: false,
+      };
+    },
+    [loaded, record],
+  );
+
+  useEffect(() => {
+    const built = buildRun(undefined, true);
+    if (built !== null) setView(built);
+  }, [buildRun]);
+
+  const stepsPerAdvance =
+    loaded === null ? 0 : Math.round((ADVANCE_HOURS * 3600) / loaded.config.clock.timestepSeconds);
+
+  /**
+   * FR-009 and NFR-04: integration is chunked to the declared chunk size and yields between
+   * chunks, so the page answers a reader who clicks something while it runs. A single
+   * synchronous loop over 1 280 steps would freeze the tab, which NFR-04 exists to forbid.
+   */
+  const integrate = useCallback(
+    (force: boolean) => {
+      if (loaded === null || view === null || view.integrating) return;
+
+      const chunk = loaded.config.model.chunkSteps;
+      const measured = measure(() => {
+        view.run.advance(Math.min(chunk, stepsPerAdvance));
+      });
+      const perStep = measured.elapsedMs / Math.min(chunk, stepsPerAdvance);
+      const longestHorizonHours = Math.max(...loaded.config.horizons.leadHours);
+      const projectedMs =
+        perStep * ((longestHorizonHours * 3600) / loaded.config.clock.timestepSeconds);
+
+      // FR-008: a run whose projected time for the longest declared horizon exceeds the
+      // declared budget says so with both figures and does not integrate until told to.
+      if (!force && overBudget(projectedMs, loaded.config.budget.frameBudgetMs)) {
+        setOverBudgetNotice({ projectedMs });
+        setView({ ...view, steps: view.run.steps, instant: view.run.clock.instantIso(), lastStepMs: perStep });
+        return;
+      }
+      setOverBudgetNotice(null);
+
+      let done = Math.min(chunk, stepsPerAdvance);
+      setView({ ...view, integrating: true, lastStepMs: perStep });
+      const continueRun = (): void => {
+        const remaining = stepsPerAdvance - done;
+        if (remaining <= 0) {
+          setView((current) =>
+            current === null
+              ? current
+              : {
+                  ...current,
+                  integrating: false,
+                  steps: current.run.steps,
+                  instant: current.run.clock.instantIso(),
+                },
+          );
+          return;
+        }
+        view.run.advance(Math.min(chunk, remaining));
+        done += Math.min(chunk, remaining);
+        setView((current) =>
+          current === null
+            ? current
+            : { ...current, steps: current.run.steps, instant: current.run.clock.instantIso() },
+        );
+        // Yielding to the event loop is what keeps the page responsive.
+        setTimeout(continueRun, 0);
+      };
+      setTimeout(continueRun, 0);
+    },
+    [loaded, view, stepsPerAdvance, overBudget],
+  );
 
   const newRun = useCallback(() => {
-    if (loaded === null) return;
     // Exemption (b): entropy is drawn here, once, before the run exists.
-    const seed = drawRootSeed();
-    setView(
-      viewOf(
-        createRun({
-          config: loaded.config,
-          configDigest: loaded.digest,
-          seed,
-          recordedCase: false,
-        }),
-        null,
-      ),
-    );
-  }, [loaded]);
+    const built = buildRun(drawRootSeed(), false);
+    if (built !== null) {
+      setOverBudgetNotice(null);
+      setView(built);
+    }
+  }, [buildRun]);
 
   const manifest = useMemo(
     () => (view === null ? null : serialiseManifest(view.run.exportManifest())),
@@ -185,11 +272,35 @@ export function App() {
                   : 'This is not the recorded case. A seed was drawn for this visit and nothing about it persists.'}
               </dd>
 
+              <dt>Domain</dt>
+              <dd>
+                <Declared>{view.run.domainId}</Declared>, cells laid over{' '}
+                <Computed>
+                  {view.results.grid.cellSizeXMetres.toFixed(0)} &times;{' '}
+                  {view.results.grid.cellSizeYMetres.toFixed(0)} m
+                </Computed>{' '}
+                &mdash; a five-degree box is not square in kilometres.
+              </dd>
+
+              <dt>Timestep</dt>
+              <dd data-testid="stability">
+                <Declared>{view.run.stability.declaredTimestepSeconds} s</Declared>, inside the{' '}
+                <Computed>{view.run.stability.largestStableTimestepSeconds.toFixed(1)} s</Computed>{' '}
+                the declared criterion admits (the scheme&rsquo;s linear boundary is{' '}
+                <Computed>{view.run.stability.linearStabilityBoundarySeconds.toFixed(1)} s</Computed>
+                ). Gravity-wave speed{' '}
+                <Computed>
+                  {view.run.stability.gravityWaveSpeedMetresPerSecond.toFixed(3)} m/s
+                </Computed>
+                .
+              </dd>
+
               <dt>Steps taken</dt>
               <dd>
                 <Computed>
                   <span data-testid="steps">{view.steps}</span>
-                </Computed>
+                </Computed>{' '}
+                {view.integrating && <span className="unmeasured">integrating&hellip;</span>}
               </dd>
 
               <dt>Valid at</dt>
@@ -223,9 +334,38 @@ export function App() {
               </dd>
             </dl>
 
+              <dt>Outcrop clamps</dt>
+              <dd data-testid="outcrops">
+                <Computed>{view.results.outcrops}</Computed>. The layer is clamped at a
+                declared minimum of{' '}
+                <Declared>{loaded.config.model.minimumLayerThicknessMetres} m</Declared> where
+                it would otherwise outcrop, and every clamp is counted rather than swallowed.
+              </dd>
+            {overBudgetNotice !== null && (
+              <div className="banner warn" data-testid="over-budget">
+                <p>
+                  The projected time to integrate the longest declared horizon (
+                  <Declared>{Math.max(...loaded.config.horizons.leadHours)} h</Declared>) is{' '}
+                  <HostTime>{overBudgetNotice.projectedMs.toFixed(0)} ms</HostTime>, which
+                  exceeds the declared frame budget of{' '}
+                  <Declared>{loaded.config.budget.frameBudgetMs} ms</Declared>. Nothing has
+                  been integrated beyond the first chunk. The page is saying so rather than
+                  freezing.
+                </p>
+                <button type="button" onClick={() => integrate(true)} data-testid="proceed-anyway">
+                  Integrate anyway
+                </button>
+              </div>
+            )}
+
             <div className="controls">
-              <button type="button" onClick={advance} data-testid="advance">
-                Advance {ADVANCE_STEPS} steps
+              <button
+                type="button"
+                onClick={() => integrate(false)}
+                data-testid="advance"
+                disabled={view.integrating}
+              >
+                Integrate {ADVANCE_HOURS} hours
               </button>
               <button type="button" onClick={newRun} data-testid="new-run">
                 New run
@@ -245,7 +385,7 @@ export function App() {
                 <Declared>
                   {loaded.config.grid.nx} &times; {loaded.config.grid.ny}
                 </Declared>{' '}
-                at <Declared>{loaded.config.grid.cellSizeMetres} m</Declared>
+                cells
               </dd>
               <dt>Timestep</dt>
               <dd>
@@ -263,6 +403,49 @@ export function App() {
                     <Declared>{domain.label}</Declared> ({domain.character})
                   </span>
                 ))}
+              </dd>
+            </dl>
+          </section>
+
+          <section data-testid="field-panel">
+            <h2>The ocean, as the model has it</h2>
+            <p className="aside">
+              Sea-surface height, computed from the layer thickness by the reduced-gravity
+              relation. Initialised from the truth record at{' '}
+              <Declared>{loaded.config.truth.period.start}</Declared> and integrated from
+              there. There is no fixture behind this: it is the field the model holds.
+            </p>
+            <FieldView
+              values={view.results.seaSurfaceHeightMetres()}
+              nx={view.results.grid.nx}
+              ny={view.results.grid.ny}
+              limit={0.8}
+              label={`Sea-surface height anomaly over ${view.run.domainId}, valid at ${view.instant}`}
+              testId="field-view"
+            />
+            <dl>
+              <dt>Valid at</dt>
+              <dd>
+                <Computed>{view.instant}</Computed>
+              </dd>
+              <dt>Initialised from</dt>
+              <dd data-testid="initialisation">
+                the truth record at{' '}
+                <Computed>{new Date(view.initialisation.instantMs).toISOString()}</Computed>;
+                layer thickness{' '}
+                <Computed>
+                  {view.initialisation.thicknessRangeMetres[0].toFixed(0)}&ndash;
+                  {view.initialisation.thicknessRangeMetres[1].toFixed(0)} m
+                </Computed>{' '}
+                about a declared mean of{' '}
+                <Declared>{loaded.config.model.meanUpperLayerThicknessMetres} m</Declared>.
+                Velocity is put in geostrophic balance with that thickness rather than taken
+                from the truth, which carries motions this model has no layer for.
+              </dd>
+              <dt>Excluded margin</dt>
+              <dd>
+                <Declared>{view.results.spongeWidthCells} cells</Declared> of sponge at each
+                edge, relaxed toward the initial state. Scoring will exclude it.
               </dd>
             </dl>
           </section>

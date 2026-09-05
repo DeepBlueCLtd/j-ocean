@@ -14,11 +14,19 @@ import type { RandomStream } from './rng.js';
  * accepting test.
  */
 
-/** The declared grid (configuration `grid`). No component holds a literal grid size. */
+/**
+ * The grid a kernel integrates on.
+ *
+ * `nx` and `ny` come from configuration; the two cell sizes are computed from the declared
+ * domain box and that grid, and they differ. A five-degree box is not square in kilometres
+ * at Gulf Stream latitudes -- about 4.5 km east-west against 5.5 km north-south -- so a
+ * single declared cell size would be declaring something untrue.
+ */
 export interface GridSpec {
   readonly nx: number;
   readonly ny: number;
-  readonly cellSizeMetres: number;
+  readonly cellSizeXMetres: number;
+  readonly cellSizeYMetres: number;
 }
 
 /**

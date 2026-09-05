@@ -74,8 +74,19 @@ def ncss_url(base: str, domain: dict, variable: str, window: dict, level: float 
 
 
 def fetch_field(records: dict, base: str, domain: dict, kind: str, window: dict, levels: list[float]) -> None:
-    """One request for sea-surface elevation, and one per declared depth level."""
+    """One request for each two-dimensional field, and one per declared depth level.
+
+    Surface velocity is fetched for the truth record and not for the climatology: the model
+    is initialised in geostrophic balance with its own layer thickness, and the truth
+    velocity is what that initialisation is *checked against* (FR-013). A mean velocity over
+    two months is not a thing that check would mean anything against.
+    """
     jobs = [("surf_el", None, f"{kind}/{domain['id']}/surf_el.nc")]
+    if kind == "truth":
+        jobs += [
+            ("water_u", 0.0, f"{kind}/{domain['id']}/water_u-0m.nc"),
+            ("water_v", 0.0, f"{kind}/{domain['id']}/water_v-0m.nc"),
+        ]
     jobs += [
         ("water_temp", level, f"{kind}/{domain['id']}/water_temp-{level:g}m.nc")
         for level in levels

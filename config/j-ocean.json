@@ -6,13 +6,12 @@
   },
   "clock": {
     "epoch": "2013-09-01T00:00:00Z",
-    "timestepSeconds": 600,
+    "timestepSeconds": 240,
     "stabilityCriterionCfl": 0.5
   },
   "grid": {
     "nx": 100,
-    "ny": 100,
-    "cellSizeMetres": 5500
+    "ny": 100
   },
   "horizons": {
     "leadHours": [
@@ -33,6 +32,50 @@
       "firstOffsetHours": 24,
       "lastOffsetHours": 168,
       "strideHours": 12
+    }
+  },
+  "model": {
+    "kernelId": "reduced-gravity/1",
+    "precision": "float64",
+    "reducedGravityMetresPerSecondSquared": 0.02,
+    "meanUpperLayerThicknessMetres": 500,
+    "minimumLayerThicknessMetres": 50,
+    "lateralViscosityMetresSquaredPerSecond": 200,
+    "bottomDragPerSecond": 1e-07,
+    "robertAsselinCoefficient": 0.05,
+    "sponge": {
+      "widthCells": 6,
+      "timescaleSeconds": 43200
+    },
+    "chunkSteps": 72,
+    "thermalStructure": {
+      "upperTemperatureDegC": 26,
+      "deepTemperatureDegC": 8,
+      "transitionThicknessMetres": 80,
+      "displayLevelsMetres": [
+        0,
+        25,
+        50,
+        75,
+        100,
+        150,
+        200,
+        300,
+        400,
+        500,
+        600,
+        700
+      ]
+    },
+    "tolerances": {
+      "volumeRelativeDrift": 0.05,
+      "energyRelativeDrift": 0.5,
+      "varianceBandOfInitial": [
+        0.1,
+        3
+      ],
+      "kernelAcceptanceRelative": 1e-05,
+      "closedBoundaryVolumeRelativeDrift": 1e-12
     }
   },
   "domains": {

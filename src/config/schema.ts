@@ -103,10 +103,14 @@ export const configurationSchema = z
     }),
 
     grid: z.object({
-      /** FR-06: configurable, and starts at 100 x 100. */
+      /**
+       * FR-06: configurable, and starts at 100 x 100. There is no declared cell size: a
+       * five-degree box is not square in kilometres at Gulf Stream latitudes, so the model
+       * computes dx and dy from the domain box and this grid and reports them as computed
+       * figures. Declaring one number for both would be declaring something untrue.
+       */
       nx: z.number().int().min(2).max(4096),
       ny: z.number().int().min(2).max(4096),
-      cellSizeMetres: z.number().positive(),
     }),
 
     horizons: z.object({
@@ -159,6 +163,55 @@ export const configurationSchema = z
       }),
     }),
 
+    /** The physics (FR-05, FR-001). Every constant the model uses is one of these. */
+    model: z.object({
+      kernelId: z.string().min(1),
+      precision: z.enum(['float64']),
+      /** ADR-0001: the reduced gravity that makes the wave speed slow enough to integrate. */
+      reducedGravityMetresPerSecondSquared: z.number().positive(),
+      meanUpperLayerThicknessMetres: z.number().positive(),
+      /** Outcropping is clamped here, and the clamp is counted and published. */
+      minimumLayerThicknessMetres: z.number().positive(),
+      lateralViscosityMetresSquaredPerSecond: z.number().nonnegative(),
+      bottomDragPerSecond: z.number().nonnegative(),
+      /** Leapfrog's computational mode is damped by this. It costs a little energy. */
+      robertAsselinCoefficient: z.number().min(0).max(0.5),
+      /** FR-012: the open boundary, relaxed toward the initial state over a declared margin. */
+      sponge: z.object({
+        widthCells: z.number().int().nonnegative(),
+        timescaleSeconds: z.number().positive(),
+      }),
+      /** FR-009: integration is chunked so the interface stays responsive. */
+      chunkSteps: z.number().int().positive(),
+      /**
+       * FR-010 and review R-1: depth is displayed, never integrated. These declare the
+       * two-layer thermal structure the profile is diagnosed from, which beat 004 also uses
+       * as the observation operator (ADR-0005).
+       */
+      thermalStructure: z.object({
+        upperTemperatureDegC: z.number(),
+        deepTemperatureDegC: z.number(),
+        transitionThicknessMetres: z.number().positive(),
+        displayLevelsMetres: z.array(z.number().nonnegative()).min(3),
+      }),
+      tolerances: z.object({
+        /**
+         * FR-006. Two figures, because there are two claims. With the sponge off the
+         * scheme's continuity equation conserves volume to round-off, and that is what the
+         * closed-boundary tolerance holds it to. With the sponge on -- the configuration
+         * that ships -- the open boundary exchanges mass with the state it relaxes toward
+         * and the outcrop clamp adds a little, so the drift is bounded rather than absent.
+         * Reporting one number for both would hide which of them was being tested.
+         */
+        volumeRelativeDrift: z.number().positive(),
+        closedBoundaryVolumeRelativeDrift: z.number().positive(),
+        energyRelativeDrift: z.number().positive(),
+        varianceBandOfInitial: z.tuple([z.number().positive(), z.number().positive()]),
+        /** ADR-0002: what a second kernel is accepted against the reference to. */
+        kernelAcceptanceRelative: z.number().positive(),
+      }),
+    }),
+
     climatology: z.object({ window: windowSchema }),
 
     observations: z.object({
@@ -181,6 +234,37 @@ export const configurationSchema = z
   .refine(
     (c) => c.horizons.leadHours.every((h, i, all) => i === 0 || h > (all[i - 1] as number)),
     { error: 'horizons.leadHours must be strictly increasing', path: ['horizons', 'leadHours'] },
+  )
+  .refine(
+    (c) =>
+      c.model.thermalStructure.displayLevelsMetres.every(
+        (d, i, all) => i === 0 || d > (all[i - 1] as number),
+      ),
+    {
+      error: 'model.thermalStructure.displayLevelsMetres must be strictly increasing',
+      path: ['model', 'thermalStructure', 'displayLevelsMetres'],
+    },
+  )
+  .refine(
+    (c) => c.model.thermalStructure.upperTemperatureDegC > c.model.thermalStructure.deepTemperatureDegC,
+    {
+      error: 'the upper layer must be warmer than the deep layer, or the profile is upside down',
+      path: ['model', 'thermalStructure'],
+    },
+  )
+  .refine(
+    (c) => c.model.minimumLayerThicknessMetres < c.model.meanUpperLayerThicknessMetres,
+    {
+      error: 'the outcrop clamp must be thinner than the mean layer it clamps',
+      path: ['model', 'minimumLayerThicknessMetres'],
+    },
+  )
+  .refine(
+    (c) => c.model.sponge.widthCells * 4 < Math.min(c.grid.nx, c.grid.ny),
+    {
+      error: 'the sponge would take more than a quarter of the grid from each side',
+      path: ['model', 'sponge', 'widthCells'],
+    },
   )
   .refine(
     (c) =>

@@ -75,9 +75,9 @@ describe('the run manifest', () => {
     });
 
     it('refuses a kernel it was not run with', () => {
-      const manifest = { ...manifestOf(), kernelId: 'reduced-gravity/1' };
+      const manifest = { ...manifestOf(), kernelId: 'someone-elses-kernel/9' };
       expect(() => createRunFromManifest(manifest, { config, configDigest: digest })).toThrow(
-        /reduced-gravity\/1/,
+        /someone-elses-kernel\/9/,
       );
     });
 

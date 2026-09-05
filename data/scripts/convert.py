@@ -38,11 +38,14 @@ DIGESTS = os.path.join(RAW, "digests.json")
 
 SEA_SURFACE_ELEVATION = "surface_elevation"
 WATER_TEMPERATURE = "water_temperature"
+VELOCITY_EAST = "velocity_east"
+VELOCITY_NORTH = "velocity_north"
 
 # The quantisation the artefacts carry. Both match how HYCOM stores these fields, so the
 # committed record has the source's precision and neither more nor less.
 ELEVATION_SCALE = 0.001
 TEMPERATURE_SCALE = 0.001
+VELOCITY_SCALE = 0.001
 
 
 class UpstreamChanged(Exception):
@@ -147,13 +150,25 @@ def read_field(kind: str, domain_id: str, levels: list[float], records: dict) ->
             # for; squeeze it rather than assuming which shape came back.
             temperature[:, index] = values.reshape(len(times), len(lat), len(lon))
 
-    return {"times": times, "lat": lat, "lon": lon, "elevation": elevation, "temperature": temperature}
+    field = {"times": times, "lat": lat, "lon": lon, "elevation": elevation, "temperature": temperature}
+
+    # Surface velocity, for the truth record only. The model is initialised in geostrophic
+    # balance with its own layer thickness; this is what that initialisation is checked
+    # against (FR-013), which is a use a two-month mean would not support.
+    if kind == "truth":
+        for name, variable in ((VELOCITY_EAST, "water_u"), (VELOCITY_NORTH, "water_v")):
+            path = verify(f"{kind}/{domain_id}/{variable}-0m.nc", records)
+            with netCDF4.Dataset(path) as dataset:
+                values = masked_to_nan(dataset.variables[variable][:])
+                field[name] = values.reshape(len(times), len(lat), len(lon))
+    return field
 
 
 def provenance_for(kind: str, domain_id: str, levels: list[float], records: dict, config: dict) -> dict:
-    names = [f"{kind}/{domain_id}/surf_el.nc"] + [
-        f"{kind}/{domain_id}/water_temp-{level:g}m.nc" for level in levels
-    ]
+    names = [f"{kind}/{domain_id}/surf_el.nc"]
+    if kind == "truth":
+        names += [f"{kind}/{domain_id}/water_u-0m.nc", f"{kind}/{domain_id}/water_v-0m.nc"]
+    names += [f"{kind}/{domain_id}/water_temp-{level:g}m.nc" for level in levels]
     return {
         "source": config["truth"]["source"]["id"],
         "sourceLabel": config["truth"]["source"]["label"],
@@ -212,6 +227,8 @@ def convert_truth(domain: dict, config: dict, records: dict, out: str) -> str:
             Variable(
                 WATER_TEMPERATURE, "degC", ["time", "depth", "lat", "lon"], field["temperature"], TEMPERATURE_SCALE
             ),
+            Variable(VELOCITY_EAST, "m s-1", ["time", "lat", "lon"], field[VELOCITY_EAST], VELOCITY_SCALE),
+            Variable(VELOCITY_NORTH, "m s-1", ["time", "lat", "lon"], field[VELOCITY_NORTH], VELOCITY_SCALE),
         ],
     )
     return path

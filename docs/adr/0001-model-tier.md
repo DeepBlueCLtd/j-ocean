@@ -42,11 +42,30 @@ The arithmetic that makes it feasible:
 |---|---|---|
 | Reduced gravity `g'` | 0.02 m/s² | Declared |
 | Upper-layer thickness `H` | 500 m | Declared |
-| Gravity-wave speed `sqrt(g'H)` | about 3.2 m/s | Computed from the two above |
-| Cell size | 5 500 m | Declared (a 5° box at 100 × 100) |
-| Explicit stability limit | of order 20 minutes | `dx / (c sqrt(2))` |
-| Declared timestep | 10 minutes | Half the limit, for margin |
-| 96 h at 10 minutes | 576 steps of 10⁴ cells | |
+| Gravity-wave speed `sqrt(g'H)` | 3.162 m/s | Computed from the two above |
+| Cell size, east–west | 4 474 m | Computed from the domain box and the 100 × 100 grid |
+| Cell size, north–south | 5 529 m | The same |
+| Linear stability boundary | **549.9 s** | `1 / (2c · sqrt(dx⁻² + dy⁻²))` — the C-grid gradient's largest eigenvalue is `2/dx` |
+| Limit at the declared CFL of 0.5 | **275.0 s** | The boundary times the criterion |
+| Declared timestep | **270 s** | Inside it, with the margin the criterion exists to buy |
+| 96 h at 270 s | 1 280 steps of 10⁴ cells | |
+
+> **Amended twice on 2026-09-06, by the tree, and the second amendment is the interesting one.**
+>
+> This table first said a 5 500 m square cell and a ten-minute timestep. A five-degree box at
+> 36.5 °N is 4 474 m per cell east–west and 5 529 m north–south — it is not square in
+> kilometres — and the limit is set by the *smaller* of the two. Beat 003's stability check
+> refused the configuration on its first run, naming both figures.
+>
+> The replacement, 540 s, then blew the model up inside fifty steps. The criterion had been
+> written as `cfl / (c · sqrt(dx⁻² + dy⁻²))`, which omits the factor of two in the C-grid
+> gradient's largest eigenvalue — so it returned the linear boundary itself rather than a
+> figure inside it, and a declared CFL of 0.5 bought no margin at all. With the factor
+> restored, the boundary is 549.9 s, the criterion admits 275 s, and 270 s is declared.
+>
+> The lesson is the one the constitution already states, twice over: the criterion is a number
+> the code evaluates, not an arithmetic somebody did once in a document — and a criterion is
+> only worth having if it has been watched refusing something.
 
 ## Consequences
 

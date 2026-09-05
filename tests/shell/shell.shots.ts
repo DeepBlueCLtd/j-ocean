@@ -23,11 +23,26 @@ test('the shell, on arrival', async ({ page }) => {
   await page.screenshot({ path: `${IMAGES}001-shell-on-arrival.png`, fullPage: true });
 });
 
-test('the shell, after advancing the run', async ({ page }) => {
+test('the shell, after integrating', async ({ page }) => {
   await page.goto('/');
   await page.getByTestId('advance').click();
-  await expect(page.getByTestId('steps')).toHaveText('100');
+  await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 30_000 });
   await page.screenshot({ path: `${IMAGES}001-shell-advanced.png`, fullPage: true });
+});
+
+test('the ocean the model holds', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('field-panel')).toBeVisible();
+  await page.getByTestId('field-panel').screenshot({ path: `${IMAGES}003-field-initial.png` });
+});
+
+test('the ocean after twelve hours', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('field-panel')).toBeVisible();
+  await page.getByTestId('advance').click();
+  await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 30_000 });
+  await page.getByTestId('field-panel').screenshot({ path: `${IMAGES}003-field-advanced.png` });
+  await page.getByTestId('run-panel').screenshot({ path: `${IMAGES}003-run-panel.png` });
 });
 
 test('the record the run is scored against', async ({ page }) => {

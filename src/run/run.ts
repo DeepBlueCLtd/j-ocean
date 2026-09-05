@@ -10,7 +10,14 @@ import {
   ManifestError,
   type RunManifest,
 } from './manifest.js';
-import { createDiffusionKernel } from '../model/diffusion-kernel.js';
+import { createReducedGravityKernel } from '../model/reduced-gravity.js';
+import {
+  assessStability,
+  gridFor,
+  parametersFor,
+  StabilityError,
+  type StabilityAssessment,
+} from '../model/parameters.js';
 
 /**
  * A run (constitution Principle I).
@@ -38,6 +45,21 @@ export interface CreateRunOptions {
   readonly kernel?: ModelKernel;
   /** False once a reader has asked for a new run (FR-012, FR-013). */
   readonly recordedCase?: boolean;
+  /**
+   * A state built elsewhere -- from the truth record, through the truth-source port. When it
+   * is absent the kernel builds one from its own stream, which is what the contract and
+   * replay tests exercise.
+   */
+  readonly initialState?: ModelState;
+  /** Which declared domain this run is over. Defaults to the declared default. */
+  readonly domainId?: string;
+}
+
+/** The reference kernel for a configuration and a domain (FR-04, ADR-0002). */
+export function referenceKernelFor(config: Configuration, domainId: string): ModelKernel {
+  const domain = config.domains.list.find((candidate) => candidate.id === domainId);
+  if (domain === undefined) throw new RangeError(`no declared domain ${domainId}`);
+  return createReducedGravityKernel(parametersFor(config, domain));
 }
 
 export class Run {
@@ -46,6 +68,9 @@ export class Run {
   readonly state: ModelState;
   readonly configDigest: string;
   readonly recordedCase: boolean;
+  readonly domainId: string;
+  /** FR-003: the computed stability limit beside the declared timestep. */
+  readonly stability: StabilityAssessment;
 
   readonly #clockControl: ClockControl;
   readonly #kernelStream: RandomStream;
@@ -56,7 +81,19 @@ export class Run {
     this.configDigest = configDigest;
     this.recordedCase = options.recordedCase ?? true;
     this.rng = new SeededRng(options.seed ?? config.run.defaultSeed);
-    this.kernel = options.kernel ?? createDiffusionKernel();
+    this.domainId = options.domainId ?? config.domains.defaultId;
+    const domain = config.domains.list.find((candidate) => candidate.id === this.domainId);
+    if (domain === undefined) throw new RangeError(`no declared domain ${this.domainId}`);
+    this.kernel = options.kernel ?? referenceKernelFor(config, this.domainId);
+
+    // FR-003, and the spec's first edge case: a configuration that declares a grid too fine
+    // for its layer parameters fails here, with both figures, and no integration runs.
+    this.stability = assessStability(
+      parametersFor(config, domain),
+      config.clock.timestepSeconds,
+      config.clock.stabilityCriterionCfl,
+    );
+    if (!this.stability.satisfied) throw new StabilityError(this.stability);
     this.#clockConfig = {
       epoch: config.clock.epoch,
       timestepSeconds: config.clock.timestepSeconds,
@@ -65,7 +102,8 @@ export class Run {
     // The order these two streams are constructed in does not matter to their contents —
     // each is derived from the root seed and its own name — but it is fixed anyway so the
     // manifest of a replayed run is identical to the manifest of the original.
-    this.state = this.kernel.createState(config.grid, this.rng.stream(INITIAL_STATE_STREAM));
+    this.state =
+      options.initialState ?? this.kernel.createState(gridFor(config, domain), this.rng.stream(INITIAL_STATE_STREAM));
     this.#kernelStream = this.rng.stream(KERNEL_STREAM);
   }
 
@@ -137,7 +175,7 @@ export function createRunFromManifest(
   manifest: RunManifest,
   options: CreateFromManifestOptions,
 ): Run {
-  const kernel = options.kernel ?? createDiffusionKernel();
+  const kernel = options.kernel ?? referenceKernelFor(options.config, options.config.domains.defaultId);
   const probe = new SeededRng(manifest.rootSeed);
   assertManifestUsable(manifest, {
     generatorVersion: probe.generatorVersion,

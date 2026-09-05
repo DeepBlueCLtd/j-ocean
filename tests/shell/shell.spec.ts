@@ -51,17 +51,45 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('manifest')).toContainText('"recordedCase": true');
   });
 
-  test('advances the run and reports the step time as host time', async ({ page }) => {
+  test('integrates the run and reports the step time as host time', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByTestId('steps')).toHaveText('0');
     await expect(page.getByTestId('step-time')).toContainText('not yet measured');
+    const startInstant = await page.getByTestId('instant').textContent();
 
     await page.getByTestId('advance').click();
-    await expect(page.getByTestId('steps')).toHaveText('100');
+    // Twelve hours at the declared timestep. The exact count comes from configuration, so
+    // the test waits for the integration to stop rather than asserting a literal.
+    await expect(page.getByTestId('steps')).not.toHaveText('0');
+    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 30_000 });
     await expect(page.getByTestId('step-time')).toContainText('ms/step');
     // Principle V: the figure is host time and says so, in a kind of its own.
     await expect(page.getByTestId('step-time').locator('.host-time')).toBeVisible();
-    await expect(page.getByTestId('instant')).not.toHaveText('2019-06-01T00:00:00.000Z');
+    await expect(page.getByTestId('instant')).not.toHaveText(startInstant ?? '');
+  });
+
+  test('draws the field the model holds, and says what it is', async ({ page }) => {
+    await page.goto('/');
+    const panel = page.getByTestId('field-panel');
+    await expect(panel).toBeVisible();
+    await expect(panel.locator('canvas')).toBeVisible();
+    await expect(panel).toContainText('no fixture behind this');
+    await expect(page.getByTestId('initialisation')).toContainText('geostrophic balance');
+    // FR-003: the criterion is on the surface, not only in a test.
+    await expect(page.getByTestId('stability')).toContainText('the declared criterion admits');
+    await expect(page.getByTestId('outcrops')).toContainText('counted rather than swallowed');
+
+    // The canvas holds a field with structure in it, not a flat colour.
+    const distinct = await panel.locator('canvas').evaluate((canvas) => {
+      const context = (canvas as HTMLCanvasElement).getContext('2d');
+      const image = context?.getImageData(0, 0, (canvas as HTMLCanvasElement).width, (canvas as HTMLCanvasElement).height);
+      const seen = new Set<number>();
+      for (let i = 0; i < (image?.data.length ?? 0); i += 4) {
+        seen.add(((image?.data[i] ?? 0) << 16) | ((image?.data[i + 1] ?? 0) << 8) | (image?.data[i + 2] ?? 0));
+      }
+      return seen.size;
+    });
+    expect(distinct).toBeGreaterThan(50);
   });
 
   test('draws a seed once for a new run, and says it is no longer the recorded case', async ({

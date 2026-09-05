@@ -1,73 +1,73 @@
 {
   "files": {
     "clim/gulf-stream-front/surf_el.nc": {
-      "bytes": 156525,
-      "sha256": "e1f16dd540e503a77a4c56c804a2e15acdce1c5c7c80c33e9019789de0ea32bd",
+      "bytes": 157448,
+      "sha256": "e0a5afda1323c60a1895bc4e6eb78d01a46c6aea79435cd9c5458c625361fc0f",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=surf_el&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4"
     },
     "clim/gulf-stream-front/water_temp-0m.nc": {
       "bytes": 191875,
-      "sha256": "2248947a7f1cc45055d05a4836b8c022bf8bb65f49228dd51519154f828c9555",
+      "sha256": "c69d8142e841a7c92c4c6b2c5ad7108b0f948c13e03319b2947d84acf0cd8d91",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4&vertCoord=0"
     },
     "clim/gulf-stream-front/water_temp-100m.nc": {
       "bytes": 193428,
-      "sha256": "80ccbc9693b4aa00d8c0d66c380fe59efc733568e0775521f0d2b25ebe424ebe",
+      "sha256": "c588ee67d6f9600cdbfaf84d86b7d2eb5c7c72b2556ca91505b66897fb505cf6",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4&vertCoord=100"
     },
     "clim/gulf-stream-front/water_temp-200m.nc": {
-      "bytes": 183540,
-      "sha256": "74d2cfde8019fdb3e51ae95d27793d30d8cb4d8870db9f3f1b4b74967cb2d5ee",
+      "bytes": 184622,
+      "sha256": "84acf8114ac98606553d84b22d767b263e8db2e54826c71082c56e388b81abc3",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4&vertCoord=200"
     },
     "clim/gulf-stream-front/water_temp-400m.nc": {
-      "bytes": 186907,
-      "sha256": "1d0424fd1c37de56a94ed5853bea95f3ebeaee48cdd8072029fa02deec3bbe90",
+      "bytes": 185625,
+      "sha256": "8f183b99686a2e6c0433d7a2262fbb4c66c7f33b9e138b393fac6c8346e6e7ec",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4&vertCoord=400"
     },
     "clim/gulf-stream-front/water_temp-50m.nc": {
-      "bytes": 208265,
-      "sha256": "97e734656be4d705355c5933bdb75da7c73922093f347c23b1d9c8180af7fd62",
+      "bytes": 208357,
+      "sha256": "66bc61fc0bb91daaaba13a8659689e48a0075c7649604c688ee4139a1f11ceb3",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4&vertCoord=50"
     },
     "clim/gulf-stream-front/water_temp-700m.nc": {
       "bytes": 185207,
-      "sha256": "fb5c7fa78a4194d20ffc38eaf733418b9aaedb787119a67dc5fbe1ad78839545",
+      "sha256": "16c9c83ae5ca2c66118a0ad50d9757d53ceacaecef453e2ae76ff3b3f789be69",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4&vertCoord=700"
     },
     "clim/open-gyre/surf_el.nc": {
-      "bytes": 128917,
-      "sha256": "c6b777e9b65a84ccab1cc028c51e616709abe97610afaf60a86930d682237e0d",
+      "bytes": 130274,
+      "sha256": "2fe51f16a62dff0073c4e665332a288a13d3d9f6fffd09acdade436e0a8760b8",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=surf_el&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4"
     },
     "clim/open-gyre/water_temp-0m.nc": {
-      "bytes": 167953,
-      "sha256": "226cfc8d4a6eb3b4d28a2a2cf6e2f32c00d4812ff0c979e0f7d4c3e28dbe0538",
+      "bytes": 167419,
+      "sha256": "53b004380dff8375631ba2770832bdf81d8596f240eace6b708450d75f50f2eb",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4&vertCoord=0"
     },
     "clim/open-gyre/water_temp-100m.nc": {
-      "bytes": 184036,
-      "sha256": "e76884b0027346155d668ff9bca4e01d40253f00e8484012c3b11409e663380a",
+      "bytes": 183041,
+      "sha256": "777651a05620904a8347e42c8d672b7c8124491b94416b73138312bdb2122e1c",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4&vertCoord=100"
     },
     "clim/open-gyre/water_temp-200m.nc": {
-      "bytes": 174738,
-      "sha256": "ac8cac7c496647eda8ce8c80ff0935ed748cc82d9d1620dc47ebdfc21498e349",
+      "bytes": 175411,
+      "sha256": "ee82c5f44dc71d15ecf004d193a086245eea1e073fc192d9b7f99fdcdfdeadbb",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4&vertCoord=200"
     },
     "clim/open-gyre/water_temp-400m.nc": {
       "bytes": 174675,
-      "sha256": "686961a3b3ae707a77910bb1b237ed7325045ffa406c1e7a638fb0f451491777",
+      "sha256": "fe3b3d669b641405053ef1470369cf248f19a65e3b3cfe48a654e7a88c8fe8a2",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4&vertCoord=400"
     },
     "clim/open-gyre/water_temp-50m.nc": {
       "bytes": 184918,
-      "sha256": "bd8d616ef929ae4f4c914f08bc91accec915a2bbf9f29fe4f15a2ee86255ba5f",
+      "sha256": "92f52316355f223c1b50a8636a64fce992f7d8baf69426e3892e357805d50c02",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4&vertCoord=50"
     },
     "clim/open-gyre/water_temp-700m.nc": {
       "bytes": 174380,
-      "sha256": "05243e30aa609cf0add07c5dcec8f955d64c37c46121cc2c656833309340198a",
+      "sha256": "be8eab43682beb9dcbf39648e97c43f1f3fe2465c44c0a7c8d623faa7ce2eef1",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-08-01T00%3A00%3A00Z&time_end=2013-09-30T00%3A00%3A00Z&timeStride=16&accept=netcdf4&vertCoord=700"
     },
     "obs/gulf-stream-front/aoml_1901584_profiles_D1901584_054.nc": {
@@ -192,73 +192,93 @@
     },
     "truth/gulf-stream-front/surf_el.nc": {
       "bytes": 273407,
-      "sha256": "65ac879564ce11cb0476f1d69ff9b325158a31056dfbe7fb1113cc5c5d97d82f",
+      "sha256": "6a54dbe3f67484239ac28acea303fb6349a40b2507fe10fad883704fd7a6c45a",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=surf_el&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4"
     },
     "truth/gulf-stream-front/water_temp-0m.nc": {
-      "bytes": 324851,
-      "sha256": "f0a9ae717962a93bc3a15f1e7178fca09d1d94ce328acc582e6cc203be9747c0",
+      "bytes": 326565,
+      "sha256": "7dc2a1f2c4a3c35b3b1c9cb60ed04dbe102f415d3ea92520784f056902d604e0",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=0"
     },
     "truth/gulf-stream-front/water_temp-100m.nc": {
       "bytes": 332743,
-      "sha256": "969aa1117d90cb6595534cda52914f9bc30f81a871bbc9d23dcf7921e1b5ed7a",
+      "sha256": "0856f90dd0d782371693d6a736b78359c1bbddd1ea138314da95c5f8a5ba4d6f",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=100"
     },
     "truth/gulf-stream-front/water_temp-200m.nc": {
       "bytes": 314244,
-      "sha256": "2056cf5896c9ae95bb3c2ae2a3487cf704cb693b438502d17fe46618ac02611d",
+      "sha256": "53e4e61ea2e104cd7f41543774586fba0b774d3db40cd89dc70d100c13fa6849",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=200"
     },
     "truth/gulf-stream-front/water_temp-400m.nc": {
       "bytes": 319924,
-      "sha256": "e730b03df1cfa3d3350485797e7403572e087b711aa90c35a06eabbed2b16d65",
+      "sha256": "657a4ab3761e881a29833515045ba98ce24bc3ae79fee39ea7a5dfdc7e0c14d9",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=400"
     },
     "truth/gulf-stream-front/water_temp-50m.nc": {
-      "bytes": 360529,
-      "sha256": "d1f3a1dfe2413a14487afddc249cb49524a7f97fa1d662ebd3fd2f67d8c14c25",
+      "bytes": 359596,
+      "sha256": "ad5a21f8f3c5eeecd377d0d2e83b22ed706181447e84b64f3cc94bd902fcd67b",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=50"
     },
     "truth/gulf-stream-front/water_temp-700m.nc": {
-      "bytes": 314375,
-      "sha256": "77be314cb9c041bc7a4ee104c14e78708caee568f3379bdcfaf2fdbc07615626",
+      "bytes": 312309,
+      "sha256": "f504041e745ea7d8c4e2db5ba78056e310ce5a0068e9b9d038aeaa2b5b682f85",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=700"
+    },
+    "truth/gulf-stream-front/water_u-0m.nc": {
+      "bytes": 292132,
+      "sha256": "099d670f8d2f87ab8856959cedbac31bb9fbf3e0df69b629ba4c999c6a1e1178",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_u&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=0"
+    },
+    "truth/gulf-stream-front/water_v-0m.nc": {
+      "bytes": 292986,
+      "sha256": "ea84346d619849c0938361228d341c0a8ce8f5fbb7c61f4940aa62cb13883aed",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_v&north=39&south=34&west=-75&east=-70&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=0"
     },
     "truth/open-gyre/surf_el.nc": {
       "bytes": 215595,
-      "sha256": "88540356780fd44dae5c3748a69b007971b6467423ec1f2e4f1c2c8f777997d1",
+      "sha256": "f70742eb1130d24d13576e6701fe467ebdac69460fb44c8bd7bde6577f8ef1b2",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=surf_el&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4"
     },
     "truth/open-gyre/water_temp-0m.nc": {
-      "bytes": 288497,
-      "sha256": "58677d4eecd2b38353beaa2141da5e56045160277c8a8c5133dfd8e226e5d03d",
+      "bytes": 289325,
+      "sha256": "637ba98c2dc31ddf50de018b93e1d259fbe8de6b393f275a6dbafdf129e57a89",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=0"
     },
     "truth/open-gyre/water_temp-100m.nc": {
       "bytes": 316136,
-      "sha256": "796445764ebee0081d78c7f4d5e7b4b65f3f77c8f25ace24f41fd9d8d054c463",
+      "sha256": "c3888ed27fce8acf090a7e95564bc5a79996d0ccba86982862d44a4de035d847",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=100"
     },
     "truth/open-gyre/water_temp-200m.nc": {
       "bytes": 301507,
-      "sha256": "27b0ce5dc3eecc759b51cf51b4835d17c888ccc8a33d30b89061fbdfcb413f71",
+      "sha256": "7c9d3b05c26e746a76afa7cf5e67eb07f8ebf036722962735d8953f6455104c4",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=200"
     },
     "truth/open-gyre/water_temp-400m.nc": {
-      "bytes": 298998,
-      "sha256": "437a9126b88b70811bcd75f2354bb31b14ac10c84ffe516dd4793bf17af5c18d",
+      "bytes": 297623,
+      "sha256": "29e15455dd948cb460fbbdafe6bcbd1b93126bab8c9f135f886daff0d804f052",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=400"
     },
     "truth/open-gyre/water_temp-50m.nc": {
-      "bytes": 320892,
-      "sha256": "0798286d06f1f0b5e94808afdf7456eb0cbcfd87b20e620ad86b9a89f3ddf5a9",
+      "bytes": 318602,
+      "sha256": "1a89753510aa8994afd89d3dd72b83f9f356a8baa66edd249f35c33a22d287b1",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=50"
     },
     "truth/open-gyre/water_temp-700m.nc": {
-      "bytes": 299221,
-      "sha256": "c001d36e93b09872d3e596033194638ba58db594300219aebc9b2cab687b9200",
+      "bytes": 300655,
+      "sha256": "b8539ca03ed1258a818f99f490f976235186dd737c6373ccb53f48a344eedf44",
       "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_temp&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=700"
+    },
+    "truth/open-gyre/water_u-0m.nc": {
+      "bytes": 270144,
+      "sha256": "6925e7bd901d6f33a93a3adba6cad0e3d6b9ff4016498e568d7608ef84b4933d",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_u&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=0"
+    },
+    "truth/open-gyre/water_v-0m.nc": {
+      "bytes": 272702,
+      "sha256": "605e3be584b55c4d09121e571cbcbe403a95f91bc3908498692c8838715eaca3",
+      "url": "https://tds.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/2013?var=water_v&north=30&south=25&west=-45&east=-40&horizStride=1&time_start=2013-09-01T00%3A00%3A00Z&time_end=2013-09-15T00%3A00%3A00Z&timeStride=2&accept=netcdf4&vertCoord=0"
     }
   }
 }

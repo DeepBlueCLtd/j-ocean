@@ -156,6 +156,63 @@ cannot see what the analysis chose to ignore. The provenance carries a flag hist
 computed from the raw NetCDF arrays *before* conversion, so a test can count the same thing
 from the committed record and compare: two independent computations of one fact.
 
+## The model
+
+### `ModelState`
+
+Three prognostic fields, all `Float64Array` on the declared grid: `thickness` at cell
+centres, `velocityU` on the eastern face, `velocityV` on the northern face. That is an
+Arakawa C-grid, and the arrangement is the point — it puts the pressure gradient and the
+divergence on adjacent points rather than averaged ones, which is what stops a
+two-grid-interval checkerboard from being invisible to the scheme.
+
+### `GridSpec`
+
+`nx` and `ny` come from configuration; `cellSizeXMetres` and `cellSizeYMetres` are computed
+from the declared domain box and reported as computed. **They differ.** A five-degree box at
+36.5 °N is 4 474 m east–west and 5 529 m north–south, so there is no single declared cell
+size — declaring one would be declaring something untrue, and the stability limit is set by
+the smaller of the two.
+
+### `StabilityAssessment`
+
+| Field | Meaning |
+|---|---|
+| `gravityWaveSpeedMetresPerSecond` | `sqrt(g'H)`, 3.162 m/s as declared |
+| `linearStabilityBoundarySeconds` | Where leapfrog on a C-grid becomes unstable: 549.9 s |
+| `largestStableTimestepSeconds` | That boundary times the declared CFL: 275.0 s |
+| `declaredTimestepSeconds` | 240 s, which also divides an hour so the hourly diagnosis is exact |
+| `viscousNumber` | `A · 2Δt · (4/dx² + 4/dy²)`, stable below a half |
+
+Initialisation fails with all of these figures if either criterion is missed. It has done so
+twice.
+
+### `ModelResults`
+
+The published interface. Everything it hands out is a **copy**, so the integration buffers
+are not reachable from the harness — a test asserts that writing into a published array
+leaves the model unchanged. It carries the sea-surface height, the thickness, the two
+velocity components, the sponge weight and its width in cells (the margin scoring must
+exclude), the invariants, the outcrop count *and the volume those clamps added*, and the
+diagnosed profile at any cell.
+
+### `DiagnosedProfile`
+
+Depth is displayed, never integrated. The profile is a warm upper layer over a cold deep one
+joined by a `tanh` transition of declared thickness centred on the layer thickness, evaluated
+at the declared display levels.
+
+**A level's kind does not move.** The surface and the deepest declared level are the model's
+own two layers and are `computed`; every level between them is `derived`, always, whatever
+the interface is doing. A kind that tracked the interface would be a kind a reader could not
+learn.
+
+The relation inverts, which is what beat 004's observation operator needs — and the inverse
+reports whether it **resolved** anything. A `tanh` saturates: a thermometer at 100 m in an
+ocean whose interface is at 700 m reads the upper layer's own temperature and constrains the
+interface hardly at all. An observation that constrains nothing must not be allowed to look
+as though it did.
+
 ## The figure kinds
 
 Not a type but a discipline, and the surface enforces it typographically.

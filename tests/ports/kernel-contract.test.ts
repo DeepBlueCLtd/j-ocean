@@ -1,19 +1,34 @@
 import { describe, expect, it } from 'vitest';
-import { createDiffusionKernel, DIFFUSION_KERNEL_ID } from '../../src/model/diffusion-kernel.js';
 import { stateBytes } from '../../src/model/grid.js';
+import { parametersFor } from '../../src/model/parameters.js';
+import {
+  createReducedGravityKernel,
+  REDUCED_GRAVITY_KERNEL_ID,
+  THICKNESS,
+} from '../../src/model/reduced-gravity.js';
 import { SeededRng } from '../../src/run/rng.js';
-import type { GridSpec } from '../../src/ports/kernel.js';
+import { declaredConfiguration } from '../support/config.js';
 
-const grid: GridSpec = { nx: 16, ny: 12, cellSizeMetres: 5500 };
+const { config } = declaredConfiguration();
+const domain = config.domains.list.find((d) => d.id === config.domains.defaultId);
+if (domain === undefined) throw new Error('the declared default domain is not in the list');
+
+// A small grid: this suite is about the contract, not about the ocean. The parameters are
+// the declared ones, so the kernel under test is the kernel that ships.
+const parameters = { ...parametersFor(config, domain), grid: { nx: 16, ny: 12, cellSizeXMetres: 4500, cellSizeYMetres: 5500 } };
+const grid = parameters.grid;
 const ROOT = '6a09e667f3bcc908';
+// The declared timestep, not a literal: this suite integrates the kernel that ships, under
+// the criterion it ships with.
+const DT = config.clock.timestepSeconds;
 
 const advance = (seed: string, steps: number) => {
   const rng = new SeededRng(seed);
-  const kernel = createDiffusionKernel();
+  const kernel = createReducedGravityKernel(parameters);
   const state = kernel.createState(grid, rng.stream('model/initial-state'));
   const stream = rng.stream('model/kernel');
   for (let step = 0; step < steps; step += 1) {
-    kernel.step(state, { step, instantMs: step * 600_000, timestepSeconds: 600, stream });
+    kernel.step(state, { step, instantMs: step * DT * 1000, timestepSeconds: DT, stream });
   }
   return state;
 };
@@ -24,7 +39,7 @@ const advance = (seed: string, steps: number) => {
  * be the same model, against the reference's output to a recorded tolerance.
  */
 describe('the model kernel port contract', () => {
-  const kernel = createDiffusionKernel();
+  const kernel = createReducedGravityKernel(parameters);
 
   it('publishes the fields it says it publishes, at the declared grid shape', () => {
     const state = kernel.createState(grid, new SeededRng(ROOT).stream('s'));
@@ -60,24 +75,26 @@ describe('the model kernel port contract', () => {
 
   it('advances in place and stays finite', () => {
     const state = advance(ROOT, 200);
-    const tracer = state.fields['tracer'] as Float64Array;
-    expect(tracer.every((v) => Number.isFinite(v))).toBe(true);
+    for (const field of Object.values(state.fields)) {
+      expect(field.every((v) => Number.isFinite(v))).toBe(true);
+    }
   });
 
   it('names itself, and declares whether it is the reference (FR-04)', () => {
-    expect(kernel.id).toBe(DIFFUSION_KERNEL_ID);
+    expect(kernel.id).toBe(REDUCED_GRAVITY_KERNEL_ID);
     expect(kernel.isReference).toBe(true);
+    expect(kernel.id).toBe(config.model.kernelId);
   });
 
-  it('refuses a state it does not recognise rather than computing on it', () => {
-    const foreign = { grid, fields: { salinity: new Float64Array(grid.nx * grid.ny) } };
+  it('refuses a state it did not prepare rather than computing on it', () => {
+    const foreign = { grid, fields: { [THICKNESS]: new Float64Array(grid.nx * grid.ny) } };
     expect(() =>
       kernel.step(foreign, {
         step: 0,
         instantMs: 0,
-        timestepSeconds: 600,
+        timestepSeconds: DT,
         stream: new SeededRng(ROOT).stream('s'),
       }),
-    ).toThrow(/no tracer field/);
+    ).toThrow(/did not prepare/);
   });
 });
