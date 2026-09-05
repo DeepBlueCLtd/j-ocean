@@ -153,6 +153,25 @@ test.describe('the shell', () => {
     );
   });
 
+  test('draws the attribution as the analysis own weights, and a cell breakdown on demand', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const panel = page.getByTestId('attribution-panel');
+    await expect(panel).toBeVisible();
+    await expect(panel).toContainText('cannot disagree with it');
+
+    // Review R-7: the radius is a property of the declared length scale, and the surface
+    // says so rather than letting a reader take it for a property of the ocean.
+    await expect(page.getByTestId('influence-radius')).toContainText('not of the ocean');
+
+    // FR-18: a breakdown is an instrument of a selected cell, never a per-panel summary.
+    await expect(page.getByTestId('cell-breakdown')).toContainText('never a per-panel summary');
+    await page.getByTestId('attribution-view-overlay').click({ position: { x: 200, y: 200 } });
+    await expect(page.getByTestId('cell-breakdown')).toContainText('observations');
+    await expect(page.getByTestId('cell-breakdown')).toContainText('climatology');
+  });
+
   test('says what the instruments measured and what each measurement was priced at', async ({
     page,
   }) => {

@@ -261,6 +261,40 @@ export const configurationSchema = z
       drops: z.array(waypointSchema).min(1),
     }),
 
+    /** The analysis (FR-16, FR-17, review R-7, ADR-0006). */
+    analysis: z.object({
+      /** ADR-0006: the analysis works in interface depth, which is the model's own variable. */
+      stateVariable: z.literal('interface_depth'),
+      /** How wrong the background is expected to be, in metres of interface depth. */
+      backgroundErrorStandardDeviationMetres: z.number().positive(),
+      /**
+       * What a point measurement of the thermocline cannot know about a *cell's* interface
+       * depth, in metres. This is not the instrument's error and it is much larger: the
+       * observation operator's formal error is under a metre, and a 4.5 km cell's mean
+       * interface differs from a point sounding by tens of metres of mesoscale variability.
+       *
+       * Declaring it separately is not tidiness. Without it the analysis believes an
+       * interface observation fifty times more than the background, two Argo profiles twenty
+       * kilometres apart become nearly collinear, and the gain produces per-observation
+       * shares above 200 per cent against shares below zero -- which is what happened.
+       */
+      interfaceRepresentativenessMetres: z.number().positive(),
+      /**
+       * Review R-7's warning made concrete: the influence radius a reader sees is a property
+       * of *this number*, not of the ocean. The surface labels it declared, never computed.
+       */
+      correlationLengthScaleKilometres: z.number().positive(),
+      /** The prior blend. With no observations the weights are exactly (this, 1 - this, 0). */
+      priorBackgroundWeight: z.number().min(0).max(1),
+      /** Where an observation's influence stops being worth drawing (AT-03). */
+      influenceThreshold: z.number().positive().max(1),
+      weightSumTolerance: z.number().positive(),
+      /** FR-010: a declared bound, not a judgement made at review time. */
+      timeBudgetMs: z.number().positive(),
+      /** A one-sided bound is admitted with its error inflated by this much. */
+      boundErrorInflationFactor: z.number().min(1),
+    }),
+
     climatology: z.object({ window: windowSchema }),
 
     observations: z.object({
@@ -399,6 +433,26 @@ export const configurationSchema = z
     {
       error: 'an instrument samples after the truth record ends',
       path: ['instruments'],
+    },
+  )
+  /**
+   * The spec's fourth edge case. An analysis in which everything influences everything is
+   * not one the attribution can explain, so a length scale at or above the domain's own
+   * size is refused rather than merely discouraged.
+   */
+  .refine(
+    (c) => {
+      const domain = c.domains.list.find((d) => d.id === c.domains.defaultId);
+      if (domain === undefined) return true;
+      const widthKm = (domain.east - domain.west) * 111.32 * Math.cos(((domain.south + domain.north) / 2) * (Math.PI / 180));
+      const heightKm = (domain.north - domain.south) * 110.574;
+      return c.analysis.correlationLengthScaleKilometres < Math.min(widthKm, heightKm) / 2;
+    },
+    {
+      error:
+        'the correlation length scale is at least half the domain, so every observation would ' +
+        'influence every cell and the attribution could not explain anything',
+      path: ['analysis', 'correlationLengthScaleKilometres'],
     },
   )
   .refine((c) => c.forecast.spinUpHours <= c.forecast.issueTimes.firstOffsetHours, {

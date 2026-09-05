@@ -29,12 +29,38 @@ export interface FieldViewProps {
   readonly values: Float64Array;
   readonly nx: number;
   readonly ny: number;
-  /** Symmetric about zero. Declared by the caller so two panels can share a scale. */
+  /** Symmetric about zero for a diverging scale; the top of the range for a sequential one. */
   readonly limit: number;
+  /**
+   * `diverging` for a signed anomaly, where the sign is the meaning; `sequential` for a
+   * quantity that runs from nothing to all of it, such as a weight. Using a diverging scale
+   * for a weight would give a field with no negative values a blue half that means nothing.
+   */
+  readonly palette?: 'diverging' | 'sequential';
+  /** The unit the scale is in. Empty for a dimensionless quantity such as a weight. */
+  readonly unit?: string;
   readonly label: string;
   readonly testId?: string;
   /** Where the instruments sampled. Beat 008 makes this a footprint; this is its first draft. */
   readonly markers?: readonly Marker[];
+  /** FR-18: a breakdown is an instrument of a selected cell. Clicking picks the cell. */
+  readonly onSelect?: (cellIndex: number) => void;
+}
+
+/**
+ * Sequential: paper to ink, monotone in lightness. Greyscale-legible by construction, which
+ * FR-17 requires of the attribution field and which this project applies to every field so a
+ * reader learns one convention.
+ */
+function sequentialColourOf(normalised: number): [number, number, number] {
+  const t = Math.max(0, Math.min(1, normalised));
+  const lightness = 1 - 0.82 * t;
+  const tint: [number, number, number] = [0.12, 0.2, 0.28];
+  return [
+    Math.round(255 * (lightness + (tint[0] - lightness) * t)),
+    Math.round(255 * (lightness + (tint[1] - lightness) * t)),
+    Math.round(255 * (lightness + (tint[2] - lightness) * t)),
+  ];
 }
 
 /** Diverging blue-white-red, with lightness monotone in |value| so greyscale still reads. */
@@ -53,7 +79,18 @@ function colourOf(normalised: number): [number, number, number] {
   ];
 }
 
-export function FieldView({ values, nx, ny, limit, label, testId, markers = [] }: FieldViewProps) {
+export function FieldView({
+  values,
+  nx,
+  ny,
+  limit,
+  label,
+  testId,
+  markers = [],
+  onSelect,
+  palette = 'diverging',
+  unit = 'm',
+}: FieldViewProps) {
   const canvas = useRef<HTMLCanvasElement | null>(null);
   const overlay = useRef<HTMLCanvasElement | null>(null);
 
@@ -77,7 +114,8 @@ export function FieldView({ values, nx, ny, limit, label, testId, markers = [] }
           image.data[target + 3] = 255;
           continue;
         }
-        const [r, g, b] = colourOf(value / limit);
+        const [r, g, b] =
+          palette === 'sequential' ? sequentialColourOf(value / limit) : colourOf(value / limit);
         image.data[target] = r;
         image.data[target + 1] = g;
         image.data[target + 2] = b;
@@ -85,7 +123,7 @@ export function FieldView({ values, nx, ny, limit, label, testId, markers = [] }
       }
     }
     context.putImageData(image, 0, 0);
-  }, [values, nx, ny, limit]);
+  }, [values, nx, ny, limit, palette]);
 
   // The markers are drawn on a second canvas at a higher resolution, because the field's
   // canvas is one pixel per cell and a track drawn there would be a staircase.
@@ -139,14 +177,41 @@ export function FieldView({ values, nx, ny, limit, label, testId, markers = [] }
           width={nx * 8}
           height={ny * 8}
           aria-hidden="true"
+          data-testid={testId === undefined ? undefined : `${testId}-overlay`}
+          onClick={
+            onSelect === undefined
+              ? undefined
+              : (event) => {
+                  const bounds = event.currentTarget.getBoundingClientRect();
+                  const ix = Math.min(nx - 1, Math.floor(((event.clientX - bounds.left) / bounds.width) * nx));
+                  const iy = Math.min(
+                    ny - 1,
+                    Math.floor((1 - (event.clientY - bounds.top) / bounds.height) * ny),
+                  );
+                  onSelect(iy * nx + ix);
+                }
+          }
+          style={onSelect === undefined ? undefined : { cursor: 'crosshair', pointerEvents: 'auto' }}
         />
       </div>
       <figcaption>
         {label}
         <span className="scale">
-          <span className="swatch cool" /> &minus;{limit.toFixed(2)} m
-          <span className="swatch zero" /> 0
-          <span className="swatch warm" /> +{limit.toFixed(2)} m
+          {palette === 'sequential' ? (
+            <>
+              <span className="swatch zero" /> 0
+              <span className="swatch ink" /> {limit.toFixed(2)}
+              {unit === '' ? '' : ` ${unit}`}
+            </>
+          ) : (
+            <>
+              <span className="swatch cool" /> &minus;{limit.toFixed(2)}
+              {unit === '' ? '' : ` ${unit}`}
+              <span className="swatch zero" /> 0
+              <span className="swatch warm" /> +{limit.toFixed(2)}
+              {unit === '' ? '' : ` ${unit}`}
+            </>
+          )}
         </span>
       </figcaption>
     </figure>

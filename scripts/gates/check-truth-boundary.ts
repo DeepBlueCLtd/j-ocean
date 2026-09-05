@@ -97,7 +97,8 @@ export function checkTruthBoundary(root: string): GateResult {
     notes: [
       `the construction site is ${BRAND_HOME}`,
       'behavioural half (an analysis with arbitrarily large instrument error recovers nothing ' +
-        'beyond the background): not yet landed, beat 005',
+        'beyond the prior): landed in beat 005, and run by tests/analysis/analysis.test.ts -- ' +
+        'a gate cannot run it, because it needs the analysis to actually execute',
     ],
   };
 }

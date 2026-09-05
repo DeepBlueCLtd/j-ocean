@@ -45,6 +45,14 @@ test('the ocean after twelve hours', async ({ page }) => {
   await page.getByTestId('run-panel').screenshot({ path: `${IMAGES}003-run-panel.png` });
 });
 
+test('where the answer came from', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('attribution-panel')).toBeVisible();
+  await page.getByTestId('attribution-view-overlay').click({ position: { x: 210, y: 190 } });
+  await expect(page.getByTestId('cell-breakdown')).toContainText('observations');
+  await page.getByTestId('attribution-panel').screenshot({ path: `${IMAGES}005-attribution.png` });
+});
+
 test('what the instruments measured', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('instruments-panel')).toBeVisible();

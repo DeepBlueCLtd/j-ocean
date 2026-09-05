@@ -261,6 +261,59 @@ that depth — a scale the artefact can answer for), `vertical-inversion`, `argo
 cover). Each carries a `detail` good enough to draw and a `usable` boolean, so consumers
 cannot disagree about what a flag means.
 
+## The analysis
+
+### `AnalysisRecord`
+
+The analysed field, the attribution, which observations were used and which excluded and why,
+and enough of the gain to answer a breakdown or an influence query.
+
+### `Attribution`
+
+Three weights per cell — observations, background, climatology — summing to one. It is
+**branded** like `Observation`: the symbol lives in `src/analysis/attribution.ts` and is
+exported from nowhere, and gate G-06 fails if its name appears elsewhere, or if anything under
+`src/harness/` contains a function producing an attribution.
+
+The weights are not estimated. Because `H` selects one cell per observation, `H·1 = 1`, and
+
+    Σ_k (I − K H)_ik + Σ_j K_ij = 1
+
+so the row sum of the gain *is* the observation weight. A test recomputes it independently and
+asserts equality; the largest difference is zero.
+
+`clampedCells` counts the cells whose row sum fell outside `[0, 1]` and was clamped and
+renormalised. That happens: optimal interpolation with a Gaussian covariance and clustered
+observations produces such row sums in the shadows between them. It is published rather than
+hidden.
+
+### `CellBreakdown` and `InfluenceRegion`
+
+A row of the gain and a column of it. The breakdown names each contributing observation and
+its share, summing to the cell's observation weight. The influence region is one observation's
+weight in every cell, and its radius **above a declared threshold**.
+
+> The radius is a property of the declared correlation length scale, not of the ocean. An
+> observation across a front influences the far side exactly as much as its own, which the
+> flow would not. The surface says so; beat 012's ensemble spread is the flow-dependent
+> answer.
+
+### What an observation is worth
+
+Three numbers, and the third is the one that is easy to forget.
+
+| | |
+|---|---|
+| The instrument's own noise | declared per instrument |
+| Representativeness *in the measured quantity* | declared per instrument |
+| Representativeness *in the state variable* | `analysis.interfaceRepresentativenessMetres` |
+
+The operator propagates a formal interface-depth error under a metre. That is what the
+instrument could not know, and it is a **lower bound** on what the observation is worth to a
+4.5 km cell, which differs from a point sounding by tens of metres of mesoscale variability.
+Using the formal error as the whole error tells the analysis to trust a measurement more than
+it deserves — and it did, until this was declared.
+
 ## The figure kinds
 
 Not a type but a discipline, and the surface enforces it typographically.

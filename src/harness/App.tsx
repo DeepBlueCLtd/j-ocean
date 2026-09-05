@@ -6,6 +6,7 @@ import { serialiseManifest } from '../run/manifest.js';
 import { loadClimatology, loadObservations, loadTruth } from './artefacts.js';
 import { FieldView, type Marker } from './FieldView.js';
 import { climatologyReferenceOver } from '../instruments/climatology-reference.js';
+import { interfaceFromProfile as interfaceFromClimatology } from '../instruments/observation-operator.js';
 import {
   argoObservations,
   sampleSurface,
@@ -14,8 +15,10 @@ import {
   type XbtResult,
 } from '../instruments/instruments.js';
 import { isUsable, type Observation } from '../instruments/observation.js';
+import { analyse, type AnalysisRecord } from '../analysis/optimal-interpolation.js';
+import { THICKNESS } from '../model/reduced-gravity.js';
 import { initialiseFromTruth, type InitialisationReport } from '../run/initialise-from-truth.js';
-import { parametersFor } from '../model/parameters.js';
+import { parametersFor, type ThermalStructure } from '../model/parameters.js';
 import { createReducedGravityKernel } from '../model/reduced-gravity.js';
 import { publishResults, type ModelResults } from '../model/results.js';
 import { flaggedLevelCount, levelCount, type ObservationRecord } from '../truth/observations.js';
@@ -69,6 +72,9 @@ interface RunView {
   readonly surface: readonly Observation[];
   readonly drops: readonly XbtResult[];
   readonly argo: readonly XbtResult[];
+  readonly analysis: AnalysisRecord;
+  /** FR-18: the breakdown is an instrument of a *selected* cell, never a per-panel summary. */
+  readonly selectedCell: number | null;
   readonly box: { readonly west: number; readonly east: number; readonly south: number; readonly north: number };
 }
 
@@ -118,6 +124,57 @@ function flagSummary(view: RunView): [string, number][] {
     add(inferred);
   }
   return [...counts.entries()].sort(([a], [b]) => a.localeCompare(b));
+}
+
+/**
+ * The climatology, expressed in the analysis's state variable.
+ *
+ * The climatology artefact holds temperature; the analysis works in interface depth. The
+ * conversion is ADR-0005's operator applied to the climatological column, so the prior and
+ * the observations are in the same units by the same relation, rather than by two.
+ */
+function climatologyInterface(
+  container: FieldContainer,
+  structure: ThermalStructure,
+  box: { west: number; east: number; south: number; north: number },
+  grid: { nx: number; ny: number },
+): Float64Array {
+  const lats = container.coordinate('latDegrees');
+  const lons = container.coordinate('lonDegrees');
+  const depths = container.coordinate('depthMetres');
+  const values = container.decode('water_temperature');
+
+  const out = new Float64Array(grid.nx * grid.ny);
+  const nearest = (axis: readonly number[], target: number): number => {
+    let best = 0;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < axis.length; i += 1) {
+      const distance = Math.abs((axis[i] as number) - target);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = i;
+      }
+    }
+    return best;
+  };
+
+  for (let iy = 0; iy < grid.ny; iy += 1) {
+    const latDeg = box.south + ((box.north - box.south) * (iy + 0.5)) / grid.ny;
+    const yi = nearest(lats, latDeg);
+    for (let ix = 0; ix < grid.nx; ix += 1) {
+      const lonDeg = box.west + ((box.east - box.west) * (ix + 0.5)) / grid.nx;
+      const xi = nearest(lons, lonDeg);
+      const column = depths.map((_, zi) => ({
+        depthMetres: depths[zi] as number,
+        requestedDepthMetres: depths[zi] as number,
+        value: values[zi * lats.length * lons.length + yi * lons.length + xi] as number,
+        flags: [],
+      }));
+      const estimate = interfaceFromClimatology(column, 0.5, structure);
+      out[iy * grid.nx + ix] = estimate.depthMetres ?? Number.NaN;
+    }
+  }
+  return out;
 }
 
 export function App() {
@@ -205,6 +262,24 @@ export function App() {
       const drops = sampleXbtDrops(sampling);
       const argo = argoObservations(record.observations, sampling);
 
+      // The analysis. It consumes observations, a background and a climatology, and nothing
+      // else: it never sees the truth source, and gate G-02 holds that both by reading the
+      // imports and, since beat 005, by running with the errors turned up.
+      const climatologyThickness = climatologyInterface(record.climatology, parameters.thermalStructure, report.box, {
+        nx: parameters.grid.nx,
+        ny: parameters.grid.ny,
+      });
+      const analysis = analyse(
+        {
+          config: loaded.config,
+          grid: parameters.grid,
+          background: (state.fields[THICKNESS] as Float64Array).slice(),
+          climatology: climatologyThickness,
+          observations: [...drops, ...argo].map((r) => r.interface),
+        },
+        report.box,
+      );
+
       return {
         run,
         recordedCase: run.recordedCase,
@@ -217,6 +292,8 @@ export function App() {
         surface,
         drops,
         argo,
+        analysis,
+        selectedCell: null,
         box: report.box,
       };
     },
@@ -533,6 +610,79 @@ export function App() {
               <dd>
                 <Declared>{view.results.spongeWidthCells} cells</Declared> of sponge at each
                 edge, relaxed toward the initial state. Scoring will exclude it.
+              </dd>
+            </dl>
+          </section>
+
+          <section data-testid="attribution-panel">
+            <h2>Where the answer came from</h2>
+            <p className="aside">
+              The weight observations carried in each cell &mdash; the analysis&rsquo;s own
+              gain, drawn as a field. This is not a picture computed to illustrate the
+              answer; it is the same arithmetic that produced it, exported beside it, which
+              is why it cannot disagree with it.
+            </p>
+            <FieldView
+              values={view.analysis.attribution.observationWeight}
+              nx={view.results.grid.nx}
+              ny={view.results.grid.ny}
+              limit={1}
+              palette="sequential"
+              unit=""
+              label="Weight carried by observations in each cell"
+              testId="attribution-view"
+              markers={markersFor(view).filter((marker) => marker.kind !== 'track')}
+              onSelect={(cellIndex) => {
+                setView((current) => (current === null ? current : { ...current, selectedCell: cellIndex }));
+              }}
+            />
+            <dl>
+              <dt>Influence radius</dt>
+              <dd data-testid="influence-radius">
+                A property of the <Declared>
+                  {loaded.config.analysis.correlationLengthScaleKilometres} km
+                </Declared>{' '}
+                declared correlation length scale, not of the ocean. An observation across a
+                front influences the far side exactly as much as its own, which the flow
+                would not. Beat 012&rsquo;s ensemble spread is the flow-dependent answer.
+              </dd>
+
+              <dt>Observations used</dt>
+              <dd data-testid="analysis-counts">
+                <Computed>{view.analysis.used.length}</Computed> entered the analysis;{' '}
+                <Computed>{view.analysis.excluded.length}</Computed> were excluded and are
+                still drawn. <Computed>{view.analysis.attribution.clampedCells}</Computed>{' '}
+                cells had a weight clamped and renormalised.
+              </dd>
+
+              <dt>A cell&rsquo;s breakdown</dt>
+              <dd data-testid="cell-breakdown">
+                {view.selectedCell === null ? (
+                  <span className="unmeasured">
+                    Click the field above. A breakdown is an instrument of a selected cell,
+                    never a per-panel summary &mdash; that was specified first and was wrong.
+                  </span>
+                ) : (
+                  (() => {
+                    const breakdown = view.analysis.breakdownAt(view.selectedCell);
+                    return (
+                      <>
+                        observations <Computed>{(breakdown.observations * 100).toFixed(1)}%</Computed>,
+                        background <Computed>{(breakdown.background * 100).toFixed(1)}%</Computed>,
+                        climatology <Computed>{(breakdown.climatology * 100).toFixed(1)}%</Computed>
+                        {breakdown.shares.length > 0 && (
+                          <>
+                            {' '}&mdash; of which{' '}
+                            {breakdown.shares
+                              .slice(0, 3)
+                              .map((share) => `${share.id} ${(share.share * 100).toFixed(1)}%`)
+                              .join(', ')}
+                          </>
+                        )}
+                      </>
+                    );
+                  })()
+                )}
               </dd>
             </dl>
           </section>

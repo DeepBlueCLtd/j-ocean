@@ -179,6 +179,17 @@
       }
     ]
   },
+  "analysis": {
+    "stateVariable": "interface_depth",
+    "backgroundErrorStandardDeviationMetres": 50,
+    "correlationLengthScaleKilometres": 60,
+    "priorBackgroundWeight": 0.85,
+    "influenceThreshold": 0.02,
+    "weightSumTolerance": 1e-09,
+    "timeBudgetMs": 1500,
+    "boundErrorInflationFactor": 4,
+    "interfaceRepresentativenessMetres": 25
+  },
   "domains": {
     "defaultId": "gulf-stream-front",
     "list": [

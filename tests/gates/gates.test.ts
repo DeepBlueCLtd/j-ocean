@@ -6,6 +6,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { checkArtefactDrift } from '../../scripts/gates/check-artefact-drift.js';
 import { checkHostTime } from '../../scripts/gates/check-host-time.js';
 import { checkModelImports } from '../../scripts/gates/check-model-imports.js';
+import { checkAttributionSource } from '../../scripts/gates/check-attribution-source.js';
 import { checkTruthBoundary } from '../../scripts/gates/check-truth-boundary.js';
 import { checkVocabulary } from '../../scripts/gates/check-vocabulary.js';
 import { REPO_ROOT } from '../../scripts/gates/gate-lib.js';
@@ -87,6 +88,22 @@ describe('the gates fail on their planted violations', () => {
     expect(output).toContain('src/instruments/observation.ts');
   });
 
+  /**
+   * G-06, and the reason it exists: a per-panel summary bar was specified before the
+   * attribution field was, and it was wrong. A summary can be computed from something other
+   * than the analysis; a field drawn from the gain cannot.
+   */
+  it('G-06 catches the harness painting an attribution of its own', () => {
+    const { code, output } = spawnGate(
+      'check-attribution-source',
+      'scripts/gates/fixtures/attribution-source',
+    );
+    expect(code).not.toBe(0);
+    expect(output).toContain('ATTRIBUTION_BRAND appears outside');
+    expect(output).toContain('src/analysis/attribution.ts');
+    expect(output).toContain('a function producing an attribution');
+  });
+
   it('the vocabulary gate catches a word on the plaintext list', () => {
     const { code, output } = spawnGate('check-vocabulary', 'scripts/gates/fixtures/vocabulary');
     expect(code).not.toBe(0);
@@ -136,7 +153,13 @@ describe('G-01 fails on a planted byte in a committed artefact', () => {
 
 describe('the gates pass what they should pass', () => {
   it('lets the navigational use of a vessel path through, on every gate', () => {
-    for (const gate of ['check-host-time', 'check-model-imports', 'check-vocabulary', 'check-truth-boundary']) {
+    for (const gate of [
+      'check-host-time',
+      'check-model-imports',
+      'check-vocabulary',
+      'check-truth-boundary',
+      'check-attribution-source',
+    ]) {
       const { code } = spawnGate(gate, CLEAN);
       expect(code, `${gate} must pass the clean fixture`).toBe(0);
     }
@@ -148,6 +171,7 @@ describe('the gates pass what they should pass', () => {
       checkModelImports(REPO_ROOT),
       checkVocabulary(REPO_ROOT),
       checkTruthBoundary(REPO_ROOT),
+      checkAttributionSource(REPO_ROOT),
       checkArtefactDrift([]),
     ]) {
       expect(result.violations, `${result.gate} must pass the tree`).toEqual([]);
@@ -160,16 +184,22 @@ describe('the gates pass what they should pass', () => {
     expect(checkModelImports(REPO_ROOT).scanned).toBeGreaterThan(0);
     expect(checkVocabulary(REPO_ROOT).scanned).toBeGreaterThan(0);
     expect(checkTruthBoundary(REPO_ROOT).scanned).toBeGreaterThan(0);
+    expect(checkAttributionSource(REPO_ROOT).scanned).toBeGreaterThan(0);
   });
 
   /**
    * The half of G-02 that is not here yet says so on every run, so that its absence is a hole
    * with a date on it rather than a hole nobody mentions.
    */
-  it('G-02 names the behavioural half it cannot run until the analysis exists', () => {
+  /**
+   * G-02's behavioural half arrived with the analysis in beat 005. The gate's own note still
+   * names it, because the *gate* cannot run it -- only the analysis suite can, and it does:
+   * `tests/analysis/analysis.test.ts` sets every observation error to 1e9 m and asserts the
+   * analysis recovers nothing beyond the prior.
+   */
+  it('G-02 still names the behavioural half, which the analysis suite now runs', () => {
     const notes = (checkTruthBoundary(REPO_ROOT).notes ?? []).join('\n');
     expect(notes).toMatch(/behavioural half/);
-    expect(notes).toMatch(/beat 005/);
   });
 
   it('lists every exemption marker it honoured, so that reviewing them is possible', () => {

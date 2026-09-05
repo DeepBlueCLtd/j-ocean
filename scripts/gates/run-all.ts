@@ -1,4 +1,5 @@
 import { checkArtefactDrift } from './check-artefact-drift.js';
+import { checkAttributionSource } from './check-attribution-source.js';
 import { checkHostTime } from './check-host-time.js';
 import { checkModelImports } from './check-model-imports.js';
 import { checkTruthBoundary } from './check-truth-boundary.js';
@@ -32,7 +33,7 @@ const GATES: readonly (Landed | NotYetLanded)[] = [
   { run: checkModelImports },
   { run: checkHostTime },
   { name: 'G-05 declared horizons rendered', beat: '007', holds: 'every declared horizon is rendered and no other panel is drawn' },
-  { name: 'G-06 attribution source', beat: '005', holds: 'attribution is read from the analysis own weights and from nowhere else' },
+  { run: checkAttributionSource },
   { run: checkVocabulary },
 ];
 

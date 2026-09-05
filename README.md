@@ -84,7 +84,7 @@ while a gate that is present but did not run is a hole that looks like a pass.
 | G-03 | the model imports no rendering module | **001** |
 | G-04 | no host clock, no unseeded randomness | **001** |
 | G-05 | every declared horizon rendered, and no other | beat 007 |
-| G-06 | attribution read from the analysis own weights | beat 005 |
+| G-06 | attribution read from the analysis own weights | **005** |
 | vocabulary | no tracked entities, no customer material | **001** |
 
 Each gate has a directory of planted violations under
@@ -105,6 +105,7 @@ src/ports/         the four ports and nothing else (Principle VIII)
 src/model/         kernel, grid, state; imports nothing above it (Principle III)
 src/truth/         the truth-source port over the committed artefacts
 src/instruments/   the only place a truth value becomes an observation (Principle II)
+src/analysis/      optimal interpolation, and the attribution that is its own gain
 src/run/           seeds, the manifest, the run that owns the clock (Principle I)
 src/harness/       the React shell, and the two bounded host-time exemptions
 scripts/gates/     the gates, their word list and their planted violations

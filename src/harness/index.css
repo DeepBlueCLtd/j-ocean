@@ -187,3 +187,5 @@ button[disabled]:hover { background: #fff; color: var(--ink); }
 
 .estimate + .estimate::before { content: " / "; color: var(--rule); }
 .estimate { white-space: nowrap; }
+
+.swatch.ink { background: rgb(31, 51, 71); }
