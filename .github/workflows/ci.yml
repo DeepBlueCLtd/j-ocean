@@ -1,0 +1,42 @@
+name: check
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# Constitution, Quality gates: every change must pass eslint and tsc, vitest including the
+# headless model test and the replay test, and gates G-01 to G-06 and the vocabulary gate.
+# The gates a beat has not yet landed are named by `pnpm gates` as not yet landed, so this
+# workflow does not have to be edited each time one arrives.
+jobs:
+  headless:
+    name: lint, types, tests, gates, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm gates
+      - run: pnpm build
+
+  shell:
+    name: the shell, in a browser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:shell

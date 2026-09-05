@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "run": {
+    "defaultSeed": "6a09e667f3bcc908",
+    "recordedCaseLabel": "the recorded case"
+  },
+  "clock": {
+    "epoch": "2019-06-01T00:00:00Z",
+    "timestepSeconds": 600,
+    "stabilityCriterionCfl": 0.5
+  },
+  "grid": {
+    "nx": 100,
+    "ny": 100,
+    "cellSizeMetres": 5500
+  },
+  "horizons": {
+    "leadHours": [0, 12, 24, 48, 72, 96]
+  },
+  "budget": {
+    "frameBudgetMs": 33
+  },
+  "domains": {
+    "defaultId": "gulf-stream-front",
+    "list": [
+      {
+        "id": "gulf-stream-front",
+        "label": "Gulf Stream front",
+        "west": -75,
+        "east": -70,
+        "south": 34,
+        "north": 39,
+        "character": "eventful"
+      },
+      {
+        "id": "open-gyre",
+        "label": "Open gyre",
+        "west": -45,
+        "east": -40,
+        "south": 25,
+        "north": 30,
+        "character": "bland"
+      }
+    ]
+  }
+}
