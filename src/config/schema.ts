@@ -100,7 +100,7 @@ const domainSchema = z
 
 export const configurationSchema = z
   .object({
-    schemaVersion: z.literal(2),
+    schemaVersion: z.literal(3),
 
     run: z.object({
       /**
@@ -146,6 +146,33 @@ export const configurationSchema = z
     budget: z.object({
       /** NFR-04: a number in configuration, not a judgement made at review time. */
       frameBudgetMs: z.number().positive(),
+    }),
+
+    /**
+     * Beat 007. The row is the primary surface, and "all six visible at once" is a claim
+     * about geometry, so the geometry is declared rather than left to a stylesheet. The
+     * stylesheet reads these as custom properties; nothing about the row's width is a
+     * literal in CSS (Principle X).
+     */
+    presentation: z.object({
+      /**
+       * The window width at which FR-13's "all visible at once" is a promise. Narrower than
+       * this, the row's own container scrolls and the page still does not.
+       */
+      referenceViewportWidthPx: z.number().int().positive(),
+      /** Below this a panel stops being legible, so the row stops shrinking panels. */
+      minimumPanelWidthPx: z.number().int().positive(),
+      panelGapPx: z.number().int().nonnegative(),
+      /** What the page keeps clear of the window edge, on both sides together. */
+      pageGutterPx: z.number().int().nonnegative(),
+      /**
+       * The half-range the panels draw interface-depth anomalies against. Drawn raw, at a
+       * limit that showed any structure at all, six panels were a uniform red; the scorer
+       * compares anomalies, so the row draws them.
+       */
+      anomalyLimitMetres: z.number().positive(),
+      /** FR-019's second channel: a cell above this weight is hatched, not merely tinted. */
+      attributionHatchThreshold: z.number().min(0).max(1),
     }),
 
     domains: z.object({
@@ -317,6 +344,23 @@ export const configurationSchema = z
   .refine(
     (c) => c.horizons.leadHours.every((h, i, all) => i === 0 || h > (all[i - 1] as number)),
     { error: 'horizons.leadHours must be strictly increasing', path: ['horizons', 'leadHours'] },
+  )
+  /**
+   * FR-13 says every declared horizon is visible at once at the declared reference width.
+   * That is arithmetic, so it is checked here rather than discovered in a screenshot: a
+   * seventh horizon declared without widening the reference width is refused, instead of
+   * quietly becoming a row that scrolls.
+   */
+  .refine(
+    (c) =>
+      c.presentation.referenceViewportWidthPx - c.presentation.pageGutterPx >=
+      c.horizons.leadHours.length * c.presentation.minimumPanelWidthPx +
+        (c.horizons.leadHours.length - 1) * c.presentation.panelGapPx,
+    {
+      error:
+        'presentation.referenceViewportWidthPx is too narrow to show every declared horizon at presentation.minimumPanelWidthPx',
+      path: ['presentation', 'referenceViewportWidthPx'],
+    },
   )
   .refine(
     (c) =>

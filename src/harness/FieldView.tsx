@@ -1,20 +1,12 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { FieldSurface, type Palette } from './field-surface.js';
 
 /**
- * A field, drawn.
+ * A field, drawn through the one rendering module, with its marks and its scale.
  *
- * Beat 003 draws one field so that the reader can see there is an ocean. Beat 007 draws six
- * of them in a row, and the constitution names a WebGL surface for that; this is a 2-D
- * canvas, and the deviation is recorded in the beat 003 plan. The reason is that a single
- * 100 x 100 field costs a tenth of a millisecond to paint through `ImageData`, and taking on
- * a GL context, a shader pipeline and a headless-Chromium software rasteriser to save that
- * tenth of a millisecond would be paying for beat 007's problem three beats early.
- *
- * The palette is diverging about zero, because a sea-surface height anomaly is a departure
- * from a mean and the sign is the meaning. It is legible in greyscale: lightness carries the
- * magnitude, so a printed panel still shows the front (Principle V, and FR-17's requirement
- * that the attribution field be greyscale-legible, inherited here so beat 007 does not have
- * to invent it).
+ * Everything about *how* a field is painted lives in `field-surface.ts`; this component is
+ * the geometry, the markers, the legend and the click target. Beat 003 had the two mixed
+ * together, which was fine for one field and would not have been for twelve.
  */
 
 /** A point to draw over the field, in fractional grid coordinates. */
@@ -29,54 +21,20 @@ export interface FieldViewProps {
   readonly values: Float64Array;
   readonly nx: number;
   readonly ny: number;
-  /** Symmetric about zero for a diverging scale; the top of the range for a sequential one. */
   readonly limit: number;
-  /**
-   * `diverging` for a signed anomaly, where the sign is the meaning; `sequential` for a
-   * quantity that runs from nothing to all of it, such as a weight. Using a diverging scale
-   * for a weight would give a field with no negative values a blue half that means nothing.
-   */
-  readonly palette?: 'diverging' | 'sequential';
-  /** The unit the scale is in. Empty for a dimensionless quantity such as a weight. */
+  readonly palette?: Palette;
   readonly unit?: string;
+  /** The second channel (FR-019). Cells above the threshold are hatched, not merely tinted. */
+  readonly hatch?: Float64Array;
+  readonly hatchThreshold?: number;
+  readonly hatchLabel?: string;
   readonly label: string;
   readonly testId?: string;
-  /** Where the instruments sampled. Beat 008 makes this a footprint; this is its first draft. */
   readonly markers?: readonly Marker[];
   /** FR-18: a breakdown is an instrument of a selected cell. Clicking picks the cell. */
   readonly onSelect?: (cellIndex: number) => void;
-}
-
-/**
- * Sequential: paper to ink, monotone in lightness. Greyscale-legible by construction, which
- * FR-17 requires of the attribution field and which this project applies to every field so a
- * reader learns one convention.
- */
-function sequentialColourOf(normalised: number): [number, number, number] {
-  const t = Math.max(0, Math.min(1, normalised));
-  const lightness = 1 - 0.82 * t;
-  const tint: [number, number, number] = [0.12, 0.2, 0.28];
-  return [
-    Math.round(255 * (lightness + (tint[0] - lightness) * t)),
-    Math.round(255 * (lightness + (tint[1] - lightness) * t)),
-    Math.round(255 * (lightness + (tint[2] - lightness) * t)),
-  ];
-}
-
-/** Diverging blue-white-red, with lightness monotone in |value| so greyscale still reads. */
-function colourOf(normalised: number): [number, number, number] {
-  const t = Math.max(-1, Math.min(1, normalised));
-  const magnitude = Math.abs(t);
-  // Lightness falls from white at zero to about a third at the extremes.
-  const lightness = 1 - 0.68 * magnitude;
-  const warm: [number, number, number] = [0.78, 0.13, 0.09];
-  const cool: [number, number, number] = [0.11, 0.28, 0.6];
-  const hue = t >= 0 ? warm : cool;
-  return [
-    Math.round(255 * (lightness + (hue[0] - lightness) * magnitude)),
-    Math.round(255 * (lightness + (hue[1] - lightness) * magnitude)),
-    Math.round(255 * (lightness + (hue[2] - lightness) * magnitude)),
-  ];
+  /** Shown beneath the field. Absent on a panel, where the caption is the panel's own. */
+  readonly caption?: boolean;
 }
 
 export function FieldView({
@@ -90,43 +48,31 @@ export function FieldView({
   onSelect,
   palette = 'diverging',
   unit = 'm',
+  hatch,
+  hatchThreshold = 0.5,
+  hatchLabel,
+  caption = true,
 }: FieldViewProps) {
   const canvas = useRef<HTMLCanvasElement | null>(null);
   const overlay = useRef<HTMLCanvasElement | null>(null);
+  const surface = useRef<FieldSurface | null>(null);
+  const [backend, setBackend] = useState<string>('');
 
   useEffect(() => {
     const element = canvas.current;
     if (element === null) return;
-    const context = element.getContext('2d');
-    if (context === null) return;
-
-    const image = context.createImageData(nx, ny);
-    for (let iy = 0; iy < ny; iy += 1) {
-      for (let ix = 0; ix < nx; ix += 1) {
-        // North is up: the field's first row is the southernmost, and a canvas's is the top.
-        const source = (ny - 1 - iy) * nx + ix;
-        const target = (iy * nx + ix) * 4;
-        const value = values[source] as number;
-        if (!Number.isFinite(value)) {
-          image.data[target] = 210;
-          image.data[target + 1] = 208;
-          image.data[target + 2] = 202;
-          image.data[target + 3] = 255;
-          continue;
-        }
-        const [r, g, b] =
-          palette === 'sequential' ? sequentialColourOf(value / limit) : colourOf(value / limit);
-        image.data[target] = r;
-        image.data[target + 1] = g;
-        image.data[target + 2] = b;
-        image.data[target + 3] = 255;
-      }
+    if (surface.current === null) {
+      surface.current = new FieldSurface(element, nx, ny);
+      setBackend(surface.current.backend);
     }
-    context.putImageData(image, 0, 0);
-  }, [values, nx, ny, limit, palette]);
+    surface.current.draw({
+      values,
+      limit,
+      palette,
+      ...(hatch === undefined ? {} : { hatch, hatchThreshold }),
+    });
+  }, [values, nx, ny, limit, palette, hatch, hatchThreshold]);
 
-  // The markers are drawn on a second canvas at a higher resolution, because the field's
-  // canvas is one pixel per cell and a track drawn there would be a staircase.
   useEffect(() => {
     const element = overlay.current;
     if (element === null) return;
@@ -140,20 +86,20 @@ export function FieldView({
     context.strokeStyle = 'rgba(16, 23, 29, 0.85)';
     context.lineWidth = Math.max(1, scale * 0.25);
     context.beginPath();
-    const track = markers.filter((marker) => marker.kind === 'track');
-    track.forEach((marker, index) => {
-      const [x, y] = at(marker);
-      if (index === 0) context.moveTo(x, y);
-      else context.lineTo(x, y);
-    });
+    markers
+      .filter((marker) => marker.kind === 'track')
+      .forEach((marker, index) => {
+        const [x, y] = at(marker);
+        if (index === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      });
     context.stroke();
 
     for (const marker of markers) {
       if (marker.kind === 'track') continue;
       const [x, y] = at(marker);
-      const radius = scale * (marker.kind === 'drop' ? 0.9 : 0.7);
       context.beginPath();
-      context.arc(x, y, radius, 0, Math.PI * 2);
+      context.arc(x, y, scale * (marker.kind === 'drop' ? 0.9 : 0.7), 0, Math.PI * 2);
       // A flagged observation is drawn as flagged, never omitted (FR-24).
       context.fillStyle = marker.flagged
         ? 'rgba(255, 255, 255, 0.9)'
@@ -170,7 +116,7 @@ export function FieldView({
   return (
     <figure className="field" data-testid={testId}>
       <div className="field-stack">
-        <canvas ref={canvas} width={nx} height={ny} role="img" aria-label={label} />
+        <canvas ref={canvas} width={nx} height={ny} role="img" aria-label={label} data-backend={backend} />
         <canvas
           ref={overlay}
           className="overlay"
@@ -184,36 +130,40 @@ export function FieldView({
               : (event) => {
                   const bounds = event.currentTarget.getBoundingClientRect();
                   const ix = Math.min(nx - 1, Math.floor(((event.clientX - bounds.left) / bounds.width) * nx));
-                  const iy = Math.min(
-                    ny - 1,
-                    Math.floor((1 - (event.clientY - bounds.top) / bounds.height) * ny),
-                  );
+                  const iy = Math.min(ny - 1, Math.floor((1 - (event.clientY - bounds.top) / bounds.height) * ny));
                   onSelect(iy * nx + ix);
                 }
           }
           style={onSelect === undefined ? undefined : { cursor: 'crosshair', pointerEvents: 'auto' }}
         />
       </div>
-      <figcaption>
-        {label}
-        <span className="scale">
-          {palette === 'sequential' ? (
-            <>
-              <span className="swatch zero" /> 0
-              <span className="swatch ink" /> {limit.toFixed(2)}
-              {unit === '' ? '' : ` ${unit}`}
-            </>
-          ) : (
-            <>
-              <span className="swatch cool" /> &minus;{limit.toFixed(2)}
-              {unit === '' ? '' : ` ${unit}`}
-              <span className="swatch zero" /> 0
-              <span className="swatch warm" /> +{limit.toFixed(2)}
-              {unit === '' ? '' : ` ${unit}`}
-            </>
-          )}
-        </span>
-      </figcaption>
+      {caption && (
+        <figcaption>
+          {label}
+          <span className="scale">
+            {palette === 'sequential' ? (
+              <>
+                <span className="swatch zero" /> 0
+                <span className="swatch ink" /> {limit.toFixed(2)}
+                {unit === '' ? '' : ` ${unit}`}
+              </>
+            ) : (
+              <>
+                <span className="swatch cool" /> &minus;{limit.toFixed(2)}
+                {unit === '' ? '' : ` ${unit}`}
+                <span className="swatch zero" /> 0
+                <span className="swatch warm" /> +{limit.toFixed(2)}
+                {unit === '' ? '' : ` ${unit}`}
+              </>
+            )}
+            {hatchLabel !== undefined && (
+              <>
+                <span className="swatch hatched" /> {hatchLabel}
+              </>
+            )}
+          </span>
+        </figcaption>
+      )}
     </figure>
   );
 }

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "run": {
     "defaultSeed": "6a09e667f3bcc908",
     "recordedCaseLabel": "the recorded case"
@@ -25,6 +25,14 @@
   },
   "budget": {
     "frameBudgetMs": 33
+  },
+  "presentation": {
+    "referenceViewportWidthPx": 1400,
+    "minimumPanelWidthPx": 190,
+    "panelGapPx": 10,
+    "pageGutterPx": 48,
+    "anomalyLimitMetres": 220,
+    "attributionHatchThreshold": 0.5
   },
   "forecast": {
     "spinUpHours": 24,

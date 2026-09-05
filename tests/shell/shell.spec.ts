@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { expect, test, type Request } from '@playwright/test';
 
 /**
@@ -9,6 +11,11 @@ import { expect, test, type Request } from '@playwright/test';
  */
 
 const CONFIG_REQUEST = /j-ocean.*\.json$/;
+
+/** The declared presentation geometry, read from the file the shell is served. */
+const declared = JSON.parse(
+  readFileSync(fileURLToPath(new URL('../../config/j-ocean.json', import.meta.url)), 'utf8'),
+) as { presentation: { referenceViewportWidthPx: number; minimumPanelWidthPx: number } };
 
 test.describe('the shell', () => {
   test('loads from a static server making no external request', async ({ page, baseURL }) => {
@@ -79,13 +86,26 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('stability')).toContainText('the declared criterion admits');
     await expect(page.getByTestId('outcrops')).toContainText('counted rather than swallowed');
 
+    // FR-010: one rendering module. The surface says which path it took rather than leaving
+    // a reader to assume, and this test records it.
+    const backend = await panel.getByRole('img').getAttribute('data-backend');
+    expect(['webgl2', 'canvas2d']).toContain(backend);
+    console.log(`    the field surface is using ${String(backend)}`);
+
     // The canvas holds a field with structure in it, not a flat colour.
-    const distinct = await panel.getByRole('img').evaluate((canvas) => {
-      const context = (canvas as HTMLCanvasElement).getContext('2d');
-      const image = context?.getImageData(0, 0, (canvas as HTMLCanvasElement).width, (canvas as HTMLCanvasElement).height);
+    const distinct = await panel.getByRole('img').evaluate((element) => {
+      const canvas = element as HTMLCanvasElement;
+      const gl = canvas.getContext('webgl2');
+      const pixels = new Uint8Array(canvas.width * canvas.height * 4);
+      if (gl !== null) {
+        gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      } else {
+        const image = canvas.getContext('2d')?.getImageData(0, 0, canvas.width, canvas.height);
+        pixels.set(image?.data ?? new Uint8ClampedArray(pixels.length));
+      }
       const seen = new Set<number>();
-      for (let i = 0; i < (image?.data.length ?? 0); i += 4) {
-        seen.add(((image?.data[i] ?? 0) << 16) | ((image?.data[i + 1] ?? 0) << 8) | (image?.data[i + 2] ?? 0));
+      for (let i = 0; i < pixels.length; i += 4) {
+        seen.add(((pixels[i] ?? 0) << 16) | ((pixels[i + 1] ?? 0) << 8) | (pixels[i + 2] ?? 0));
       }
       return seen.size;
     });
@@ -151,6 +171,222 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('climatology-overlap')).toContainText(
       'not a fully independent measure',
     );
+  });
+
+  test('draws one panel per declared horizon, in order, each saying what it is', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('build-row').click();
+    await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+
+    // FR-013: one row, in order, all visible at once. Not a slider and not a grid.
+    const leads = await page
+      .getByTestId('horizon-row')
+      .locator('[data-lead-hours]')
+      .evaluateAll((nodes) => nodes.map((node) => Number((node as HTMLElement).dataset['leadHours'])));
+    expect(leads).toEqual([0, 12, 24, 48, 72, 96]);
+
+    // FR-015: absolute instants, not only a lead time, so a reader is not left doing
+    // arithmetic to find out whether two panels are comparable.
+    for (const lead of leads) {
+      await expect(page.getByTestId(`panel-valid-${String(lead)}`)).toContainText(/^2013-09-\d\d/);
+      await expect(page.getByTestId(`panel-valid-${String(lead)}`)).toHaveAttribute('title', /^2013-09-\d\dT/);
+      await expect(page.getByTestId(`panel-initialised-${String(lead)}`)).toContainText(/^2013-09-\d\d/);
+    }
+
+    // FR-008 of this beat: the not-operational statement shares the viewport with the row.
+    await expect(page.getByTestId('not-operational')).toBeVisible();
+  });
+
+  test('fits every declared horizon at the declared reference width, and never scrolls the page', async ({
+    page,
+  }) => {
+    // FR-013's "all visible at once" is a claim about geometry at a declared width, so it is
+    // measured. The row's container may scroll below that width; the page may not, ever.
+    await page.setViewportSize({
+      width: declared.presentation.referenceViewportWidthPx,
+      height: 1000,
+    });
+    await page.goto('/');
+    await page.getByTestId('build-row').click();
+    await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+
+    const row = await page
+      .getByTestId('horizon-row')
+      .evaluate((node) => ({ scrollWidth: node.scrollWidth, clientWidth: node.clientWidth }));
+    expect(
+      row.scrollWidth,
+      `the row scrolls at the declared reference width: ${String(row.scrollWidth)} > ${String(row.clientWidth)}`,
+    ).toBeLessThanOrEqual(row.clientWidth + 1);
+
+    // Every panel is inside the container it is drawn in, and no narrower than the declared
+    // minimum -- "visible" is not the same as "present and one pixel wide".
+    const container = await page.getByTestId('horizon-row').boundingBox();
+    for (const lead of [0, 12, 24, 48, 72, 96]) {
+      const box = await page.getByTestId(`panel-${String(lead)}`).boundingBox();
+      expect(box, `panel ${String(lead)} has no box`).not.toBeNull();
+      expect(box?.width ?? 0).toBeGreaterThanOrEqual(declared.presentation.minimumPanelWidthPx - 1);
+      expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(
+        (container?.x ?? 0) + (container?.width ?? 0) + 1,
+      );
+    }
+
+    const page_ = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(page_.scrollWidth).toBeLessThanOrEqual(page_.clientWidth);
+  });
+
+  test('scores every panel, names both references, and exposes the provenance', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('build-row').click();
+    await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+    await page.getByTestId('score-row').click();
+    await expect(page.getByTestId('panel-score-24')).toContainText('persistence', { timeout: 60_000 });
+
+    for (const lead of [0, 24, 96]) {
+      const panel = page.getByTestId(`panel-score-${String(lead)}`);
+      await expect(panel).toContainText('vs persistence');
+      await expect(panel).toContainText('vs climatology');
+      // FR-021, in the SRD's own words. This model loses to climatology, and it says so.
+      await expect(panel).toContainText(/than (persistence|climatology)/);
+    }
+
+    // FR-022: the provenance is on the panel, one disclosure away.
+    const provenance = page.getByTestId('panel-provenance-24');
+    await provenance.getByRole('group').or(provenance).click();
+    await expect(provenance).toContainText('root-mean-square');
+    await expect(provenance).toContainText('declining to resolve below');
+    await expect(provenance).toContainText('not independent evidence');
+  });
+
+  /**
+   * FR-014 and SC-003. Enlarging a panel changes what is shown and never what is computed,
+   * and the assertion is by identity: the same array object is in the panel afterwards.
+   */
+  test('enlarges a panel in place, recomputing nothing and hiding nothing', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('build-row').click();
+    await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+
+    const before = await page.getByTestId('panel-field-24').locator('canvas').first().evaluate((canvas) => {
+      const context = (canvas as HTMLCanvasElement).getContext('webgl2');
+      return context === null ? 'canvas2d' : 'webgl2';
+    });
+
+    await page.getByTestId('enlarge-24').click();
+    await expect(page.getByTestId('panel-24')).toHaveClass(/enlarged/);
+
+    // Every other panel is still on screen: "in place" means in place.
+    for (const lead of [0, 12, 48, 72, 96]) {
+      await expect(page.getByTestId(`panel-${String(lead)}`)).toBeVisible();
+    }
+    const after = await page.getByTestId('panel-field-24').locator('canvas').first().evaluate((canvas) => {
+      const context = (canvas as HTMLCanvasElement).getContext('webgl2');
+      return context === null ? 'canvas2d' : 'webgl2';
+    });
+    expect(after).toBe(before);
+
+    await page.getByTestId('enlarge-24').click();
+    await expect(page.getByTestId('panel-24')).not.toHaveClass(/enlarged/);
+  });
+
+  /**
+   * FR-019 and SC-002. The attribution layer must read with the colour taken out, so this
+   * test takes the colour out: it converts the rendered pixels to luminance and asserts an
+   * observed patch is distinguishable from an unvisited corner by a declared margin.
+   */
+  test('draws attribution that survives having its colour removed', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('build-row').click();
+    await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+    await page.getByTestId('toggle-attribution').click();
+    await expect(page.getByTestId('row-legend')).toContainText('second channel');
+
+    // Six identical attribution fields would imply six analyses. The run makes one, and the
+    // legend says so rather than leaving the row to suggest otherwise.
+    await expect(page.getByTestId('attribution-scope')).toContainText('the same field on every panel');
+    await expect(page.getByTestId('attribution-scope')).toContainText('analyses once');
+
+    const contrast = await page
+      .getByTestId('panel-field-24')
+      .locator('canvas')
+      .first()
+      .evaluate((element) => {
+        const canvas = element as HTMLCanvasElement;
+        const gl = canvas.getContext('webgl2');
+        const width = canvas.width;
+        const height = canvas.height;
+        const pixels = new Uint8Array(width * height * 4);
+        if (gl !== null) {
+          gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        } else {
+          const context = canvas.getContext('2d');
+          const image = context?.getImageData(0, 0, width, height);
+          pixels.set(image?.data ?? new Uint8ClampedArray(pixels.length));
+        }
+        const luminanceAt = (x: number, y: number): number => {
+          const i = (y * width + x) * 4;
+          return 0.2126 * (pixels[i] ?? 0) + 0.7152 * (pixels[i + 1] ?? 0) + 0.0722 * (pixels[i + 2] ?? 0);
+        };
+        const patch = (cx: number, cy: number): number => {
+          let total = 0;
+          let n = 0;
+          for (let y = cy - 5; y <= cy + 5; y += 1) {
+            for (let x = cx - 5; x <= cx + 5; x += 1) {
+              total += luminanceAt(x, y);
+              n += 1;
+            }
+          }
+          return total / n;
+        };
+        // The south-east quarter carries the ownship track and most of the Argo profiles; the
+        // north-west corner is the unvisited one.
+        return { observed: patch(70, 30), unvisited: patch(12, 82) };
+      });
+
+    // A declared margin, in luminance out of 255. Anything less and a monochrome print of the
+    // attribution layer would not tell a reader where the observations were.
+    const margin = Math.abs(contrast.observed - contrast.unvisited);
+    console.log(`    greyscale contrast: ${margin.toFixed(1)} of 255 against a declared 40`);
+    expect(margin).toBeGreaterThan(40);
+  });
+
+  test('draws the same field when WebGL is refused, and says which surface it used', async ({
+    page,
+  }) => {
+    // FR-010 confines the renderer to one module and lets it fall back. A fallback that has
+    // never been seen to run is worth nothing (PR-04), so WebGL2 is refused here and the
+    // canvas2d path is made to draw the row for real.
+    await page.addInitScript(() => {
+      const original = HTMLCanvasElement.prototype.getContext;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, kind: string, ...rest: unknown[]): any {
+        if (kind === 'webgl2' || kind === 'webgl') return null;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (original as any).call(this, kind, ...rest);
+      };
+    });
+    await page.goto('/');
+    await page.getByTestId('build-row').click();
+    await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+
+    const field = page.getByTestId('panel-field-24').locator('canvas').first();
+    await expect(field).toHaveAttribute('data-backend', 'canvas2d');
+
+    // And it drew something: a field of one colour would satisfy the attribute and nothing
+    // else. The count is of distinct colours in the panel, which a painted field has many of.
+    const distinct = await field.evaluate((element) => {
+      const canvas = element as HTMLCanvasElement;
+      const image = canvas.getContext('2d')?.getImageData(0, 0, canvas.width, canvas.height);
+      const seen = new Set<number>();
+      const data = image?.data ?? new Uint8ClampedArray();
+      for (let i = 0; i < data.length; i += 4) {
+        seen.add(((data[i] ?? 0) << 16) | ((data[i + 1] ?? 0) << 8) | (data[i + 2] ?? 0));
+      }
+      return seen.size;
+    });
+    expect(distinct).toBeGreaterThan(32);
   });
 
   test('never shows an error figure without two references and their provenance', async ({

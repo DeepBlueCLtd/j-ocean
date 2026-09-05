@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -12,6 +12,13 @@ import { fileURLToPath } from 'node:url';
  */
 
 const IMAGES = fileURLToPath(new URL('../../docs/site/images/', import.meta.url));
+
+/** The row is captured at the width configuration declares it fits in, not at a round number. */
+const REFERENCE_WIDTH = (
+  JSON.parse(
+    readFileSync(fileURLToPath(new URL('../../config/j-ocean.json', import.meta.url)), 'utf8'),
+  ) as { presentation: { referenceViewportWidthPx: number } }
+).presentation.referenceViewportWidthPx;
 
 test.beforeAll(() => {
   mkdirSync(IMAGES, { recursive: true });
@@ -43,6 +50,23 @@ test('the ocean after twelve hours', async ({ page }) => {
   await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 30_000 });
   await page.getByTestId('field-panel').screenshot({ path: `${IMAGES}003-field-advanced.png` });
   await page.getByTestId('run-panel').screenshot({ path: `${IMAGES}003-run-panel.png` });
+});
+
+test('the horizon row', async ({ page }) => {
+  await page.setViewportSize({ width: REFERENCE_WIDTH, height: 1000 });
+  await page.goto('/');
+  await page.getByTestId('build-row').click();
+  await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId('score-row').click();
+  await expect(page.getByTestId('panel-score-24')).toContainText('persistence', { timeout: 60_000 });
+  await page.getByTestId('horizon-row-panel').screenshot({ path: `${IMAGES}007-horizon-row.png` });
+
+  await page.getByTestId('toggle-attribution').click();
+  await page.getByTestId('horizon-row').screenshot({ path: `${IMAGES}007-attribution-row.png` });
+
+  await page.getByTestId('toggle-attribution').click();
+  await page.getByTestId('enlarge-24').click();
+  await page.getByTestId('horizon-row').screenshot({ path: `${IMAGES}007-enlarged.png` });
 });
 
 test('what the forecast was worth', async ({ page }) => {

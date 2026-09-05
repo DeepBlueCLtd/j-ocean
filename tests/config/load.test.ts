@@ -8,7 +8,7 @@ const raw = (): Record<string, unknown> => JSON.parse(readFileSync(CONFIG_PATH, 
 describe('the configuration loader', () => {
   it('loads the declared configuration and digests it', () => {
     const { config, digest } = declaredConfiguration();
-    expect(config.schemaVersion).toBe(2);
+    expect(config.schemaVersion).toBe(3);
     expect(config.grid.nx).toBe(100);
     expect(config.grid.ny).toBe(100);
     expect(digest).toMatch(/^[0-9a-f]{64}$/);
@@ -117,6 +117,14 @@ describe('the configuration loader', () => {
       expect(() => validateConfiguration(broken)).toThrow(/does not match the box, the grid/);
     });
 
+    it('rejects a seventh horizon the declared reference width cannot show at once', () => {
+      // FR-013 is a promise about geometry, and the promise is arithmetic: a horizon added
+      // without widening the row is refused at load rather than found in a screenshot.
+      const horizons = raw()['horizons'] as { leadHours: number[] };
+      const broken = { ...raw(), horizons: { leadHours: [...horizons.leadHours, 120] } };
+      expect(() => validateConfiguration(broken)).toThrow(/too narrow to show every declared horizon/);
+    });
+
     it('rejects a stride the three-hourly source cannot supply', () => {
       const current = raw()['truth'] as { period: Record<string, unknown> };
       const broken = {
@@ -128,6 +136,6 @@ describe('the configuration loader', () => {
   });
 
   it('rejects a schema version it does not know', () => {
-    expect(() => validateConfiguration({ ...raw(), schemaVersion: 3 })).toThrow(/schemaVersion/);
+    expect(() => validateConfiguration({ ...raw(), schemaVersion: 4 })).toThrow(/schemaVersion/);
   });
 });

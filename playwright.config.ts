@@ -11,7 +11,7 @@ const chromium = process.env['J_OCEAN_CHROMIUM'];
 // SC-003: the site is loaded from a static file server, not from a dev server, so that
 // "no network request other than the site's own assets" is a claim about what ships.
 export default defineConfig({
-  testDir: './tests/shell',
+  testDir: './tests',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0,
@@ -23,7 +23,7 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      testMatch: '**/*.spec.ts',
+      testMatch: '**/shell/*.spec.ts',
       use: {
         ...devices['Desktop Chrome'],
         // Ordinarily Playwright's own browser, installed with `pnpm exec playwright
@@ -34,11 +34,21 @@ export default defineConfig({
       },
     },
     {
+      // Gate G-05. Its own project so that `pnpm gates` can run it without running the rest
+      // of the shell suite, and so that a failure names the gate rather than a test file.
+      name: 'gate-g05',
+      testMatch: '**/*.gate.ts',
+      use: {
+        ...devices['Desktop Chrome'],
+        ...(chromium === undefined ? {} : { launchOptions: { executablePath: chromium } }),
+      },
+    },
+    {
       // `pnpm screenshots`. Separate from the test project because these write into the
       // tree: the documentation site's figures are captured from the real application, so
       // a screenshot can never show something the shell does not do.
       name: 'screenshots',
-      testMatch: '**/*.shots.ts',
+      testMatch: '**/shell/*.shots.ts',
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1200, height: 900 },

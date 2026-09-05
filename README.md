@@ -16,11 +16,18 @@ constitution → specify → plan → tasks → analyze → implement.
 
 ## Where the tree is
 
-Beats **001 (foundation and ports)** and **002 (truth and observation records)** have
-landed: the toolchain, the four ports and their contract tests, seeded streams, the run
-manifest and its byte-identical replay, the static shell, the committed HYCOM and Argo
-records with the drift gate over them, and four of the seven gates. There is no ocean in it
-yet — beat 003, the reduced-gravity model, is next.
+Beats **001** through **007** have landed: the four ports and their contract tests, seeded
+streams, the run manifest and its byte-identical replay, the committed HYCOM and Argo
+records with the drift gate over them, the one-and-a-half layer reduced-gravity model, the
+simulated instruments that are the only way truth reaches it, optimal interpolation with the
+attribution that is its own gain, skill against two references with provenance on every
+figure, and the horizon row that is the primary surface. **All seven gates now run**, each
+watched failing against a planted violation.
+
+Two things the tree reports rather than hides: the model is **worse than climatology at
+every horizon**, for a reason beat 006's note traces to two declared numbers that disagree;
+and the attribution the row draws is **one analysis shown on six panels**, until beat 009
+cycles the forecast. Beat 008, the observation footprint, is next.
 
 ## Running it
 
@@ -83,7 +90,7 @@ while a gate that is present but did not run is a hole that looks like a pass.
 | G-02 | truth reaches the analysis only through an instrument | **004** (behavioural half: 005) |
 | G-03 | the model imports no rendering module | **001** |
 | G-04 | no host clock, no unseeded randomness | **001** |
-| G-05 | every declared horizon rendered, and no other | beat 007 |
+| G-05 | every declared horizon rendered, and no other | **007** (in a real browser) |
 | G-06 | attribution read from the analysis own weights | **005** |
 | vocabulary | no tracked entities, no customer material | **001** |
 

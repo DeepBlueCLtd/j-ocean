@@ -23,9 +23,14 @@ lives here, and no component in the tree holds a literal for one.
 | `clock.epoch` | The instant step zero is valid for. |
 | `clock.timestepSeconds` | The stated timestep. |
 | `clock.stabilityCriterionCfl` | The stated stability criterion the kernel must satisfy. |
-| `grid.nx`, `grid.ny`, `grid.cellSizeMetres` | The grid, configurable and starting at 100 x 100. |
+| `grid.nx`, `grid.ny` | The grid, configurable and starting at 100 x 100. There is no declared cell size: a five-degree box is not square in kilometres at Gulf Stream latitudes, so `dx` and `dy` are computed from the box and the grid and reported as computed figures. |
 | `horizons.leadHours` | Strictly increasing. Every one is rendered; no panel is drawn for anything else. |
 | `budget.frameBudgetMs` | The frame budget, a number rather than a judgement made at review time. |
+| `presentation.referenceViewportWidthPx` | The window width at which *all six visible at once* is a promise. The schema refuses a value too narrow for the declared horizons; a browser test measures the rendered geometry at it. |
+| `presentation.minimumPanelWidthPx` | Below this a panel stops being legible, so the row stops shrinking panels and its own container scrolls. The page never does. |
+| `presentation.panelGapPx`, `presentation.pageGutterPx` | The rest of the row's arithmetic, so that no width is a literal in the stylesheet. |
+| `presentation.anomalyLimitMetres` | The half-range the panels draw interface-depth anomalies against. |
+| `presentation.attributionHatchThreshold` | The weight above which a cell is hatched rather than merely tinted — the second channel that makes the layer readable without colour. |
 | `domains.list[]` | Extents in degrees, and a declared `character` of `eventful` or `bland`. |
 
 The **configuration digest** is a SHA-256 over a canonical serialisation: object keys in
@@ -353,6 +358,33 @@ A score without provenance is an assertion, so the type makes one impossible.
 - A valid instant outside the record — the refusal beat 009's validity statement rests on.
 - A region with nothing left after the margin is removed.
 - Division by a perfect reference: `null`, and *persistence is perfect here*.
+
+## The row
+
+The primary surface, and the only place the six horizons appear together. ADR-0003 records
+why it is a row and not a slider or a grid.
+
+| Field | Meaning |
+|---|---|
+| `Panel.leadHours` | The <span class="declared">declared</span> horizon. One panel per horizon and no others; gate G-05 checks that in a running browser. |
+| `Panel.validInstant`, `Panel.initialisedFrom` | Absolute instants in the run's clock, not only a lead time, so that no reader has to do arithmetic to find out whether two panels are comparable. |
+| `Panel.field` | The forecast interface depth as an **anomaly** about its own regional mean — the same convention the scorer uses, so the picture and the number describe the same thing. |
+| `Panel.observationWeight` | The analysis's own weights, read through `weightsAt` and computed nowhere else. |
+| `Panel.observationsDominant` | Where observations lead both other sources: the hatch, and the second channel of FR-019. |
+| `Panel.score` | The `Score` of the section above, or `null` before the row has been scored. Scoring is on demand because it costs a second and the interface does not freeze. |
+| `Panel.enlarged` | A class on an element. Enlargement changes what is shown and never what is computed; the test asserts it by object identity. |
+
+**The attribution is one field.** The recorded case runs a single analysis, at the issue
+instant, and the row draws it on every panel. Six identical fields side by side would imply
+six analyses, so the legend states the instant and says that attribution becomes per horizon
+once the forecast cycles.
+
+## Where a field is painted
+
+One module, `field-surface.ts`, owns every palette and shader. It reports the surface it got
+— `webgl2` where the browser has it, `canvas2d` where it does not — on the canvas itself, and
+both paths are exercised by tests: headless Chromium here has WebGL2, so a test refuses it in
+an init script to make the fallback actually run.
 
 ## The figure kinds
 

@@ -5,6 +5,8 @@ import { createRun, type Run } from '../run/run.js';
 import { serialiseManifest } from '../run/manifest.js';
 import { loadClimatology, loadObservations, loadTruth } from './artefacts.js';
 import { FieldView, type Marker } from './FieldView.js';
+import { HorizonRow } from './HorizonRow.js';
+import { runForecast, type ForecastResult } from '../run/forecast.js';
 import { climatologyReferenceOver } from '../instruments/climatology-reference.js';
 import { interfaceFieldFromContainer, interfaceFieldFromTruth } from '../instruments/interface-field.js';
 import {
@@ -77,6 +79,8 @@ interface RunView {
   /** Computed on demand: scoring the row costs a second, and NFR-04 says not to freeze. */
   readonly score: Score | null;
   readonly scoringLeadHours: number;
+  /** The row's forecasts. Computed on demand: it costs a couple of seconds (NFR-04). */
+  readonly forecast: ForecastResult | null;
   /** FR-18: the breakdown is an instrument of a *selected* cell, never a per-panel summary. */
   readonly selectedCell: number | null;
   readonly box: { readonly west: number; readonly east: number; readonly south: number; readonly north: number };
@@ -250,6 +254,7 @@ export function App() {
         analysis,
         score: null,
         scoringLeadHours: 24,
+        forecast: null,
         selectedCell: null,
         box: report.box,
       };
@@ -359,6 +364,28 @@ export function App() {
         .map((o) => o.id),
     });
     setView({ ...view, score: computedScore });
+  }, [loaded, record, view]);
+
+  /**
+   * The row's forecasts. Integrating six horizons costs a couple of seconds, so it happens
+   * when a reader asks rather than on load -- NFR-04 says the integration does not block the
+   * interface, and the honest way to obey that is not to start it unbidden.
+   */
+  const buildRow = useCallback(() => {
+    if (loaded === null || record === null || view === null) return;
+    const domain = loaded.config.domains.list.find((d) => d.id === record.domainId);
+    if (domain === undefined) return;
+    const forecast = runForecast({
+      config: loaded.config,
+      domain,
+      truth: record.truth,
+      climatology: record.climatology,
+      argo: record.observations,
+      issueInstantMs:
+        Date.parse(loaded.config.truth.period.start) + loaded.config.forecast.spinUpHours * 3_600_000,
+      ...(view.recordedCase ? {} : { seed: view.run.rng.rootSeed }),
+    });
+    setView({ ...view, forecast });
   }, [loaded, record, view]);
 
   const newRun = useCallback(() => {
@@ -607,6 +634,36 @@ export function App() {
               </dd>
             </dl>
           </section>
+
+          {view.forecast === null ? (
+            <section data-testid="row-invitation">
+              <h2>The row</h2>
+              <p className="aside">
+                Six panels at the declared horizons, each stating what it is valid for, what it
+                was initialised from, and what it was worth against two references. Building
+                them means integrating the analysis forward four days, which takes a couple of
+                seconds &mdash; so it happens when you ask.
+              </p>
+              <button type="button" onClick={buildRow} data-testid="build-row">
+                Build the horizon row
+              </button>
+            </section>
+          ) : (
+            <HorizonRow
+              config={loaded.config}
+              domain={
+                loaded.config.domains.list.find((d) => d.id === view.run.domainId) as never
+              }
+              forecast={view.forecast}
+              analysis={view.forecast.analysis}
+              truth={record?.truth as never}
+              climatology={record?.climatology as never}
+              markers={markersFor(view)}
+              onSelectCell={(cellIndex) => {
+                setView((current) => (current === null ? current : { ...current, selectedCell: cellIndex }));
+              }}
+            />
+          )}
 
           <section data-testid="score-panel">
             <h2>What the forecast was worth</h2>

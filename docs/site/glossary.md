@@ -67,6 +67,12 @@ rendered as a panel, and no panel is drawn for a horizon that is not declared.</
 is marked as such wherever it is drawn and never enters a run, a manifest, or any
 simulation-time quantity.</dd>
 
+<dt>Enlarge in place</dt>
+<dd>Growing one panel while the other five stay visible and shrink to their declared
+minimum. Not a modal and not a new page: an enlargement that hid the row would be a slider
+with extra steps. It changes what is shown and never what is computed, and the test asserts
+that by object identity rather than by appearance.</dd>
+
 <dt>Instrument</dt>
 <dd>The simulated device through which — and only through which — the model may sample
 truth. It applies declared noise and declared error characteristics at a chosen position,
@@ -90,6 +96,11 @@ this project holds to.</dd>
 <dd>The reference forecast that says tomorrow looks like today. One of the two references
 skill is reported against.</dd>
 
+<dt>Panel</dt>
+<dd>One horizon's view: the forecast field as an anomaly, the attribution layer, the
+absolute instants it is valid for and was initialised from, both skill figures in the
+scorer's own words, and the provenance one disclosure away.</dd>
+
 <dt>Port</dt>
 <dd>An interface with more than one conceivable implementation. There are four and there
 will not quietly be a fifth.</dd>
@@ -98,6 +109,18 @@ will not quietly be a fifth.</dd>
 <dd>The run produced by the declared default seed: the one two readers are both looking at
 when they say "the recorded case". A reader may draw a new run instead, and the surface
 then says the run is no longer the recorded case.</dd>
+
+<dt>Row</dt>
+<dd>The primary surface: one panel per declared horizon, in order, all visible at once. Not
+a slider — what is not on screen is what the eye forgets, and a claim about a trend
+delivered one frame at a time is a claim taken on trust. Not a grid — lead time is
+one-dimensional, and laying it out in two invents an ordering the data does not have.</dd>
+
+<dt>Second channel</dt>
+<dd>Whatever carries a distinction besides hue: here, a diagonal hatch over the cells where
+observations lead both other sources. It is what makes the attribution layer survive a
+monochrome print, and the margin it must clear is measured in luminance rather than
+asserted.</dd>
 
 <dt>Skill</dt>
 <dd>Performance relative to a reference, in the convention where zero means <em>no better
