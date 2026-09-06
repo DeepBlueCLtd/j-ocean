@@ -175,3 +175,41 @@ test('the shell, refusing an invalid configuration', async ({ page }) => {
   await expect(page.getByTestId('configuration-failure')).toBeVisible();
   await page.screenshot({ path: `${IMAGES}001-shell-invalid-configuration.png`, fullPage: true });
 });
+
+test('the walkthrough', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('run-panel')).toBeVisible();
+
+  // The button on its own, in the corner it lives in, at the top of the page a reader
+  // arrives at.
+  await page.screenshot({
+    path: `${IMAGES}013-help-button.png`,
+    clip: { x: 0, y: 0, width: 1280, height: 320 },
+  });
+
+  await page.getByTestId('help-button').click();
+  await expect(page.getByTestId('walkthrough-card')).toBeVisible();
+  await page.screenshot({ path: `${IMAGES}013-walkthrough-first-step.png` });
+
+  // A step whose anchor is a figure rather than a list: the ring is around the field, and
+  // the card has moved to sit beside it.
+  await page.getByTestId('walkthrough-next').click();
+  await page.getByTestId('walkthrough-next').click();
+  await page.getByTestId('walkthrough-next').click();
+  await expect(page.getByTestId('walkthrough-title')).toContainText('The ocean the model holds');
+  // Waited for rather than assumed: the step scrolls, and a figure taken mid-scroll shows a
+  // dimmed page with its ring still below the fold.
+  // Waited on the card too: it is placed from the anchor's rectangle and its own measured
+  // height, which arrive a frame apart, and a figure taken between the two shows it
+  // part-way to where it settles.
+  await expect
+    .poll(async () => {
+      const ring = await page.getByTestId('walkthrough-spotlight').boundingBox();
+      const card = await page.getByTestId('walkthrough-card').boundingBox();
+      const size = page.viewportSize();
+      if (ring === null || card === null || size === null) return null;
+      return ring.y > 0 && ring.y < 200 && card.y + card.height <= size.height;
+    })
+    .toBe(true);
+  await page.screenshot({ path: `${IMAGES}013-walkthrough-field-step.png` });
+});

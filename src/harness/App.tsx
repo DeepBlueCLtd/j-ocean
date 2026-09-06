@@ -41,6 +41,7 @@ import type { FieldContainer } from '../truth/container.js';
 import { domainRegion, score, type Score } from '../scoring/scorer.js';
 import { drawRootSeed } from './seed-provisioning.js';
 import { measure, overBudget } from './timing.js';
+import { Walkthrough } from './Walkthrough.js';
 
 /**
  * The shell (FR-002, FR-013, NFR-02, constitution Principle V and VI).
@@ -554,6 +555,11 @@ export function App() {
 
   return (
     <main>
+      {/* The walkthrough sits outside every panel because it is about all of them, and
+          before them in the document so that a reader tabbing in reaches the explanation
+          of the page before the page itself. */}
+      <Walkthrough />
+
       {/* FR-02, and it is the first thing in the document rather than a footnote. It has
           no dismiss control because there is nothing about it that stops being true. */}
       <section className="not-operational" data-testid="not-operational" role="note">

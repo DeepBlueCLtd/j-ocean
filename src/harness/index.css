@@ -7,6 +7,9 @@
   --derived: #6b5a2e;
   --host: #6d6a63;
   --alarm: #8a1f1f;
+  /* The one bright colour on the page, reserved for the walkthrough. Nothing that
+     carries a figure uses it, so it cannot be mistaken for a kind of number. */
+  --help: #ffd54a;
   color-scheme: light;
 }
 
@@ -436,3 +439,93 @@ textarea[data-testid='manifest-input'] {
 }
 
 h3 { font-size: 0.95rem; margin: 1.25rem 0 0.35rem; }
+
+/* The walkthrough (the help button and its steps).
+   The button is the one bright thing on an otherwise paper-coloured page, which is the
+   point: a reader who does not know what they are looking at should not have to hunt for
+   the control that tells them. It stays fixed, because the question "what is this?" arrives
+   at whichever panel the reader has scrolled to. */
+.help-button {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 62;
+  width: 2.6rem;
+  height: 2.6rem;
+  padding: 0;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--help);
+  color: var(--ink);
+  font: 700 1.4rem/1 ui-serif, Georgia, "Times New Roman", serif;
+  box-shadow: 0 2px 6px rgb(16 23 29 / 25%);
+}
+
+.help-button:hover,
+.help-button:focus-visible {
+  background: var(--ink);
+  color: var(--help);
+}
+
+/* The dimming is this element's own box-shadow rather than a separate overlay, so there is
+   exactly one thing to position and the hole in it cannot drift from the ring around it.
+   It never takes the pointer: the page underneath stays usable while a step is open. */
+.walkthrough-spotlight {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  border: 2px solid var(--help);
+  border-radius: 3px;
+  box-shadow: 0 0 0 9999px rgb(16 23 29 / 45%);
+}
+
+.walkthrough-card {
+  position: fixed;
+  z-index: 61;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  border: 2px solid var(--ink);
+  border-top: 6px solid var(--help);
+  background: #fff;
+  padding: 0.9rem 1.1rem 1rem;
+  box-shadow: 0 4px 18px rgb(16 23 29 / 30%);
+}
+
+.walkthrough-card h2 {
+  margin: 0.1rem 0 0.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.walkthrough-progress {
+  margin: 0;
+  color: var(--host);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.walkthrough-body p { margin: 0 0 0.6rem; font-size: 0.92rem; }
+.walkthrough-body p:last-child { margin-bottom: 0; }
+.walkthrough-note { color: var(--host); font-style: italic; }
+
+.walkthrough-legend {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.88rem;
+  color: var(--host);
+}
+
+.walkthrough-controls {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--rule);
+}
+
+.walkthrough-controls button { padding: 0.3rem 0.7rem; font-size: 0.9rem; }
+.walkthrough-close { margin-left: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  .walkthrough-spotlight { transition: none; }
+}

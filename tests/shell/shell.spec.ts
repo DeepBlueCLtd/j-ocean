@@ -1028,3 +1028,183 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('declared-panel').locator('.figure.declared').first()).toBeVisible();
   });
 });
+
+/**
+ * The walkthrough (a reader's first pass over the shell).
+ *
+ * The anchors are the whole mechanism: a step points at a panel by `data-testid`, and a
+ * step whose anchor is missing is dropped rather than shown against nothing. That makes the
+ * tour silently shortenable by a rename, so the count is asserted here. If this fails after
+ * a panel was renamed, the fix is the step's anchor, never the number.
+ */
+test.describe('the walkthrough', () => {
+  /** Every panel the tour points at is on the page in its default state. */
+  const DECLARED_STEPS = 11;
+
+  test('offers a bright help button without scrolling, and opens on it', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('run-panel')).toBeVisible();
+    const help = page.getByTestId('help-button');
+    await expect(help).toBeVisible();
+
+    // "Top right" is geometry, so it is measured: inside the first viewport, in its upper
+    // and right quarters. Asserting only that the element exists would pass with it
+    // anywhere on the page.
+    const box = await help.boundingBox();
+    const viewport = page.viewportSize();
+    expect(box).not.toBeNull();
+    expect(viewport).not.toBeNull();
+    const seen = box as NonNullable<typeof box>;
+    const size = viewport as NonNullable<typeof viewport>;
+    expect(seen.y).toBeLessThan(size.height / 4);
+    expect(seen.x).toBeGreaterThan((size.width * 3) / 4);
+
+    await help.click();
+    await expect(page.getByTestId('walkthrough-card')).toBeVisible();
+    await expect(page.getByTestId('walkthrough-title')).toContainText('What you are looking at');
+    await expect(page.getByTestId('walkthrough-progress')).toContainText(
+      `Step 1 of ${DECLARED_STEPS}`,
+    );
+  });
+
+  test('finds an anchor for every step it declares', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('deferrals-panel')).toBeVisible();
+    await page.getByTestId('help-button').click();
+
+    const titles: string[] = [];
+    for (let step = 1; step <= DECLARED_STEPS; step += 1) {
+      await expect(page.getByTestId('walkthrough-progress')).toContainText(
+        `Step ${step} of ${DECLARED_STEPS}`,
+      );
+      titles.push((await page.getByTestId('walkthrough-title').textContent()) ?? '');
+
+      // The spotlight is only rendered once an anchor has been found and measured, so its
+      // presence at every step is the assertion that no step is pointing at nothing.
+      await expect(page.getByTestId('walkthrough-spotlight')).toBeVisible();
+
+      // And it is on screen. "Visible" in Playwright's sense does not mean in the viewport,
+      // and a step that dims the page while its ring sits below the fold shows the reader
+      // nothing at all — which is what the first version did on the taller panels. Only the
+      // top edge is required: a panel taller than the window runs off the bottom by design.
+      await expect
+        .poll(async () => {
+          const ring = await page.getByTestId('walkthrough-spotlight').boundingBox();
+          const size = page.viewportSize();
+          if (ring === null || size === null) return null;
+          return ring.y >= 0 && ring.y < size.height;
+        }, { message: `the ring for step ${step} never came into view` })
+        .toBe(true);
+
+      // And the card itself settles fully inside the window. It is placed from the anchor's
+      // rectangle and its own measured height, and the two arrive a frame apart, so this is
+      // an assertion about where it comes to rest: a card hanging off the bottom takes its
+      // Next button with it.
+      await expect
+        .poll(async () => {
+          const card = await page.getByTestId('walkthrough-card').boundingBox();
+          const size = page.viewportSize();
+          if (card === null || size === null) return null;
+          return card.y >= 0 && card.y + card.height <= size.height;
+        }, { message: `the card for step ${step} never settled inside the window` })
+        .toBe(true);
+
+      if (step < DECLARED_STEPS) await page.getByTestId('walkthrough-next').click();
+    }
+
+    await expect(page.getByTestId('walkthrough-done')).toBeVisible();
+    expect(new Set(titles).size, `two steps share a title: ${titles.join(' | ')}`).toBe(
+      DECLARED_STEPS,
+    );
+  });
+
+  test('rings the panel its step is about, not some other part of the page', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('run-panel')).toBeVisible();
+    await page.getByTestId('help-button').click();
+    await page.getByTestId('walkthrough-next').click();
+    await expect(page.getByTestId('walkthrough-title')).toContainText('Which run this is');
+
+    // Geometry again: the spotlight's rectangle is the run panel's rectangle. Beat 007 was
+    // a lesson in what a test that counts elements does not notice.
+    //
+    // Polled rather than read once, because the step scrolls its anchor into view and the
+    // ring is still catching up for a few frames. Polling waits for the mechanism to
+    // settle; it does not weaken what is being asserted, which is that the two rectangles
+    // end up the same one.
+    await expect
+      .poll(async () => {
+        const ring = await page.getByTestId('walkthrough-spotlight').boundingBox();
+        const panel = await page.getByTestId('run-panel').boundingBox();
+        if (ring === null || panel === null) return null;
+        return [
+          Math.round(Math.abs(ring.x - panel.x)),
+          Math.round(Math.abs(ring.y - panel.y)),
+          Math.round(Math.abs(ring.width - panel.width)),
+          Math.round(Math.abs(ring.height - panel.height)),
+        ].every((offset) => offset <= 2);
+      })
+      .toBe(true);
+  });
+
+  test('leaves the page underneath usable, and closes on Escape', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('run-panel')).toBeVisible();
+    await page.getByTestId('help-button').click();
+    await expect(page.getByTestId('walkthrough-card')).toBeVisible();
+
+    // Not modal: the panel being explained is still readable, which is the point of
+    // pointing at it.
+    await expect(page.getByTestId('not-operational')).toContainText(
+      'not an operational forecast system',
+    );
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('walkthrough-card')).toHaveCount(0);
+    await expect(page.getByTestId('walkthrough-spotlight')).toHaveCount(0);
+
+    // Focus returns to the control that opened it, so a keyboard reader is where they were.
+    await expect(page.getByTestId('help-button')).toBeFocused();
+  });
+
+  test('takes in a panel that appears after it was opened', async ({ page }) => {
+    // The question "what am I looking at?" arrives while the page is still provisioning, so
+    // the tour was written to grow. Held here on purpose: the first version resolved its
+    // steps once, on opening, and a reader who asked early got a one-step tour that never
+    // recovered.
+    await page.route(CONFIG_REQUEST, async (route) => {
+      await new Promise((settle) => setTimeout(settle, 2_000));
+      await route.continue();
+    });
+    await page.goto('/');
+
+    await page.getByTestId('help-button').click();
+    await expect(page.getByTestId('walkthrough-progress')).toContainText('Step 1 of 1');
+
+    await expect(page.getByTestId('run-panel')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('walkthrough-progress')).toContainText(
+      `Step 1 of ${DECLARED_STEPS}`,
+    );
+    // And the reader has not been moved: they are still on the step they were reading.
+    await expect(page.getByTestId('walkthrough-title')).toContainText('What you are looking at');
+  });
+
+  test('drops a step whose panel is not on the page', async ({ page }) => {
+    // A configuration that does not validate leaves the shell showing its refusal and none
+    // of the panels the tour describes. The tour should be shorter, not wrong.
+    await page.route(CONFIG_REQUEST, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ schemaVersion: 1, grid: { nx: 1, ny: 100, cellSizeMetres: 5500 } }),
+      }),
+    );
+    await page.goto('/');
+    await expect(page.getByTestId('configuration-failure')).toBeVisible();
+
+    await page.getByTestId('help-button').click();
+    await expect(page.getByTestId('walkthrough-progress')).toContainText('Step 1 of 1');
+    await expect(page.getByTestId('walkthrough-title')).toContainText('What you are looking at');
+    await expect(page.getByTestId('walkthrough-done')).toBeVisible();
+  });
+});
