@@ -938,6 +938,19 @@ test.describe('the shell', () => {
     expect(page.url()).not.toContain('?');
   });
 
+  test('says what it does not do, and what would change that', async ({ page }) => {
+    await page.goto('/');
+    const panel = page.getByTestId('deferrals-panel');
+    await expect(panel).toBeVisible();
+
+    // Four deferrals, each with its trigger, where a reader meets the run. Leaving them off
+    // would make the harness look more capable than it is.
+    await expect(page.getByTestId('deferral-adaptive')).toContainText('AT-03 has; AT-02 and AT-06 have not');
+    await expect(page.getByTestId('deferral-depth')).toContainText('is not that trigger');
+    await expect(page.getByTestId('deferral-gpu')).toContainText('frame budget');
+    await expect(page.getByTestId('deferral-latency')).toContainText('special case');
+  });
+
   test('never shows an error figure without two references and their provenance', async ({
     page,
   }) => {

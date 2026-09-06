@@ -1240,6 +1240,47 @@ export function App() {
             )}
           </section>
 
+          {/*
+            What this harness does not do, and what would have to be true before it did.
+            §10's deferrals are assessed, not vague: each has a trigger somebody wrote down,
+            and one of them is measured on every test run. Leaving them off the surface would
+            make the harness look more capable than it is, which is the failure mode this
+            project spends most of its effort avoiding.
+          */}
+          <section data-testid="deferrals-panel">
+            <h2>What this does not do, and what would change that</h2>
+            <p className="aside">
+              Four capabilities are assessed, deferred and cheap to adopt. Each has a trigger,
+              and the triggers are written down rather than remembered.
+            </p>
+            <dl>
+              <dt>Adaptive sampling</dt>
+              <dd data-testid="deferral-adaptive">
+                An ensemble, its spread, and a vessel steered by it against a lawnmower track.
+                Deferred until scoring is trusted &mdash; which means AT-02, AT-03 and AT-06
+                have passed. <strong>AT-03 has; AT-02 and AT-06 have not</strong>, and both
+                fail because two declared numbers disagree about amplitude. A test measures the
+                trigger on every run, so this statement is never out of date.
+              </dd>
+              <dt>Dynamic depth levels</dt>
+              <dd data-testid="deferral-depth">
+                Vertical structure that is advected rather than diagnosed. The trigger is a
+                question about vertical structure evolving in time. The disagreement a reader
+                can see between an XBT and the model&rsquo;s derived profile is <em>not that trigger</em>: it is a static offset, and advected structure would not move it.
+              </dd>
+              <dt>A GPU kernel</dt>
+              <dd data-testid="deferral-gpu">
+                The trigger is the declared frame budget binding at a grid somebody wants. At
+                100 &times; 100 it does not.
+              </dd>
+              <dt>Observation latency</dt>
+              <dd data-testid="deferral-latency">
+                Observations arriving late rather than not at all. Withholding is its special
+                case, and beat 010 built that.
+              </dd>
+            </dl>
+          </section>
+
           <footer>
             <p className="aside">
               j-ocean is a teaching harness: a real but reduced ocean model, its measurements,

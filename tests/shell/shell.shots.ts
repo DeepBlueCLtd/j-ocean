@@ -129,6 +129,12 @@ test('the counterfactuals', async ({ page }) => {
   await page.getByTestId('run-status').screenshot({ path: `${IMAGES}010-run-status.png` });
 });
 
+test('what it does not do', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('deferrals-panel')).toBeVisible();
+  await page.getByTestId('deferrals-panel').screenshot({ path: `${IMAGES}012-deferrals.png` });
+});
+
 test('what the forecast was worth', async ({ page }) => {
   await page.goto('/');
   await page.getByTestId('score-run').click();

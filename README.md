@@ -33,8 +33,17 @@ than climatology at every horizon**, for a reason beat 006's note traces to two 
 numbers that disagree. And the attribution the row draws is **one analysis shown on six
 panels** until the forecast cycles. Beat 010 added a fourth: quality control had never excluded anything, because its flags
 stopped at the levels and never reached the observation the analysis consumed. Beat 011's two-context replay added a fifth: the shell's analysis depended on when it was
-computed, so a replayed run produced a different analysis from the one it exported. Beat 012,
-adaptive sampling, is deferred behind a trigger this project has not met.
+computed, so a replayed run produced a different analysis from the one it exported.
+
+**Beat 012 is deliberately not built.** Adaptive sampling is deferred behind a trigger --
+that scoring be trusted, meaning AT-02, AT-03 and AT-06 have passed -- and
+`tests/run/deferral-trigger.test.ts` measures all three on every run. AT-03 passes; AT-02 and
+AT-06 do not, both for the same reason. The test asserts the current state, so it fails when
+the figures improve, which is the signal to plan the beat.
+
+**Seven questions are open for the author**, in
+[`docs/questions-for-the-author.md`](docs/questions-for-the-author.md); the first of them,
+settled, would change most of the rest.
 
 ## Running it
 
