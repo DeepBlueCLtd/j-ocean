@@ -65,7 +65,7 @@ Individually:
 | `pnpm test` | vitest: ports, run, replay, headless model, gates |
 | `pnpm test:shell` | Playwright against the built static site |
 | `pnpm gates` | every gate that has landed, and the name of every one that has not |
-| `pnpm site` | the documentation site, into `dist-site/` |
+| `pnpm site` | the documentation site, into `dist-site/` (its `Run the app` link resolves only once the application is published beside it) |
 | `pnpm screenshots` | the documentation site's figures, captured from the real application |
 | `pnpm manifest-schema` | regenerates the committed JSON Schema for a run manifest |
 
@@ -89,7 +89,7 @@ Every push to `main` publishes to the `gh-pages` branch:
 | Path | What is there |
 |---|---|
 | `/` | The [documentation site](https://deepbluecltd.github.io/j-ocean/): overview, architecture, data model, glossary, and one engineering note per beat |
-| `/app/` | The application, built from `main` |
+| `/app/` | The application, built from `main`, linked from every page of the site |
 | `/pr-preview/pr-N/` | A static instance of the application for each open pull request, linked from the pull request itself |
 
 The site's figures are captured from the real application by `pnpm screenshots`, so a
