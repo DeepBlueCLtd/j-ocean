@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>A walkthrough, and what building one found &middot; j-ocean</title>
+    <meta name="description" content="A bright help button and an eleven-step tour of the shell. Anchoring each step to the panel it describes turned three layout assumptions into failing tests, and one of them had been shipping a dimmed page with nothing lit." />
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="wordmark" href="../index.html">j-ocean</a>
+      <p class="disclaimer">Not an operational forecast system.</p>
+      <nav>
+        <a href="../index.html">Overview</a>
+        <a href="../architecture.html">Architecture</a>
+        <a href="../data-model.html">Data model</a>
+        <a href="../glossary.html">Glossary</a>
+        <a href="../deferred.html">Deferred</a>
+        <a href="../blog/index.html" class="active">Notes</a>
+        <a class="external" href="https://github.com/DeepBlueCLtd/j-ocean">Repository</a>
+        <a class="launch" href="../app/index.html">Run the app</a>
+      </nav>
+    </header>
+    <main>
+      <article>
+      <p class="post-date"><time datetime="2026-09-17">2026-09-17</time></p>
+<h1>A walkthrough, and what building one found</h1>
+<p>The shell had a problem no test could have caught: a reader opening it for the first time
+did not know what they were looking at. Every panel says what it is — the run panel names
+the seed, the attribution panel explains that it is the analysis&#39;s own gain — but none of
+them says why it is next to the one above it, and nothing at all says how to read the four
+kinds of number the page is built out of.</p>
+<p>So: a bright yellow <strong>?</strong> fixed in the top-right corner, and behind it eleven steps, one per
+panel, each anchored to the panel it is about.</p>
+<p><img src="images/013-help-button.png" alt="The help button, in the corner of a page a reader has just arrived at"></p>
+<h2>The steps are anchored, not authored beside the page</h2>
+<p>A step does not carry a description of where it belongs. It carries a list of
+<code>data-testid</code> values, in preference order, and resolves the first one that is actually in
+the document:</p>
+<pre><code class="language-ts">{
+  testIds: [&#39;horizon-row-panel&#39;, &#39;row-invitation&#39;],
+  title: &#39;The forecast, at every horizon at once&#39;,
+  body: /* ... */,
+}
+</code></pre>
+<p>That has a consequence worth stating plainly: a step whose anchor is absent is <strong>dropped</strong>,
+not shown against nothing. Refuse the configuration and the tour is one step long, because
+one panel is all there is. That is the honest behaviour, and it is the same instinct as
+Principle VI — the harness can lose, and a tour describing panels that are not on the screen
+is the kind of loss that looks like success.</p>
+<p>It is also a way to go quietly wrong. Rename a panel and the tour silently shortens; nothing
+breaks, the reader just never hears about attribution. So the count is asserted:</p>
+<pre><code class="language-ts">const DECLARED_STEPS = 11;
+await expect(page.getByTestId(&#39;walkthrough-progress&#39;))
+  .toContainText(`Step 1 of ${DECLARED_STEPS}`);
+</code></pre>
+<p>Renaming <code>attribution-panel</code> in <code>App.tsx</code> turns that into <code>Step 1 of 10</code> and the build
+fails. Watched failing, as everything here is expected to be.</p>
+<p><img src="images/013-walkthrough-first-step.png" alt="The first step, over the statement of what j-ocean is not"></p>
+<h2>Three things the tests found, in the order they hurt</h2>
+<p><strong>A one-step tour for anyone who asked early.</strong> The first version resolved its steps once,
+when the walkthrough opened. The page takes a second or two to provision, and &quot;what am I
+looking at?&quot; is exactly the question a reader asks during that second — so they got a
+one-step tour that never recovered. The list is now recomputed from a <code>MutationObserver</code>,
+and the reader&#39;s place is held as a position in the <em>declared</em> list rather than in the
+visible one, so a panel arriving mid-tour inserts itself without moving them.</p>
+<p>The test for it delays the configuration fetch by two seconds and opens the walkthrough into
+the gap:</p>
+<pre><code class="language-ts">await page.route(CONFIG_REQUEST, async (route) =&gt; {
+  await new Promise((settle) =&gt; setTimeout(settle, 2_000));
+  await route.continue();
+});
+</code></pre>
+<p><strong>A dimmed page with nothing lit.</strong> The step scrolls its anchor into view, and the ring is
+drawn from the anchor&#39;s rectangle. Playwright&#39;s <code>toBeVisible</code> does not mean <em>in the
+viewport</em>, so a step could pass its test while showing the reader a grey page with the ring
+below the fold. The walk now polls the ring&#39;s position into the window at every step. It
+also stopped using <code>scrollIntoView({ block: &#39;center&#39; })</code>: centring a panel taller than the
+screen puts its heading above the fold, so the reader is shown the middle of the thing the
+card just named.</p>
+<p><strong>A Next button below the bottom edge.</strong> The card was placed from the anchor&#39;s rectangle and
+its own measured height — but the two arrive a frame apart, so for one frame it was placed
+using the <em>previous</em> step&#39;s height. On the field panel that left it hanging off the bottom
+of the window with its controls out of reach. Chasing that with a wait in the test was the
+wrong fix; the mechanism was wrong. The card is now placed from the <strong>space</strong> around the
+anchor, which is known before it renders, and given a matching <code>max-height</code> so it scrolls
+its own text instead of leaving the window:</p>
+<pre><code class="language-ts">const spaceBelow = window.innerHeight - (placement.top + placement.height) - 2 * CARD_MARGIN_PX;
+if (spaceBelow &gt;= MIN_CARD_SPACE_PX) {
+  return { ...anchored, top: /* below the anchor */, maxHeight: `${spaceBelow}px` };
+}
+</code></pre>
+<p>Below the anchor, else above it, else along the bottom of the window — the last for an
+anchor taller than the screen, where the card must overlap something and the bottom is the
+cheapest place to do it.</p>
+<p><img src="images/013-walkthrough-field-step.png" alt="Step four, ringing the field panel, with the card pinned clear of the figure"></p>
+<h2>It is not modal</h2>
+<p>The page stays live underneath. The spotlight takes no pointer events, so a reader can click
+the thing a step has just described while the step is still open; Escape closes from
+wherever focus has ended up, which is the point — a reader who clicked into the page no
+longer has the card focused, and the way out should not depend on where they last clicked.</p>
+<p>The dimming is the spotlight&#39;s own <code>box-shadow: 0 0 0 9999px</code>, so there is exactly one
+element to position and the hole cannot drift from the ring around it.</p>
+<h2>What it costs</h2>
+<p>Eleven steps of prose, about 380 lines including the copy, one CSS block, and six shell
+tests. Four of the six have been watched failing against a real defect rather than a planted
+one, which is the more useful kind.</p>
+<p>The one thing it does not do is teach itself: the tour explains the page, and if the page
+changes the tour does not notice — beyond the anchor check, which only knows that a panel
+exists, not that the sentence about it is still true. That is a real limit, and the honest
+mitigation is that the steps are eleven paragraphs in one file, next to each other, where a
+reader changing a panel will see them.</p>
+
+      </article>
+    </main>
+    <footer>
+      <p>
+        j-ocean is a teaching harness. Its numerics are real but reduced, its domain small,
+        and its claims are about relative skill between references it computes itself. This
+        site is a claim about the tree; where the two disagree, the tree wins.
+      </p>
+    </footer>
+  </body>
+</html>
