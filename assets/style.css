@@ -54,7 +54,35 @@ body {
 
 .masthead nav a:hover { color: var(--ink); }
 .masthead nav a.active { color: var(--ink); border-bottom-color: var(--ink); }
-.masthead nav a.external { margin-left: auto; }
+.masthead nav a.external { color: var(--host); }
+
+/* The application itself, published at /app/. It is the point of the project, so it is the
+   one nav item that does not look like the others. */
+.masthead nav a.launch {
+  color: var(--paper);
+  background: var(--declared);
+  border-radius: 2px;
+  padding: 0.2rem 0.6rem;
+  margin-bottom: 0.5rem;
+}
+
+.masthead nav a.launch:hover { color: var(--paper); background: var(--ink); }
+
+.launch-cta { margin: 1.25rem 0 1.75rem; }
+
+.launch-cta a {
+  display: inline-block;
+  background: var(--declared);
+  color: var(--paper);
+  text-decoration: none;
+  font-size: 0.95rem;
+  padding: 0.5rem 1rem;
+  border-radius: 2px;
+}
+
+.launch-cta a:hover { background: var(--ink); }
+
+.launch-cta .note { color: var(--host); font-size: 0.9rem; margin-left: 0.75rem; }
 
 main {
   max-width: 52rem;
