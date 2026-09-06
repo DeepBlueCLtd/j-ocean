@@ -144,7 +144,10 @@ vite.config.ts.timestamp-*
 
 # j-ocean
 node_modules/
+.venv/
 dist/
 test-results/
 playwright-report/
 .vite/
+dist-site/
+.gh-pages/

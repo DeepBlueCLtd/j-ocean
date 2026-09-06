@@ -1,0 +1,40 @@
+name: publish
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# The documentation site and the application are published to the gh-pages branch:
+#   /            the documentation site
+#   /app/        the application, built from main
+#   /pr-preview/pr-N/   one static instance per open pull request (see pr-preview.yml)
+# Both workflows write to the same branch, so they share a concurrency group.
+concurrency:
+  group: gh-pages
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm site
+      - run: pnpm build
+
+      - name: Publish to gh-pages
+        env:
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: github-actions[bot]@users.noreply.github.com
+        run: bash scripts/pages/publish.sh site "$GITHUB_SHA"

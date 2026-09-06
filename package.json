@@ -13,11 +13,14 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:shell": "playwright test",
+    "test:shell": "playwright test --project=chromium",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "gates": "tsx scripts/gates/run-all.ts",
-    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm gates && pnpm build"
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm gates && pnpm build && pnpm site",
+    "screenshots": "playwright test --project=screenshots",
+    "site": "tsx scripts/docs/build-site.ts",
+    "manifest-schema": "tsx scripts/docs/build-manifest-schema.ts"
   },
   "dependencies": {
     "react": "^19.2.8",
@@ -32,6 +35,7 @@
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^5.2.0",
     "eslint": "^9.39.5",
+    "marked": "^18.0.11",
     "tsx": "^4.23.13",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.69.0",
