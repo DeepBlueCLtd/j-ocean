@@ -97,9 +97,19 @@ describe('the run manifest', () => {
       expect(() => parseManifest(text)).toThrow(new RegExp(String(MANIFEST_FORMAT_VERSION)));
     });
 
-    it('refuses a counterfactual slot that is not a list of edits', () => {
+    it('refuses a counterfactual slot that is not a list of edits, naming the field', () => {
       const text = JSON.stringify({ ...manifestOf(), counterfactual: { edits: [] } });
-      expect(() => parseManifest(text)).toThrow(/not a list of edits/);
+      expect(() => parseManifest(text)).toThrow(/counterfactual/);
+    });
+
+    it('refuses a manifest carrying anything the schema does not know (FR-002)', () => {
+      // The point of a strict schema: a manifest with a field, a score or an observation in it
+      // is rejected for carrying a key that does not belong, not because somebody remembered
+      // to look for those three words.
+      for (const extra of ['fields', 'scores', 'observations', 'state']) {
+        const text = JSON.stringify({ ...manifestOf(), [extra]: [1, 2, 3] });
+        expect(() => parseManifest(text), extra).toThrow(/not one this code can read/);
+      }
     });
 
     it('carries the reader edits, in order (FR-002)', () => {
@@ -117,8 +127,8 @@ describe('the run manifest', () => {
 
     it('refuses something that is not a manifest at all', () => {
       expect(() => parseManifest('{')).toThrow(/not valid JSON/);
-      expect(() => parseManifest('[]')).toThrow(/not an object/);
-      expect(() => parseManifest('{"formatVersion":1}')).toThrow(/missing: /);
+      expect(() => parseManifest('{"formatVersion":1}')).toThrow(/version 1 cannot be read/);
+      expect(() => parseManifest('[]')).toThrow(/format version undefined/);
     });
   });
 });

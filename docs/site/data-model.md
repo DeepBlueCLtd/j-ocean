@@ -59,6 +59,8 @@ Everything needed to rebuild a run, and none of its state.
 | `clock` | The epoch and timestep the run used. |
 | `configDigest` | The digest above. A mismatch is refused, naming both digests. |
 | `steps` | How far the run had got. |
+| `codeVersion` | The build's own commit, injected at build time. "Byte-identical" is a promise about the same code, so the manifest says which code. A difference is a warning beside the run, not a refusal. |
+| `domainId` | The domain the run was made in. A manifest naming one this build lacks is refused, naming both. |
 | `issueInstantMs` | The instant the shore forecast was issued. A reader's choice rather than a property of the integration, so a manifest that did not record it could not rebuild the fields it describes. |
 | `recordedCase` | False once a reader has asked for a new run. |
 | `counterfactual` | The reader's edits, in order. Empty for the recorded case; the slot was present from beat 001, so a manifest exported before the counterfactuals existed and one after have the same shape. |
@@ -68,7 +70,15 @@ holds no state: a snapshot compared with itself would prove nothing, whereas a r
 compared byte for byte proves the property the whole system rests on.
 
 Every refusal happens before anything is constructed, so a refused load leaves no run
-behind.
+behind. In order: the **schema** (strict, so a manifest carrying a field, a score or an
+observation is rejected for carrying a key that does not belong), the **format version**
+(before the shape, so a manifest from another version is told what it is), the
+**configuration digest**, and the **domain**. The **code version** is the one difference that
+warns rather than refuses.
+
+The committed [`schemas/run-manifest.schema.json`](https://github.com/DeepBlueCLtd/j-ocean/blob/main/schemas/run-manifest.schema.json)
+is generated from the same definition by `pnpm manifest-schema`, and a test regenerates and
+compares it, so the portable copy cannot drift from the code.
 
 ## Ports
 

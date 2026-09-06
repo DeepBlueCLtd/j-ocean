@@ -60,7 +60,10 @@ export default defineConfig({
   webServer: {
     command: `pnpm build && pnpm exec vite preview --host ${HOST} --port ${String(PORT)} --strictPort`,
     url: `http://${HOST}:${String(PORT)}/`,
-    reuseExistingServer: !process.env.CI,
+    // Never reused when a gate is asking: a server started earlier serves the `dist/` that
+    // was there when it started, and a gate asking its question of a build that is not the
+    // tree can pass or fail for reasons nothing in the tree explains.
+    reuseExistingServer: !process.env.CI && process.env['J_OCEAN_GATE'] === undefined,
     timeout: 180_000,
     // So that a server which fails to start says why in the job log, instead of leaving a
     // bare "timed out waiting for config.webServer" to be guessed at.

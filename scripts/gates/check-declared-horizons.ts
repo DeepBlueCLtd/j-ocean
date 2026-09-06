@@ -20,7 +20,20 @@ export function checkDeclaredHorizons(): GateResult {
     const output = execFileSync(
       'pnpm',
       ['exec', 'playwright', 'test', '--project=gate-g05'],
-      { cwd: REPO_ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+      {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        /*
+         * The gate never reuses a preview server it did not start.
+         *
+         * Playwright reuses one by default outside CI, and a server left running by an earlier
+         * command serves the `dist/` that was there when it started -- so the gate would be
+         * asking its question of a build that is not the tree, and could pass or fail for
+         * reasons nothing in the tree explains. A gate that can do that is worth nothing.
+         */
+        env: { ...process.env, J_OCEAN_GATE: '1' },
+      },
     );
     const passed = /(\d+) passed/.exec(output);
     return {

@@ -804,6 +804,140 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('track-stretch')).toContainText(/knots/);
   });
 
+  test('replays a run in a fresh context from its manifest alone', async ({ page, browser }) => {
+    test.setTimeout(240_000);
+    await page.goto('/');
+    await expect(page.getByTestId('manifest')).toContainText('rootSeed');
+
+    // Make it a run worth replaying: a drawn seed, some integration and an edit.
+    await page.getByTestId('new-run').click();
+    await page.getByTestId('advance').click();
+    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 30_000 });
+    await page.getByTestId('build-row').click();
+    await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+    await page.getByTestId('bias-degrees').fill('1.5');
+    await page.getByTestId('bias-degrees').blur();
+    await expect(page.getByTestId('run-status')).toContainText('edit', { timeout: 120_000 });
+
+    const manifest = (await page.getByTestId('manifest').textContent()) ?? '';
+    const digest = await page.getByTestId('results-digest').textContent();
+    const seed = await page.getByTestId('root-seed').textContent();
+    expect(manifest).toContain('"biasDegC": 1.5');
+    // FR-002: the manifest carries no field, score or observation data.
+    for (const forbidden of ['thickness', 'velocityU', 'skill', 'observations']) {
+      expect(manifest, `the manifest carries ${forbidden}`).not.toContain(forbidden);
+    }
+
+    // AT-04, in the shell and across contexts: a second visit, on nothing but the manifest.
+    const fresh = await browser.newContext();
+    const other = await fresh.newPage();
+    await other.goto(page.url());
+    await expect(other.getByTestId('manifest')).toContainText('rootSeed');
+    await other.getByTestId('manifest-input').fill(manifest);
+    await other.getByTestId('import-manifest').click();
+
+    await expect(other.getByTestId('root-seed')).toHaveText(seed ?? '', { timeout: 60_000 });
+    await expect(other.getByTestId('results-digest')).toHaveText(digest ?? '');
+    await expect(other.getByTestId('import-failure')).toHaveCount(0);
+    // The edits came back with it: a manifest that recorded them and a replay that ignored
+    // them would reproduce a run nobody made.
+    await expect(other.getByTestId('manifest')).toContainText('"biasDegC": 1.5');
+    await fresh.close();
+  });
+
+  test('refuses a manifest that does not belong to this tree, and says which check failed', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const manifest = (await page.getByTestId('manifest').textContent()) ?? '';
+    const parsed = JSON.parse(manifest) as Record<string, unknown>;
+
+    // FR-003 and FR-005. A digest difference is a refusal: the declared values differ, and a
+    // run made against other values is a different run.
+    await page.getByTestId('manifest-input').fill(
+      JSON.stringify({ ...parsed, configDigest: 'not-this-configuration' }),
+    );
+    await page.getByTestId('import-manifest').click();
+    await expect(page.getByTestId('import-failure')).toContainText('digest');
+    await expect(page.getByTestId('import-failure')).toContainText('not-this-configuration');
+
+    // A domain this build does not have is refused, naming it.
+    await page.getByTestId('manifest-input').fill(JSON.stringify({ ...parsed, domainId: 'atlantis' }));
+    await page.getByTestId('import-manifest').click();
+    await expect(page.getByTestId('import-failure')).toContainText('atlantis');
+
+    // A manifest carrying field data is refused by the schema, for carrying a key that does
+    // not belong rather than because somebody looked for that word.
+    await page.getByTestId('manifest-input').fill(
+      JSON.stringify({ ...parsed, fields: { thickness: [1, 2, 3] } }),
+    );
+    await page.getByTestId('import-manifest').click();
+    await expect(page.getByTestId('import-failure')).toContainText('not one this code can read');
+
+    // Nothing was provisioned by any of that: the run on screen is the one that was there.
+    await expect(page.getByTestId('recorded-case')).toContainText('the recorded case');
+  });
+
+  test('warns about a different build rather than refusing it', async ({ page }) => {
+    await page.goto('/');
+    const parsed = JSON.parse((await page.getByTestId('manifest').textContent()) ?? '{}') as Record<
+      string,
+      unknown
+    >;
+    // FR-005: a reader holding a manifest from last month is better served by a warned replay
+    // than by a door, and the warning says identity is no longer promised.
+    await page.getByTestId('manifest-input').fill(
+      JSON.stringify({ ...parsed, codeVersion: 'a-build-from-last-month' }),
+    );
+    await page.getByTestId('import-manifest').click();
+    await expect(page.getByTestId('import-warning')).toContainText('a-build-from-last-month');
+    await expect(page.getByTestId('import-warning')).toContainText('only');
+    await expect(page.getByTestId('import-failure')).toHaveCount(0);
+  });
+
+  test('writes nothing to storage, in a whole visit', async ({ page }) => {
+    // NFR-02 and FR-006. Measured rather than promised: the storage APIs are replaced before
+    // the page loads and any write is recorded.
+    await page.addInitScript(() => {
+      const writes: string[] = [];
+      (window as unknown as { __writes: string[] }).__writes = writes;
+      for (const [name, storage] of [
+        ['localStorage', window.localStorage],
+        ['sessionStorage', window.sessionStorage],
+      ] as const) {
+        const original = storage.setItem.bind(storage);
+        storage.setItem = (key: string, value: string) => {
+          writes.push(`${name}.${key}`);
+          original(key, value);
+        };
+      }
+      const cookie = Object.getOwnPropertyDescriptor(Document.prototype, 'cookie');
+      Object.defineProperty(document, 'cookie', {
+        get: () => cookie?.get?.call(document) ?? '',
+        set: (value: string) => {
+          writes.push(`cookie.${value}`);
+        },
+      });
+      const openDatabase = indexedDB.open.bind(indexedDB);
+      indexedDB.open = ((...args: Parameters<typeof indexedDB.open>) => {
+        writes.push('indexedDB.open');
+        return openDatabase(...args);
+      }) as typeof indexedDB.open;
+    });
+
+    await page.goto('/');
+    await page.getByTestId('advance').click();
+    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 30_000 });
+    await page.getByTestId('build-row').click();
+    await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+    await page.getByTestId('new-run').click();
+
+    const writes = await page.evaluate(() => (window as unknown as { __writes: string[] }).__writes);
+    expect(writes, `these were written: ${writes.join(', ')}`).toEqual([]);
+    expect(page.url()).not.toContain('#');
+    expect(page.url()).not.toContain('?');
+  });
+
   test('never shows an error figure without two references and their provenance', async ({
     page,
   }) => {

@@ -2,8 +2,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import configUrl from '../../config/j-ocean.json?url';
 import { ConfigurationError, fetchConfiguration, type LoadedConfiguration } from '../config/load.js';
 import type { Configuration } from '../config/schema.js';
-import { createRun, type Run } from '../run/run.js';
-import { serialiseManifest } from '../run/manifest.js';
+import { createRun, createRunFromManifest, type Run } from '../run/run.js';
+import {
+  codeVersionWarning,
+  ManifestError,
+  parseManifest,
+  serialiseManifest,
+  type RunManifest,
+} from '../run/manifest.js';
+import { CODE_VERSION } from '../run/code-version.js';
+import { sha256Bytes } from '../config/digest.js';
+import { stateBytes } from '../model/grid.js';
 import { loadClimatology, loadObservations, loadTruth } from './artefacts.js';
 import { FieldView, type Marker } from './FieldView.js';
 import { footprintOf, markersFrom, type Footprint } from './footprint.js';
@@ -158,6 +167,10 @@ function flagSummary(view: RunView): [string, number][] {
 export function App() {
   const [loaded, setLoaded] = useState<LoadedConfiguration | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  /** Beat 011: what the reader pasted, and what happened when it was read. */
+  const [pasted, setPasted] = useState('');
+  const [importFailure, setImportFailure] = useState<string | null>(null);
+  const [importWarning, setImportWarning] = useState<string | null>(null);
   const [view, setView] = useState<RunView | null>(null);
   const [record, setRecord] = useState<Record002 | null>(null);
   const [overBudgetNotice, setOverBudgetNotice] = useState<{ projectedMs: number } | null>(null);
@@ -203,7 +216,11 @@ export function App() {
   }, [loaded]);
 
   const buildRun = useCallback(
-    (seed: string | undefined, recordedCase: boolean): RunView | null => {
+    (
+      seed: string | undefined,
+      recordedCase: boolean,
+      manifest?: RunManifest,
+    ): RunView | null => {
       if (loaded === null || record === null) return null;
       const domain = loaded.config.domains.list.find((d) => d.id === record.domainId);
       if (domain === undefined) return null;
@@ -217,15 +234,41 @@ export function App() {
         Date.parse(loaded.config.truth.period.start),
         'surface_elevation',
       );
-      const run = createRun({
-        config: loaded.config,
-        configDigest: loaded.digest,
-        kernel,
-        initialState: state,
-        domainId: record.domainId,
-        recordedCase,
-        ...(seed === undefined ? {} : { seed }),
-      });
+      /*
+       * The analysis is the analysis **at the run's initial instant** (beat 005), so the
+       * background is taken here, before anything advances the state.
+       *
+       * Beat 011's replay found this: a replayed run is rebuilt by advancing it to the step
+       * the manifest records, and this function then computed the analysis from whatever the
+       * state was at that moment -- so the same run, replayed, produced a different analysis
+       * from the one it had exported. The analysis is a property of the run's start, not of
+       * when somebody happened to ask for it.
+       */
+      const background = (state.fields[THICKNESS] as Float64Array).slice();
+
+      /*
+       * Beat 011. A replayed run is *rebuilt* from the manifest: same seed, same derived
+       * streams, same edits, advanced to the same step. It is not a restored snapshot, which
+       * is the whole reason the byte-identity test means anything -- a snapshot compared with
+       * itself proves nothing.
+       */
+      const run =
+        manifest === undefined
+          ? createRun({
+              config: loaded.config,
+              configDigest: loaded.digest,
+              kernel,
+              initialState: state,
+              domainId: record.domainId,
+              recordedCase,
+              ...(seed === undefined ? {} : { seed }),
+            })
+          : createRunFromManifest(manifest, {
+              config: loaded.config,
+              configDigest: loaded.digest,
+              kernel,
+              initialState: state,
+            });
       // The instruments sample the truth record through the port, in the one module allowed
       // to do so. Nothing here touches truth itself.
       const sampling: SamplingContext = {
@@ -253,7 +296,7 @@ export function App() {
         {
           config: loaded.config,
           grid: parameters.grid,
-          background: (state.fields[THICKNESS] as Float64Array).slice(),
+          background,
           climatology: climatologyThickness,
           observations: [...drops, ...argo].map((r) => r.interface),
         },
@@ -278,7 +321,7 @@ export function App() {
         forecast: null,
         brief: null,
         pendingIssueInstantMs: null,
-        edits: [],
+        edits: manifest?.counterfactual ?? [],
         baseline: null,
         selectedCell: null,
         box: report.box,
@@ -439,6 +482,45 @@ export function App() {
     [loaded, record, view],
   );
 
+  /**
+   * Import a manifest (FR-003, FR-005).
+   *
+   * The order is the spec's and it matters: the schema, then the version, then the digest,
+   * then the domain -- all before anything is provisioned, so a refused import leaves no run
+   * behind. A code-version difference is a *warning*; a digest difference is a refusal,
+   * because the declared values differ and a run made against other values is a different run.
+   */
+  const importManifest = useCallback(
+    (text: string) => {
+      setImportFailure(null);
+      setImportWarning(null);
+      try {
+        const manifest = parseManifest(text);
+        if (view !== null && view.edits.length > 0) {
+          // The one confirmation dialogue this harness has. Export is beside it, so the
+          // reader is not asked to choose between their edits and a dialogue.
+          const proceed = window.confirm(
+            'This visit has edits that are not in an exported manifest. Importing will discard ' +
+              'them. Continue?',
+          );
+          if (!proceed) return;
+        }
+        const built = buildRun(undefined, manifest.recordedCase, manifest);
+        if (built === null) {
+          setImportFailure('the run could not be provisioned from this manifest');
+          return;
+        }
+        setImportWarning(codeVersionWarning(manifest, { codeVersion: CODE_VERSION }));
+        setView(built);
+      } catch (error) {
+        setImportFailure(
+          error instanceof ManifestError ? error.message : `the manifest could not be read: ${String(error)}`,
+        );
+      }
+    },
+    [buildRun, view],
+  );
+
   const newRun = useCallback(() => {
     // Exemption (b): entropy is drawn here, once, before the run exists.
     const built = buildRun(drawRootSeed(), false);
@@ -447,6 +529,23 @@ export function App() {
       setView(built);
     }
   }, [buildRun]);
+
+  /**
+   * A digest of what this run computed (beat 011, AT-04).
+   *
+   * It is over the model state and the analysed field: the two things a replay has to
+   * reproduce. Two visits showing the same digest have the same fields, which is what
+   * "byte-identical" means and is a claim a reader can check by looking at two tabs.
+   */
+  const resultsDigest = useMemo(() => {
+    if (view === null) return null;
+    const state = stateBytes(view.run.state);
+    const analysis = new Uint8Array(view.analysis.field.buffer.slice(0));
+    const both = new Uint8Array(state.length + analysis.length);
+    both.set(state, 0);
+    both.set(analysis, state.length);
+    return sha256Bytes(both);
+  }, [view]);
 
   const manifest = useMemo(
     () => (view === null ? null : serialiseManifest(view.run.exportManifest())),
@@ -1056,15 +1155,96 @@ export function App() {
             <h2>The manifest this run replays from</h2>
             <p className="aside">
               Everything needed to rebuild this run, and none of its state: replay is
-              re-computation, not the restoration of a snapshot.
+              re-computation, not the restoration of a snapshot. Nothing persists between
+              visits &mdash; no storage, no cookie, no run in the URL &mdash; so this file is
+              the only thing that leaves and the only thing that comes back.
             </p>
+
+            <dl>
+              <dt>This build</dt>
+              <dd className="computed" data-testid="code-version">{CODE_VERSION}</dd>
+              <dt>Fields and analysis</dt>
+              {/* AT-04, as something a reader can check: two visits showing this digest have
+                  the same fields. */}
+              <dd className="computed" data-testid="results-digest">{resultsDigest}</dd>
+            </dl>
+
+            <div className="row-controls">
+              <button
+                type="button"
+                data-testid="download-manifest"
+                onClick={() => {
+                  const url = URL.createObjectURL(
+                    new Blob([manifest ?? ''], { type: 'application/json' }),
+                  );
+                  const anchor = document.createElement('a');
+                  anchor.href = url;
+                  anchor.download = `j-ocean-${view.run.rng.rootSeed}.json`;
+                  anchor.click();
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                Download this manifest
+              </button>
+            </div>
+
             <pre data-testid="manifest">{manifest}</pre>
+
+            <h3>Import a manifest</h3>
+            <p className="aside">
+              Paste one and this visit becomes that run &mdash; rebuilt from its seed and its
+              edits, not restored. The schema, the format version, the configuration digest and
+              the domain are all checked before anything is provisioned, so a refused import
+              leaves the run you have alone.
+            </p>
+            <textarea
+              data-testid="manifest-input"
+              rows={4}
+              value={pasted}
+              onChange={(event) => { setPasted(event.target.value); }}
+              placeholder="Paste a manifest"
+            />
+            <div className="row-controls">
+              <button
+                type="button"
+                data-testid="import-manifest"
+                onClick={() => { importManifest(pasted); }}
+                disabled={pasted.trim() === ''}
+              >
+                Import this manifest
+              </button>
+              <input
+                type="file"
+                accept="application/json,.json"
+                data-testid="manifest-file"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file === undefined) return;
+                  void file.text().then((text) => {
+                    setPasted(text);
+                    importManifest(text);
+                  });
+                }}
+              />
+            </div>
+
+            {importFailure !== null && (
+              <p className="banner warn" data-testid="import-failure">
+                {importFailure}
+              </p>
+            )}
+            {importWarning !== null && (
+              <p className="banner warn" data-testid="import-warning">
+                {importWarning}
+              </p>
+            )}
           </section>
 
           <footer>
             <p className="aside">
-              Beat 001 of the development plan: the foundation and the four ports. There is
-              no ocean here yet, and the page says so rather than drawing one.
+              j-ocean is a teaching harness: a real but reduced ocean model, its measurements,
+              and what each of them was worth. It is not an operational forecast system, and
+              every figure on this page says where it came from.
             </p>
           </footer>
         </>

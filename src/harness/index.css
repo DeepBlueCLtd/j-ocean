@@ -422,3 +422,17 @@ button[disabled]:hover { background: #fff; color: var(--ink); }
 .profile-editor { margin: 0.5rem 0 0; }
 .profile-editor svg { background: #fff; border: 1px solid var(--rule); display: block; touch-action: none; }
 .profile-editor figcaption { font-size: 0.7rem; color: var(--host); margin-top: 0.25rem; }
+
+/* Beat 011: export and import. The manifest is the only thing that leaves this page. */
+#root textarea,
+.harness textarea,
+textarea[data-testid='manifest-input'] {
+  width: 100%;
+  font: 0.78rem/1.4 ui-monospace, Menlo, Consolas, monospace;
+  padding: 0.4rem;
+  border: 1px solid var(--rule);
+  background: #fff;
+  resize: vertical;
+}
+
+h3 { font-size: 0.95rem; margin: 1.25rem 0 0.35rem; }

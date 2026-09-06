@@ -22,7 +22,8 @@ records with the drift gate over them, the one-and-a-half layer reduced-gravity 
 simulated instruments that are the only way truth reaches it, optimal interpolation with the
 attribution that is its own gain, skill against two references with provenance on every
 figure, the horizon row that is the primary surface, the observation footprint drawn over it, and the
-shore forecast on two axes, and the counterfactuals.
+shore forecast on two axes, the counterfactuals, and export and replay of a run from its
+manifest.
 **All seven gates now run**, each watched failing against a planted violation.
 
 Three things the tree reports rather than hides. Beat 009 found that the analysis had been
@@ -31,8 +32,9 @@ were optimistic; corrected, the model is roughly no better than persistence. It 
 than climatology at every horizon**, for a reason beat 006's note traces to two declared
 numbers that disagree. And the attribution the row draws is **one analysis shown on six
 panels** until the forecast cycles. Beat 010 added a fourth: quality control had never excluded anything, because its flags
-stopped at the levels and never reached the observation the analysis consumed. Beat 011,
-manifest replay, is next.
+stopped at the levels and never reached the observation the analysis consumed. Beat 011's two-context replay added a fifth: the shell's analysis depended on when it was
+computed, so a replayed run produced a different analysis from the one it exported. Beat 012,
+adaptive sampling, is deferred behind a trigger this project has not met.
 
 ## Running it
 
@@ -56,6 +58,7 @@ Individually:
 | `pnpm gates` | every gate that has landed, and the name of every one that has not |
 | `pnpm site` | the documentation site, into `dist-site/` |
 | `pnpm screenshots` | the documentation site's figures, captured from the real application |
+| `pnpm manifest-schema` | regenerates the committed JSON Schema for a run manifest |
 
 The shell test needs a Chromium. `pnpm exec playwright install chromium` fetches one; on a
 machine that already has one, set `J_OCEAN_CHROMIUM` to its executable instead.

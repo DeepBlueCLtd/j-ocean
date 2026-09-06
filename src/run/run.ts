@@ -4,6 +4,7 @@ import type { ModelKernel, ModelState } from '../ports/kernel.js';
 import type { RandomStream } from '../ports/rng.js';
 import type { ClockControl, SimulationClock } from '../ports/clock.js';
 import { createClock } from './clock.js';
+import { CODE_VERSION } from './code-version.js';
 import { SeededRng } from './rng.js';
 import {
   assertManifestUsable,
@@ -172,6 +173,8 @@ export class Run {
       configDigest: this.configDigest,
       steps: this.steps,
       issueInstantMs: this.issueInstantMs,
+      codeVersion: CODE_VERSION,
+      domainId: this.domainId,
       recordedCase: this.recordedCase,
       counterfactual: this.counterfactual,
     };
@@ -186,6 +189,12 @@ export interface CreateFromManifestOptions {
   readonly config: Configuration;
   readonly configDigest: string;
   readonly kernel?: ModelKernel;
+  /**
+   * The state the run starts from. The shell has one already -- initialised from the truth
+   * record -- and rebuilding it would be doing the same work twice; headless callers let the
+   * kernel make one.
+   */
+  readonly initialState?: ModelState;
   /**
    * Replay to the step the manifest records. On by default, because "a run is constructible
    * from a manifest alone" means the run you get back is the run that was exported, not a
@@ -204,11 +213,12 @@ export function createRunFromManifest(
   manifest: RunManifest,
   options: CreateFromManifestOptions,
 ): Run {
-  const kernel = options.kernel ?? referenceKernelFor(options.config, options.config.domains.defaultId);
+  const kernel = options.kernel ?? referenceKernelFor(options.config, manifest.domainId);
   const probe = new SeededRng(manifest.rootSeed);
   assertManifestUsable(manifest, {
     generatorVersion: probe.generatorVersion,
     configDigest: options.configDigest,
+    domainIds: options.config.domains.list.map((domain) => domain.id),
   });
   if (manifest.kernelId !== kernel.id) {
     throw new ManifestError(
@@ -230,11 +240,16 @@ export function createRunFromManifest(
   const run = new Run({
     config: options.config,
     configDigest: options.configDigest,
+    ...(options.initialState === undefined ? {} : { initialState: options.initialState }),
     seed: manifest.rootSeed,
     kernel,
     recordedCase: manifest.recordedCase,
     issueInstantMs: manifest.issueInstantMs,
+    domainId: manifest.domainId,
   });
+  // The edits travel with the run (beat 010, FR-002): a manifest that recorded them and a
+  // replay that ignored them would reproduce a run nobody made.
+  run.setCounterfactual(manifest.counterfactual);
   if (options.replay !== false) run.advance(manifest.steps);
   return run;
 }
