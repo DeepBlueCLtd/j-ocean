@@ -86,6 +86,9 @@ function layout(options: LayoutOptions): string {
     })
     .join('\n        ');
 
+  // The application is published alongside this site, at /app/, by scripts/pages/publish.sh.
+  // The link is written here rather than in a page so that every page carries it: a reader
+  // who arrives at the glossary should not have to find the home page to run the thing.
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -102,6 +105,7 @@ function layout(options: LayoutOptions): string {
       <nav>
         ${links}
         <a class="external" href="https://github.com/DeepBlueCLtd/j-ocean">Repository</a>
+        <a class="launch" href="${up}app/index.html">Run the app</a>
       </nav>
     </header>
     <main>

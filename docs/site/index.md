@@ -14,6 +14,11 @@ reduced, its domain small, and its claims are about <em>relative</em> skill betw
 references it computes itself, scored against a truth record it did not author.</p>
 </div>
 
+<p class="launch-cta">
+<a href="app/index.html">Run j-ocean in your browser</a>
+<span class="note">The application, built from <code>main</code>. Nothing to install.</span>
+</p>
+
 ## What it is for
 
 Three things, in order of how much they matter:
