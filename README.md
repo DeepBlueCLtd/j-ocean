@@ -16,11 +16,34 @@ constitution → specify → plan → tasks → analyze → implement.
 
 ## Where the tree is
 
-Beat **001, foundation and ports**, has landed: the toolchain, the four ports and their
-contract tests, seeded streams, the run manifest and its byte-identical replay, the static
-shell, and three of the seven gates. There is no ocean in it yet. Beat 002 (truth and
-observation records) and beat 003 (the reduced-gravity model) are next and may proceed in
-parallel — see the plan.
+Beats **001** through **007** have landed: the four ports and their contract tests, seeded
+streams, the run manifest and its byte-identical replay, the committed HYCOM and Argo
+records with the drift gate over them, the one-and-a-half layer reduced-gravity model, the
+simulated instruments that are the only way truth reaches it, optimal interpolation with the
+attribution that is its own gain, skill against two references with provenance on every
+figure, the horizon row that is the primary surface, the observation footprint drawn over it, and the
+shore forecast on two axes, the counterfactuals, and export and replay of a run from its
+manifest.
+**All seven gates now run**, each watched failing against a planted violation.
+
+Three things the tree reports rather than hides. Beat 009 found that the analysis had been
+reading observations from **after** its own issue instant, so three beats of skill figures
+were optimistic; corrected, the model is roughly no better than persistence. It is **worse
+than climatology at every horizon**, for a reason beat 006's note traces to two declared
+numbers that disagree. And the attribution the row draws is **one analysis shown on six
+panels** until the forecast cycles. Beat 010 added a fourth: quality control had never excluded anything, because its flags
+stopped at the levels and never reached the observation the analysis consumed. Beat 011's two-context replay added a fifth: the shell's analysis depended on when it was
+computed, so a replayed run produced a different analysis from the one it exported.
+
+**Beat 012 is deliberately not built.** Adaptive sampling is deferred behind a trigger --
+that scoring be trusted, meaning AT-02, AT-03 and AT-06 have passed -- and
+`tests/run/deferral-trigger.test.ts` measures all three on every run. AT-03 passes; AT-02 and
+AT-06 do not, both for the same reason. The test asserts the current state, so it fails when
+the figures improve, which is the signal to plan the beat.
+
+**Seven questions are open for the author**, in
+[`docs/questions-for-the-author.md`](docs/questions-for-the-author.md); the first of them,
+settled, would change most of the rest.
 
 ## Running it
 
@@ -44,9 +67,20 @@ Individually:
 | `pnpm gates` | every gate that has landed, and the name of every one that has not |
 | `pnpm site` | the documentation site, into `dist-site/` |
 | `pnpm screenshots` | the documentation site's figures, captured from the real application |
+| `pnpm manifest-schema` | regenerates the committed JSON Schema for a run manifest |
 
 The shell test needs a Chromium. `pnpm exec playwright install chromium` fetches one; on a
 machine that already has one, set `J_OCEAN_CHROMIUM` to its executable instead.
+
+Gate G-01 regenerates the committed data artefacts, so it needs the build step's Python:
+
+```sh
+python3 -m pip install -r data/scripts/requirements.txt
+```
+
+A machine without it sees G-01 **fail**, not skip, because a skipped gate is not a passed
+gate. Set `J_OCEAN_PYTHON` if the interpreter is not `python3`. See
+[`data/scripts/README.md`](data/scripts/README.md) for the pipeline itself.
 
 ## Published
 
@@ -69,12 +103,12 @@ while a gate that is present but did not run is a hole that looks like a pass.
 
 | Gate | Holds | Landed |
 |---|---|---|
-| G-01 | artefacts regenerate identically | beat 002 |
-| G-02 | truth reaches the analysis only through an instrument | beat 004 |
+| G-01 | artefacts regenerate identically | **002** |
+| G-02 | truth reaches the analysis only through an instrument | **004** (behavioural half: 005) |
 | G-03 | the model imports no rendering module | **001** |
 | G-04 | no host clock, no unseeded randomness | **001** |
-| G-05 | every declared horizon rendered, and no other | beat 007 |
-| G-06 | attribution read from the analysis own weights | beat 005 |
+| G-05 | every declared horizon rendered, and no other | **007** (in a real browser) |
+| G-06 | attribution read from the analysis own weights | **005** |
 | vocabulary | no tracked entities, no customer material | **001** |
 
 Each gate has a directory of planted violations under
@@ -87,9 +121,15 @@ fixture and requires it to fail. A check that has never been seen to fail is wor
 
 ```text
 config/            declared values, validated at startup (Principle X)
+data/scripts/      the build step: fetch (network) and convert (pure), and nothing else
+data/raw/          the committed raw subsets and their digests
+data/truth,clim,obs/  the committed derived artefacts, held honest by gate G-01
 src/config/        the one loader, the schema, the configuration digest
 src/ports/         the four ports and nothing else (Principle VIII)
 src/model/         kernel, grid, state; imports nothing above it (Principle III)
+src/truth/         the truth-source port over the committed artefacts
+src/instruments/   the only place a truth value becomes an observation (Principle II)
+src/analysis/      optimal interpolation, and the attribution that is its own gain
 src/run/           seeds, the manifest, the run that owns the clock (Principle I)
 src/harness/       the React shell, and the two bounded host-time exemptions
 scripts/gates/     the gates, their word list and their planted violations

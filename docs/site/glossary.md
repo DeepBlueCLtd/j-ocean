@@ -54,6 +54,29 @@ drawing a depth profile states that the levels between the model's own are deriv
 <dd>The check that regenerates a committed artefact and fails the build on any difference,
 so that a change is attributed to the tree or to the upstream rather than guessed at.</dd>
 
+<dt>Counterfactual</dt>
+<dd>An edit a reader made, as a value: withhold a measurement, drag a profile, break an
+instrument, turn quality control off, redraw the track. Edits are applied in order to a
+fresh run and recorded in the manifest, so reverting is removing them rather than undoing
+them — which is why the recorded case comes back byte for byte.</dd>
+
+<dt>Departure brief</dt>
+<dd>The analysis at the quay-side instant, held constant and never refreshed: correct at
+issue and losing to the world on its own. The baseline every forecast is watched against.
+In the recorded case nothing has reported by then, so it is the background blended with
+climatology — which makes it a generous baseline rather than a straw man.</dd>
+
+<dt>Ghost</dt>
+<dd>The measured profile, kept drawn behind an edited one. A reader dragging a profile is
+stating what the instrument would have read, not erasing what it did read, and a picture
+that forgot the measurement would make the difference field meaningless.</dd>
+
+<dt>Footprint</dt>
+<dd>What the instruments did, drawn: the track and its measurements, and a needle or a
+depth-coded glyph for every profile. Built from the run's observations and from nothing
+else — it neither samples truth nor computes, so what it shows is what was measured rather
+than a picture of the answer.</dd>
+
 <dt>Gate</dt>
 <dd>A check that fails the build. Every gate is watched failing against a planted violation
 before it is trusted, and the commit that introduces it says so.</dd>
@@ -67,6 +90,12 @@ rendered as a panel, and no panel is drawn for a horizon that is not declared.</
 is marked as such wherever it is drawn and never enters a run, a manifest, or any
 simulation-time quantity.</dd>
 
+<dt>Enlarge in place</dt>
+<dd>Growing one panel while the other five stay visible and shrink to their declared
+minimum. Not a modal and not a new page: an enlargement that hid the row would be a slider
+with extra steps. It changes what is shown and never what is computed, and the test asserts
+that by object identity rather than by appearance.</dd>
+
 <dt>Instrument</dt>
 <dd>The simulated device through which — and only through which — the model may sample
 truth. It applies declared noise and declared error characteristics at a chosen position,
@@ -75,6 +104,18 @@ depth and time.</dd>
 <dt>Manifest</dt>
 <dd>The complete description of a run: seeds, versions, digests and counterfactual state.
 The unit of export and import, and the thing a run is rebuilt from.</dd>
+
+<dt>Issue time</dt>
+<dd>The instant a forecast was made, and an axis of its own. The row is the lead-time axis;
+one scrubber above it is the issue-time axis. Moving it leaves every panel valid at the same
+moment and makes each a longer forecast of it, so the whole skill curve drops bodily. An
+analysis may see only observations with instants at or before its issue time.</dd>
+
+<dt>Needle</dt>
+<dd>A profile as drawn: a vertical line through the depth elevation extending exactly to the
+depth that probe reached, with a tick at every level it sampled and a barb where it carried
+on past the floor of the displayed volume. A profile that measured nothing is a cross at the
+surface instead, because a needle of no length would read as a probe that stopped there.</dd>
 
 <dt>Observation</dt>
 <dd>Truth sampled through an instrument. The type is opaque and has exactly one
@@ -90,6 +131,11 @@ this project holds to.</dd>
 <dd>The reference forecast that says tomorrow looks like today. One of the two references
 skill is reported against.</dd>
 
+<dt>Panel</dt>
+<dd>One horizon's view: the forecast field as an anomaly, the attribution layer, the
+absolute instants it is valid for and was initialised from, both skill figures in the
+scorer's own words, and the provenance one disclosure away.</dd>
+
 <dt>Port</dt>
 <dd>An interface with more than one conceivable implementation. There are four and there
 will not quietly be a fifth.</dd>
@@ -98,6 +144,24 @@ will not quietly be a fifth.</dd>
 <dd>The run produced by the declared default seed: the one two readers are both looking at
 when they say "the recorded case". A reader may draw a new run instead, and the surface
 then says the run is no longer the recorded case.</dd>
+
+<dt>Outside validity</dt>
+<dd>A panel whose valid instant is past its forecast's declared validity window, or before
+the forecast was issued. It says so and draws nothing: there is no field to give it that
+would not be an extrapolation, and an extrapolation drawn beside five forecasts would read
+as one.</dd>
+
+<dt>Row</dt>
+<dd>The primary surface: one panel per declared horizon, in order, all visible at once. Not
+a slider — what is not on screen is what the eye forgets, and a claim about a trend
+delivered one frame at a time is a claim taken on trust. Not a grid — lead time is
+one-dimensional, and laying it out in two invents an ordering the data does not have.</dd>
+
+<dt>Second channel</dt>
+<dd>Whatever carries a distinction besides hue: here, a diagonal hatch over the cells where
+observations lead both other sources. It is what makes the attribution layer survive a
+monochrome print, and the margin it must clear is measured in luminance rather than
+asserted.</dd>
 
 <dt>Skill</dt>
 <dd>Performance relative to a reference, in the convention where zero means <em>no better

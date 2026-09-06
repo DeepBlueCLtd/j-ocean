@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deepbluecltd.github.io/j-ocean/schemas/run-manifest.schema.json",
+  "title": "j-ocean run manifest",
+  "description": "Everything needed to rebuild a run and nothing of its state. A manifest carrying a field, a score or an observation is invalid: replay is re-computation, not the restoration of a snapshot.",
+  "type": "object",
+  "properties": {
+    "formatVersion": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "generatorVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kernelId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rootSeed": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{16}$"
+    },
+    "derivedSeeds": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{16}$"
+      }
+    },
+    "clock": {
+      "type": "object",
+      "properties": {
+        "epoch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timestepSeconds": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "epoch",
+        "timestepSeconds"
+      ],
+      "additionalProperties": false
+    },
+    "configDigest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "steps": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "issueInstantMs": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "codeVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "domainId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recordedCase": {
+      "type": "boolean"
+    },
+    "counterfactual": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "withhold"
+              },
+              "observationId": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "kind",
+              "observationId"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "profile"
+              },
+              "observationId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "levels": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "depthMetres": {
+                      "type": "number"
+                    },
+                    "value": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "depthMetres",
+                    "value"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "observationId",
+              "levels"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "bias"
+              },
+              "instrumentId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "biasDegC": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "kind",
+              "instrumentId",
+              "biasDegC"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "quality-control"
+              },
+              "enabled": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "kind",
+              "enabled"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "track"
+              },
+              "waypoints": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "lonDeg": {
+                      "type": "number"
+                    },
+                    "latDeg": {
+                      "type": "number"
+                    },
+                    "offsetHours": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "lonDeg",
+                    "latDeg",
+                    "offsetHours"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "waypoints"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    }
+  },
+  "required": [
+    "formatVersion",
+    "generatorVersion",
+    "kernelId",
+    "rootSeed",
+    "derivedSeeds",
+    "clock",
+    "configDigest",
+    "steps",
+    "issueInstantMs",
+    "codeVersion",
+    "domainId",
+    "recordedCase",
+    "counterfactual"
+  ],
+  "additionalProperties": false
+}

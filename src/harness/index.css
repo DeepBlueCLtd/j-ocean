@@ -111,3 +111,328 @@ pre {
 .aside { color: var(--host); font-size: 0.9rem; }
 
 footer { margin-top: 2.5rem; border-top: 1px solid var(--rule); padding-top: 0.75rem; }
+
+/* The field panel (beat 003). The canvas is 100 x 100 device pixels scaled up, and
+   `image-rendering: pixelated` keeps a cell a cell: a smoothed 100 x 100 field would show
+   structure the model does not have, which is the sort of picture Principle V exists to
+   forbid. */
+.field { margin: 1rem 0 1.5rem; }
+
+.field canvas {
+  width: 100%;
+  max-width: 28rem;
+  aspect-ratio: 1 / 1;
+  image-rendering: pixelated;
+  border: 1px solid var(--ink);
+  background: #fff;
+  display: block;
+}
+
+.field figcaption {
+  color: var(--host);
+  font-size: 0.85rem;
+  margin-top: 0.4rem;
+  max-width: 28rem;
+}
+
+.scale { display: flex; align-items: center; gap: 0.3rem; margin-top: 0.35rem; }
+
+.swatch {
+  width: 1.5rem;
+  height: 0.7rem;
+  border: 1px solid var(--rule);
+  display: inline-block;
+}
+
+.swatch.cool { background: #1c47993d; background: rgb(28, 71, 153); }
+.swatch.zero { background: #fff; }
+.swatch.warm { background: rgb(199, 33, 23); }
+
+.banner {
+  border: 2px solid var(--ink);
+  background: #fff;
+  padding: 0.9rem 1.1rem;
+  margin: 1.25rem 0;
+}
+
+.banner.warn { border-color: var(--alarm); }
+.banner p { margin: 0 0 0.6rem; }
+
+button[disabled] { opacity: 0.5; cursor: default; }
+button[disabled]:hover { background: #fff; color: var(--ink); }
+
+.field-stack { position: relative; max-width: 28rem; }
+.field-stack canvas.overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: auto;
+  border: none;
+  background: none;
+}
+
+.legend { display: flex; flex-wrap: wrap; gap: 0 1rem; font-size: 0.85rem; color: var(--host); }
+.legend .dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 0.3rem;
+  vertical-align: baseline;
+}
+.legend .dot.drop { background: var(--ink); }
+.legend .dot.external { background: var(--derived); }
+.legend .dot.flagged { background: #fff; border: 2px solid var(--alarm); }
+
+.estimate + .estimate::before { content: " / "; color: var(--rule); }
+.estimate { white-space: nowrap; }
+
+.swatch.ink { background: rgb(31, 51, 71); }
+
+/* The score's own statement, printed verbatim. FR-021 says a model that is not earning its
+   compute is told so in those words, and the surface does not get to phrase it more kindly. */
+.statement {
+  border-left: 3px solid var(--ink);
+  padding-left: 0.9rem;
+  margin: 1rem 0;
+  font-size: 1.05rem;
+}
+
+/* The row (FR-013, ADR-0003). Six panels, all visible at once. A grid is forbidden and a
+   slider was rejected; the one concession the spec allows is that the panels shrink to a
+   declared minimum and only then may the row's own container scroll horizontally.
+
+   The row breaks out of the page's prose column, because six legible panels do not fit in a
+   measure set for reading and the row -- not the prose -- is the primary surface. Every
+   number here comes from `presentation` in configuration through a custom property; the
+   fallbacks exist only so the stylesheet is readable on its own, and the schema refuses a
+   configuration whose reference width cannot hold every declared horizon. */
+.row-section {
+  --row-width: min(
+    calc(var(--row-reference-width, 1400px) - var(--row-page-gutter, 48px)),
+    calc(100vw - var(--row-page-gutter, 48px))
+  );
+  width: var(--row-width);
+  margin-left: calc(50% - var(--row-width) / 2);
+}
+
+.horizon-row {
+  display: flex;
+  gap: var(--panel-gap, 10px);
+  align-items: flex-start;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+  margin: 1rem 0;
+}
+
+.panel {
+  flex: 1 1 0;
+  min-width: var(--panel-minimum-width, 190px);
+  border: 1px solid var(--rule);
+  background: #fff;
+  padding: 0.5rem 0.6rem 0.7rem;
+}
+
+/* FR-014: enlargement is a class on an element. Nothing is recomputed, and the other panels
+   stay visible -- "in place" means in place. */
+.panel.enlarged {
+  flex: 3 1 0;
+  border-color: var(--ink);
+  border-width: 2px;
+}
+
+.panel header { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.panel h3 { margin: 0 0 0.35rem; font-size: 1rem; }
+
+.panel .enlarge {
+  font-size: 0.72rem;
+  padding: 0.1rem 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.panel .field { margin: 0; }
+.panel .field-stack { max-width: none; }
+.panel canvas { max-width: none; width: 100%; }
+
+.panel-labels {
+  grid-template-columns: minmax(4.5rem, auto) 1fr;
+  gap: 0.1rem 0.5rem;
+  font-size: 0.78rem;
+  margin-top: 0.45rem;
+}
+
+.panel-labels dt { font-size: 0.72rem; padding-top: 0; }
+.panel-labels dd { white-space: nowrap; }
+.panel-labels dd.instant span { display: block; font-size: 0.74rem; line-height: 1.25; }
+.panel-labels { grid-template-columns: minmax(3.6rem, auto) 1fr; }
+
+.panel-score { margin-top: 0.5rem; border-top: 1px solid var(--rule); padding-top: 0.4rem; }
+.panel-score .statement { font-size: 0.76rem; margin: 0 0 0.3rem; border-left-width: 2px; padding-left: 0.5rem; }
+.panel-score details { font-size: 0.75rem; color: var(--host); margin-top: 0.4rem; }
+.panel-score summary { cursor: pointer; }
+.panel-score .caveat { color: var(--alarm); }
+
+/* NFR-05, declared once so a figure's style cannot change between states. */
+.panel .declared, .panel-labels .declared { color: var(--declared); border-bottom: 1px dotted var(--declared); font-family: ui-monospace, Menlo, Consolas, monospace; }
+.panel .computed, .panel-labels .computed { color: var(--computed); font-weight: 600; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.panel .derived, .panel-labels .derived { color: var(--derived); font-style: italic; border-bottom: 1px dashed var(--derived); }
+
+.row-controls { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+
+.dot.ink { background: rgb(31, 51, 71); }
+.dot.cool { background: rgb(28, 71, 153); }
+.dot.warm { background: rgb(199, 33, 23); }
+.dot.hatched, .swatch.hatched {
+  background: repeating-linear-gradient(45deg, rgb(31, 51, 71) 0 2px, #fff 2px 4px);
+}
+
+/* Beat 008: the observation footprint.
+
+   The elevation is the enlarged panel's depth axis (FR-003). It shares the field's horizontal
+   axis and adds depth downward; it is a side elevation and not a scene, which the caption
+   says, because a perspective volume would imply a viewpoint and a set of distances the
+   harness does not have. */
+.elevation {
+  margin: 0.4rem 0 0;
+}
+
+.elevation svg {
+  width: 100%;
+  display: block;
+  background: #fff;
+  border: 1px solid var(--rule);
+}
+
+.elevation figcaption {
+  font-size: 0.72rem;
+  color: var(--host);
+  margin-top: 0.25rem;
+}
+
+/* What a mark says when it is hovered. It sits under the panel rather than floating over the
+   field, because a tooltip that covers the thing it describes is worse than no tooltip. */
+.observation-hover {
+  margin-top: 0.5rem;
+  border: 1px solid var(--rule);
+  background: #fff;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.74rem;
+}
+
+.observation-hover dl {
+  grid-template-columns: minmax(4.5rem, auto) 1fr;
+  gap: 0.15rem 0.6rem;
+}
+
+.observation-hover p { margin: 0.35rem 0 0; }
+
+.profile-comparison {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.4rem;
+  font-size: 0.72rem;
+}
+
+.profile-comparison caption {
+  text-align: left;
+  color: var(--host);
+  padding-bottom: 0.25rem;
+}
+
+.profile-comparison th,
+.profile-comparison td {
+  text-align: left;
+  padding: 0.1rem 0.3rem 0.1rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.dot.track { background: rgb(90, 90, 90); }
+.dot.dashed {
+  background: transparent;
+  border-bottom: 2px dashed var(--ink);
+  border-radius: 0;
+  height: 0;
+}
+
+/* The marks as text. Visually hidden, not display:none: it is in the accessibility tree,
+   because a canvas is not. */
+.mark-list {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  margin: 0;
+  padding: 0;
+}
+
+.elevation-stack { position: relative; }
+
+.elevation-axis span {
+  position: absolute;
+  left: 0;
+  transform: translateY(-50%);
+  font-size: 0.62rem;
+  color: var(--host);
+  background: rgba(255, 255, 255, 0.8);
+  padding: 0 0.15rem;
+  z-index: 1;
+}
+
+/* Beat 009: the issue-time axis. One control, above the row, because the row is already the
+   lead-time axis and §11's two-dimensional control would be one nobody could read. */
+.issue-control {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin: 0.75rem 0 0.25rem;
+  font-size: 0.85rem;
+}
+
+.issue-control input[type='range'] { flex: 1 1 16rem; min-width: 12rem; }
+.issue-control label { color: var(--host); }
+
+.skill-inset { margin: 0.75rem 0 0; }
+.skill-inset svg { background: #fff; border: 1px solid var(--rule); display: block; }
+.skill-inset figcaption { font-size: 0.72rem; color: var(--host); margin-top: 0.25rem; }
+
+/* Beat 010: the counterfactuals. The status is not decoration -- a reader who cannot tell an
+   edit from the record has been misled by the harness, so it is always on the surface. */
+.counterfactuals { margin: 0.75rem 0; }
+
+.run-status {
+  margin: 0 0 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--rule);
+  background: #fff;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.counterfactuals label { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; }
+.counterfactuals input[type='number'] { width: 4.5rem; }
+
+.profile-editor { margin: 0.5rem 0 0; }
+.profile-editor svg { background: #fff; border: 1px solid var(--rule); display: block; touch-action: none; }
+.profile-editor figcaption { font-size: 0.7rem; color: var(--host); margin-top: 0.25rem; }
+
+/* Beat 011: export and import. The manifest is the only thing that leaves this page. */
+#root textarea,
+.harness textarea,
+textarea[data-testid='manifest-input'] {
+  width: 100%;
+  font: 0.78rem/1.4 ui-monospace, Menlo, Consolas, monospace;
+  padding: 0.4rem;
+  border: 1px solid var(--rule);
+  background: #fff;
+  resize: vertical;
+}
+
+h3 { font-size: 0.95rem; margin: 1.25rem 0 0.35rem; }

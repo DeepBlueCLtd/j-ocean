@@ -21,6 +21,15 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Python is the one permitted second runtime and is a build step. CI installs it for
+      # gate G-01 alone, which regenerates the committed artefacts and compares them.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python3 -m pip install -r data/scripts/requirements.txt
+      # Gate G-05 checks the running shell, so `pnpm gates` needs a browser as well as Python.
+      # A skipped gate is not a passed gate, so the alternative would be to let it fail here.
+      - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test

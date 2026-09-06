@@ -44,6 +44,13 @@ interface WordList {
   readonly hashedTerms: readonly { readonly sha256: string; readonly why: string }[];
   /** Paths exempt from `terms` only. Never from `hashedTerms`. */
   readonly plaintextExemptPaths: readonly string[];
+  /**
+   * Build outputs, excluded from both halves. They are not writing: gate G-01 regenerates
+   * each one from digest-verified public inputs and fails on any byte difference, so a
+   * hand-written file placed among them fails *that* gate rather than hiding from this one.
+   * The two gates interlock; neither is weakened.
+   */
+  readonly derivedArtefactPaths: readonly string[];
 }
 
 const WORD_LIST_PATH = 'scripts/gates/vocabulary.json';
@@ -74,7 +81,12 @@ export function checkVocabulary(root: string): GateResult {
   const files = walk(root, {
     include: ['.'],
     extensions: SCANNED_EXTENSIONS,
-    excludePrefixes: [...NEVER_SCANNED, WORD_LIST_PATH, 'scripts/gates/check-vocabulary.ts'],
+    excludePrefixes: [
+      ...NEVER_SCANNED,
+      ...list.derivedArtefactPaths,
+      WORD_LIST_PATH,
+      'scripts/gates/check-vocabulary.ts',
+    ],
   });
 
   const violations: Violation[] = [];
@@ -136,6 +148,7 @@ export function checkVocabulary(root: string): GateResult {
     notes: [
       `word list reviewed ${list.reviewed}: ${String(list.terms.length)} plaintext, ` +
         `${String(list.hashedTerms.length)} hashed`,
+      `${String(list.derivedArtefactPaths.length)} derived-artefact paths excluded; gate G-01 holds those`,
     ],
   };
 }

@@ -1,8 +1,10 @@
 import type { Configuration } from '../config/schema.js';
+import type { Edit } from '../instruments/edits.js';
 import type { ModelKernel, ModelState } from '../ports/kernel.js';
 import type { RandomStream } from '../ports/rng.js';
 import type { ClockControl, SimulationClock } from '../ports/clock.js';
 import { createClock } from './clock.js';
+import { CODE_VERSION } from './code-version.js';
 import { SeededRng } from './rng.js';
 import {
   assertManifestUsable,
@@ -10,7 +12,14 @@ import {
   ManifestError,
   type RunManifest,
 } from './manifest.js';
-import { createDiffusionKernel } from '../model/diffusion-kernel.js';
+import { createReducedGravityKernel } from '../model/reduced-gravity.js';
+import {
+  assessStability,
+  gridFor,
+  parametersFor,
+  StabilityError,
+  type StabilityAssessment,
+} from '../model/parameters.js';
 
 /**
  * A run (constitution Principle I).
@@ -38,6 +47,27 @@ export interface CreateRunOptions {
   readonly kernel?: ModelKernel;
   /** False once a reader has asked for a new run (FR-012, FR-013). */
   readonly recordedCase?: boolean;
+  /**
+   * The instant the shore forecast is issued (beat 009). Defaults to the declared spin-up,
+   * which is the recorded case's issue time; a reader who moves the control creates a run
+   * whose manifest records where they moved it to.
+   */
+  readonly issueInstantMs?: number;
+  /**
+   * A state built elsewhere -- from the truth record, through the truth-source port. When it
+   * is absent the kernel builds one from its own stream, which is what the contract and
+   * replay tests exercise.
+   */
+  readonly initialState?: ModelState;
+  /** Which declared domain this run is over. Defaults to the declared default. */
+  readonly domainId?: string;
+}
+
+/** The reference kernel for a configuration and a domain (FR-04, ADR-0002). */
+export function referenceKernelFor(config: Configuration, domainId: string): ModelKernel {
+  const domain = config.domains.list.find((candidate) => candidate.id === domainId);
+  if (domain === undefined) throw new RangeError(`no declared domain ${domainId}`);
+  return createReducedGravityKernel(parametersFor(config, domain));
 }
 
 export class Run {
@@ -46,6 +76,17 @@ export class Run {
   readonly state: ModelState;
   readonly configDigest: string;
   readonly recordedCase: boolean;
+  /**
+   * Beat 009. A reader's choice rather than a property of the integration: moving it changes
+   * which analysis the row is built from and nothing about the run's own trajectory, which is
+   * why it can be set after construction and why the manifest has to record it.
+   */
+  issueInstantMs: number;
+  /** FR-002: the edits this run was made with, so an edited run replays. */
+  counterfactual: readonly Edit[] = [];
+  readonly domainId: string;
+  /** FR-003: the computed stability limit beside the declared timestep. */
+  readonly stability: StabilityAssessment;
 
   readonly #clockControl: ClockControl;
   readonly #kernelStream: RandomStream;
@@ -55,8 +96,23 @@ export class Run {
     const { config, configDigest } = options;
     this.configDigest = configDigest;
     this.recordedCase = options.recordedCase ?? true;
+    this.issueInstantMs =
+      options.issueInstantMs ??
+      Date.parse(options.config.truth.period.start) + options.config.forecast.spinUpHours * 3_600_000;
     this.rng = new SeededRng(options.seed ?? config.run.defaultSeed);
-    this.kernel = options.kernel ?? createDiffusionKernel();
+    this.domainId = options.domainId ?? config.domains.defaultId;
+    const domain = config.domains.list.find((candidate) => candidate.id === this.domainId);
+    if (domain === undefined) throw new RangeError(`no declared domain ${this.domainId}`);
+    this.kernel = options.kernel ?? referenceKernelFor(config, this.domainId);
+
+    // FR-003, and the spec's first edge case: a configuration that declares a grid too fine
+    // for its layer parameters fails here, with both figures, and no integration runs.
+    this.stability = assessStability(
+      parametersFor(config, domain),
+      config.clock.timestepSeconds,
+      config.clock.stabilityCriterionCfl,
+    );
+    if (!this.stability.satisfied) throw new StabilityError(this.stability);
     this.#clockConfig = {
       epoch: config.clock.epoch,
       timestepSeconds: config.clock.timestepSeconds,
@@ -65,7 +121,8 @@ export class Run {
     // The order these two streams are constructed in does not matter to their contents —
     // each is derived from the root seed and its own name — but it is fixed anyway so the
     // manifest of a replayed run is identical to the manifest of the original.
-    this.state = this.kernel.createState(config.grid, this.rng.stream(INITIAL_STATE_STREAM));
+    this.state =
+      options.initialState ?? this.kernel.createState(gridFor(config, domain), this.rng.stream(INITIAL_STATE_STREAM));
     this.#kernelStream = this.rng.stream(KERNEL_STREAM);
   }
 
@@ -94,6 +151,16 @@ export class Run {
     }
   }
 
+  /** Record a new issue instant. It changes no state; it changes what the manifest says. */
+  reissue(instantMs: number): void {
+    this.issueInstantMs = instantMs;
+  }
+
+  /** Record the reader's edits (FR-002). Like the issue instant, a choice and not a state. */
+  setCounterfactual(edits: readonly Edit[]): void {
+    this.counterfactual = edits;
+  }
+
   /** Everything needed to rebuild this run, and nothing of its state (FR-005). */
   exportManifest(): RunManifest {
     return {
@@ -105,8 +172,11 @@ export class Run {
       clock: this.#clockConfig,
       configDigest: this.configDigest,
       steps: this.steps,
+      issueInstantMs: this.issueInstantMs,
+      codeVersion: CODE_VERSION,
+      domainId: this.domainId,
       recordedCase: this.recordedCase,
-      counterfactual: null,
+      counterfactual: this.counterfactual,
     };
   }
 }
@@ -119,6 +189,12 @@ export interface CreateFromManifestOptions {
   readonly config: Configuration;
   readonly configDigest: string;
   readonly kernel?: ModelKernel;
+  /**
+   * The state the run starts from. The shell has one already -- initialised from the truth
+   * record -- and rebuilding it would be doing the same work twice; headless callers let the
+   * kernel make one.
+   */
+  readonly initialState?: ModelState;
   /**
    * Replay to the step the manifest records. On by default, because "a run is constructible
    * from a manifest alone" means the run you get back is the run that was exported, not a
@@ -137,11 +213,12 @@ export function createRunFromManifest(
   manifest: RunManifest,
   options: CreateFromManifestOptions,
 ): Run {
-  const kernel = options.kernel ?? createDiffusionKernel();
+  const kernel = options.kernel ?? referenceKernelFor(options.config, manifest.domainId);
   const probe = new SeededRng(manifest.rootSeed);
   assertManifestUsable(manifest, {
     generatorVersion: probe.generatorVersion,
     configDigest: options.configDigest,
+    domainIds: options.config.domains.list.map((domain) => domain.id),
   });
   if (manifest.kernelId !== kernel.id) {
     throw new ManifestError(
@@ -163,10 +240,16 @@ export function createRunFromManifest(
   const run = new Run({
     config: options.config,
     configDigest: options.configDigest,
+    ...(options.initialState === undefined ? {} : { initialState: options.initialState }),
     seed: manifest.rootSeed,
     kernel,
     recordedCase: manifest.recordedCase,
+    issueInstantMs: manifest.issueInstantMs,
+    domainId: manifest.domainId,
   });
+  // The edits travel with the run (beat 010, FR-002): a manifest that recorded them and a
+  // replay that ignored them would reproduce a run nobody made.
+  run.setCounterfactual(manifest.counterfactual);
   if (options.replay !== false) run.advance(manifest.steps);
   return run;
 }

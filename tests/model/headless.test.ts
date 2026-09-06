@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createRun } from '../../src/run/run.js';
+import { THICKNESS } from '../../src/model/reduced-gravity.js';
 import { declaredConfiguration } from '../support/config.js';
 
 const { config, digest } = declaredConfiguration();
@@ -19,8 +20,23 @@ describe('the model runs headlessly', () => {
   it('advances a run at the declared grid with no DOM present', () => {
     const run = createRun({ config, configDigest: digest });
     run.advance(100);
-    const tracer = run.state.fields['tracer'];
-    expect(tracer?.length).toBe(config.grid.nx * config.grid.ny);
+    expect(run.state.fields[THICKNESS]?.length).toBe(config.grid.nx * config.grid.ny);
     expect(run.clock.step).toBe(100);
+  });
+
+  it('reports the stability the criterion computed, and the run satisfies it', () => {
+    const run = createRun({ config, configDigest: digest });
+    expect(run.stability.satisfied).toBe(true);
+    expect(run.stability.declaredTimestepSeconds).toBe(config.clock.timestepSeconds);
+    expect(run.stability.declaredTimestepSeconds).toBeLessThanOrEqual(
+      run.stability.largestStableTimestepSeconds,
+    );
+    process.stdout.write(
+      `    gravity-wave speed ${run.stability.gravityWaveSpeedMetresPerSecond.toFixed(3)} m/s; ` +
+        `linear boundary ${run.stability.linearStabilityBoundarySeconds.toFixed(1)} s; ` +
+        `criterion admits ${run.stability.largestStableTimestepSeconds.toFixed(1)} s; ` +
+        `declared ${String(run.stability.declaredTimestepSeconds)} s; ` +
+        `viscous number ${run.stability.viscousNumber.toFixed(4)}\n`,
+    );
   });
 });
