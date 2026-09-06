@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Overview &middot; j-ocean</title>
+    <meta name="description" content="What j-ocean is, what it refuses to claim, and how to read the rest of this site." />
+    <link rel="stylesheet" href="assets/style.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="wordmark" href="index.html">j-ocean</a>
+      <p class="disclaimer">Not an operational forecast system.</p>
+      <nav>
+        <a href="index.html" class="active">Overview</a>
+        <a href="architecture.html">Architecture</a>
+        <a href="data-model.html">Data model</a>
+        <a href="glossary.html">Glossary</a>
+        <a href="deferred.html">Deferred</a>
+        <a href="blog/index.html">Notes</a>
+        <a class="external" href="https://github.com/DeepBlueCLtd/j-ocean">Repository</a>
+      </nav>
+    </header>
+    <main>
+<h1>j-ocean</h1>
+<p>A browser-resident ocean forecast model and the harness that teaches with it.</p>
+<div class="banner warn">
+<p><strong>j-ocean is not an operational forecast system.</strong> Its numerics are real but
+reduced, its domain small, and its claims are about <em>relative</em> skill between
+references it computes itself, scored against a truth record it did not author.</p>
+</div><h2>What it is for</h2>
+<p>Three things, in order of how much they matter:</p>
+<ol>
+<li><strong>Understanding.</strong> What a measurement is worth, where a forecast&#39;s information came
+from, and what changes when a reader drags a profile and the machinery re-runs.</li>
+<li><strong>Teaching.</strong> The same understanding, transferred to a reader who knows the ocean and
+not the numerics, without a lecture.</li>
+<li><strong>Evidence.</strong> Modest, specific, falsifiable claims about sampling and forecast skill.</li>
+</ol>
+<h2>The shape of it</h2>
+<p>One browser application in three rings, and the boundaries between them are the design.</p>
+<table>
+<thead>
+<tr>
+<th>Ring</th>
+<th>What it does</th>
+<th>What it may not do</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Model</strong></td>
+<td>A reduced-gravity ocean integrating in typed arrays</td>
+<td>Import anything that draws; read the host clock; know a display exists</td>
+</tr>
+<tr>
+<td><strong>Assimilation and scoring</strong></td>
+<td>Analysis, references, skill, and the per-cell attribution</td>
+<td>Reach truth except through a simulated instrument</td>
+</tr>
+<tr>
+<td><strong>Harness</strong></td>
+<td>Horizon panels, attribution layer, profile editor, controls</td>
+<td>Reach into integration state, or paint a figure it did not compute</td>
+</tr>
+</tbody></table>
+<p>Read <a href="architecture.html">Architecture</a> for how those boundaries are held, the
+<a href="data-model.html">Data model</a> for what flows across them, and the
+<a href="glossary.html">Glossary</a> for the words this project uses precisely.</p>
+<h2>Where the tree is</h2>
+<p>The build order is one feature per beat, in
+<a href="https://github.com/DeepBlueCLtd/j-ocean/blob/main/docs/development-plan.md">the development plan</a>.
+Each beat&#39;s <a href="blog/index.html">note</a> says what landed and what it refuses to claim.</p>
+<h2>Three habits worth knowing before you read the code</h2>
+<ul>
+<li><strong>Every figure says what kind it is.</strong> <span class="declared">Declared</span> values come
+from configuration, <span class="computed">computed</span> ones from the model or the
+analysis, <span class="derived">derived</span> ones are diagnosed from computed state, and
+<span class="host-time">host time</span> is how long the machinery took and never enters a
+run. The typography is the same here and in the application.</li>
+<li><strong>A check that has never failed is worth nothing.</strong> Every gate is watched failing against
+a planted violation before it is trusted, and the commit says so.</li>
+<li><strong>The harness can lose.</strong> There is no demo mode and no fixture that flatters. The surface
+must be able to report that the model is worse than persistence, and that a piece of
+machinery bought nothing.</li>
+</ul>
+
+    </main>
+    <footer>
+      <p>
+        j-ocean is a teaching harness. Its numerics are real but reduced, its domain small,
+        and its claims are about relative skill between references it computes itself. This
+        site is a claim about the tree; where the two disagree, the tree wins.
+      </p>
+    </footer>
+  </body>
+</html>

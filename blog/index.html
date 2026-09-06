@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Notes &middot; j-ocean</title>
+    <meta name="description" content="Short engineering notes, one per beat." />
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="wordmark" href="../index.html">j-ocean</a>
+      <p class="disclaimer">Not an operational forecast system.</p>
+      <nav>
+        <a href="../index.html">Overview</a>
+        <a href="../architecture.html">Architecture</a>
+        <a href="../data-model.html">Data model</a>
+        <a href="../glossary.html">Glossary</a>
+        <a href="../deferred.html">Deferred</a>
+        <a href="../blog/index.html" class="active">Notes</a>
+        <a class="external" href="https://github.com/DeepBlueCLtd/j-ocean">Repository</a>
+      </nav>
+    </header>
+    <main>
+      <h1>Notes</h1>
+      <p class="lede">One short note per beat: what landed, what it cost, and what it
+      refuses to claim.</p>
+      <ul class="post-list">
+      <li>
+        <a href="2026-09-16-beat-012-deferred.html">Beat 012: the beat that reports it should not be built yet</a>
+        <time datetime="2026-09-16">2026-09-16</time>
+        <p>Adaptive sampling was deferred behind a trigger. Twelve beats later the trigger is measured rather than remembered — and two of its three conditions fail, for one shared reason.</p>
+      </li>
+      <li>
+        <a href="2026-09-15-beat-011-replay.html">Beat 011: the replay that found an analysis meaning two different things</a>
+        <time datetime="2026-09-15">2026-09-15</time>
+        <p>Export a run, import it in a fresh browser context, get the same fields back. Testing that properly found a defect nothing else in the suite could have found — and a gate that had been allowed to test a build that was not the tree.</p>
+      </li>
+      <li>
+        <a href="2026-09-14-beat-010-counterfactuals.html">Beat 010: the quality control that was not excluding anything</a>
+        <time datetime="2026-09-14">2026-09-14</time>
+        <p>Withhold a measurement, drag a profile, break an instrument, redraw the track — and revert. Building the controls that exercise quality control showed that quality control had never changed a single number.</p>
+      </li>
+      <li>
+        <a href="2026-09-13-beat-009-two-axes.html">Beat 009: a forecast that was using measurements it could not have had</a>
+        <time datetime="2026-09-13">2026-09-13</time>
+        <p>Issue time becomes an axis of its own — and building it exposed that the analysis had been reading observations from its own future for three beats. The corrected skill figures are much worse.</p>
+      </li>
+      <li>
+        <a href="2026-09-12-beat-008-footprint.html">Beat 008: five profiles that measured nothing, drawn as though they had</a>
+        <time datetime="2026-09-12">2026-09-12</time>
+        <p>The observation footprint — the track, needles at the depths actually reached, and everything flagged drawn as flagged. Drawing the observations found a defect in what the harness said about them.</p>
+      </li>
+      <li>
+        <a href="2026-09-11-beat-007-horizon-row.html">Beat 007: six panels, and the test that was counting instead of measuring</a>
+        <time datetime="2026-09-11">2026-09-11</time>
+        <p>The row is the primary surface — one panel per declared horizon, all visible at once. It passed its tests while showing four and a half panels, because nothing was measuring geometry.</p>
+      </li>
+      <li>
+        <a href="2026-09-10-beat-006-scoring.html">Beat 006: the harness loses</a>
+        <time datetime="2026-09-10">2026-09-10</time>
+        <p>Skill against persistence and climatology, with provenance. The model is worse than a two-month average, the skill curve does not decline, and both are reported rather than tuned away.</p>
+      </li>
+      <li>
+        <a href="2026-09-09-beat-005-analysis.html">Beat 005: a share of 202 per cent</a>
+        <time datetime="2026-09-09">2026-09-09</time>
+        <p>Optimal interpolation, and the attribution field that is literally the gain's row sums. The first working analysis produced weights that could not be weights, and the reason was a number nobody had declared.</p>
+      </li>
+      <li>
+        <a href="2026-09-08-beat-004-instruments.html">Beat 004: the gate's first catch was ours</a>
+        <time datetime="2026-09-08">2026-09-08</time>
+        <p>Truth becomes an observation in exactly one module. Writing the gate that enforces that found a violation beat 003 had already committed, and two configurations that defeated themselves.</p>
+      </li>
+      <li>
+        <a href="2026-09-07-beat-003-reduced-gravity.html">Beat 003: an ocean, and three things it refused to do</a>
+        <time datetime="2026-09-07">2026-09-07</time>
+        <p>A one-and-a-half layer reduced-gravity model initialised from HYCOM. It blew up twice and outcropped once, and each refusal was more useful than the fix.</p>
+      </li>
+      <li>
+        <a href="2026-09-06-beat-002-truth-record.html">Beat 002: a truth record you can regenerate</a>
+        <time datetime="2026-09-06">2026-09-06</time>
+        <p>Two Python scripts, 8 MB of committed raw NetCDF, and a gate that rebuilds every artefact and compares it byte for byte. Plus two nine-hour holes in the ocean.</p>
+      </li>
+      <li>
+        <a href="2026-09-05-beat-001-foundation.html">Beat 001: a foundation you can watch fail</a>
+        <time datetime="2026-09-05">2026-09-05</time>
+        <p>Four ports, a manifest that holds no state, and three gates that were planted with violations before anybody trusted them.</p>
+      </li>
+      </ul>
+    </main>
+    <footer>
+      <p>
+        j-ocean is a teaching harness. Its numerics are real but reduced, its domain small,
+        and its claims are about relative skill between references it computes itself. This
+        site is a claim about the tree; where the two disagree, the tree wins.
+      </p>
+    </footer>
+  </body>
+</html>

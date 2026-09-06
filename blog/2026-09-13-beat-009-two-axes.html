@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Beat 009: a forecast that was using measurements it could not have had &middot; j-ocean</title>
+    <meta name="description" content="Issue time becomes an axis of its own — and building it exposed that the analysis had been reading observations from its own future for three beats. The corrected skill figures are much worse." />
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="wordmark" href="../index.html">j-ocean</a>
+      <p class="disclaimer">Not an operational forecast system.</p>
+      <nav>
+        <a href="../index.html">Overview</a>
+        <a href="../architecture.html">Architecture</a>
+        <a href="../data-model.html">Data model</a>
+        <a href="../glossary.html">Glossary</a>
+        <a href="../deferred.html">Deferred</a>
+        <a href="../blog/index.html" class="active">Notes</a>
+        <a class="external" href="https://github.com/DeepBlueCLtd/j-ocean">Repository</a>
+      </nav>
+    </header>
+    <main>
+      <article>
+      <p class="post-date"><time datetime="2026-09-13">2026-09-13</time></p>
+<h1>Beat 009: a forecast that was using measurements it could not have had</h1>
+<p>This beat was supposed to be about presentation: a second axis, so that staleness and lead
+time stop being conflated. It is, and that part works. But adding an issue-time control means
+asking what a forecast issued at a given instant is allowed to know, and the answer we had been
+giving was wrong.</p>
+<h2>The analysis was reading its own future</h2>
+<p>The recorded case issues its forecast at +24 h. Its XBT drops are at +6, +18, +30, +42, +54 and
++66 h; its Argo profiles are spread across the whole period.</p>
+<p><strong>The analysis at +24 h was being handed all of them.</strong> A forecast made on the second of
+September was using a measurement taken on the fourth.</p>
+<p>Nothing about this was subtle once the question was asked. It survived three beats because
+nothing ever asked it: the analysis consumed &quot;the run&#39;s observations&quot;, the run produced one set
+of them, and the issue instant was a number that fixed where the integration started rather
+than a boundary on what could be known.</p>
+<p>Fixing it is one line and a comment. The consequences are not one line:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Before</th>
+<th>After</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Observations the analysis saw</td>
+<td>31</td>
+<td><strong>2</strong></td>
+</tr>
+<tr>
+<td>Skill against persistence at 12 h</td>
+<td>0.133</td>
+<td><strong>−0.067</strong></td>
+</tr>
+<tr>
+<td>Skill against persistence at 24 h</td>
+<td>0.145</td>
+<td><strong>0.089</strong></td>
+</tr>
+<tr>
+<td>Skill against persistence at 96 h</td>
+<td>0.155</td>
+<td><strong>−0.057</strong></td>
+</tr>
+</tbody></table>
+<p>The corrected row is roughly <em>no better than persistence</em>: positive at two horizons, negative at
+three, zero at the first. Beat 006&#39;s engineering note now carries a correction pointing here,
+because a superseded figure left looking current is worse than no figure.</p>
+<p>Two more consequences worth stating:</p>
+<ul>
+<li><strong>The independence caveat never fires in the recorded case.</strong> No Argo profile has arrived by
++24 h, so nothing external is assimilated and review R-3&#39;s caveat has nothing to attach to.
+Good for independence; useless for testing the caveat, which now lives on a later issue time.
+And a panel with nothing to caveat says so, because a reader cannot tell &quot;independent&quot; from
+&quot;nobody checked&quot; by looking at a blank space.</li>
+<li><strong>AT-03 got <em>stronger</em>.</strong> With only the two drops that had reported, skill within 120 km of a
+drop is <strong>0.377</strong> against <strong>−0.012</strong> outside it. The measurement is worth something, and it is
+worth it locally in a way nothing else in this system is doing for it.</li>
+</ul>
+<h2>The two axes</h2>
+<p>That was the accident. Here is the feature.</p>
+<p><img src="../images/009-issued-at-default.png" alt="The row issued at the default instant, with the issue-time control above it"></p>
+<p>The declared horizons are measured from the <strong>default</strong> issue instant, which fixes the six
+valid instants the row shows. Move the control back twelve hours and the panels do not move:
+each becomes a <em>longer</em> forecast of the same moment. Every panel says both — the horizon that
+names it, and the lead actually asked of the model.</p>
+<p><img src="../images/009-issued-earlier.png" alt="The same row issued twelve hours earlier: same valid instants, longer leads, and the last panel outside validity"></p>
+<pre><code>  +0 h  issued at default  0.000   issued 12 h earlier  -0.023
+ +12 h  issued at default -0.067   issued 12 h earlier  -0.161
+ +24 h  issued at default  0.089   issued 12 h earlier  -0.004
+ +48 h  issued at default -0.070   issued 12 h earlier  -0.174
+ +72 h  issued at default  0.024   issued 12 h earlier  -0.056
+ +96 h  issued at default -0.057   issued 12 h earlier  outside validity
+</code></pre>
+<p>Worse at every horizon that can be compared, with nothing else changed. That is what twelve
+hours of staleness costs, and it is a different question from what four days of lead time
+costs — which is the whole reason the second axis exists.</p>
+<p>The SRD asked whether the two axes needed a two-dimensional control. They do not: <strong>the row is
+one of the axes</strong>, so there is one scrubber, with the instants at which something was actually
+measured marked along it. A small inset draws the curves that have been scored, so the drop is
+visible as a shape and not only as twelve numbers.</p>
+<p><img src="../images/009-skill-inset.png" alt="The skill inset: two curves, labelled by the instant each was issued"></p>
+<p>The last panel, once the forecast is twelve hours older, has fallen outside its declared
+validity window. It says so and draws nothing. There is no field to give it that would not be
+an extrapolation, and an extrapolation drawn beside five forecasts would read as one.</p>
+<h2>The departure brief</h2>
+<p>Every panel now carries the departure brief&#39;s error beside its own: the quay-side analysis,
+held constant and never refreshed. Asserted by byte identity across an issue-time move — it is
+not re-analysed, and it is not re-integrated.</p>
+<p>At the quay side of the recorded case nothing has reported yet, so the brief is the background
+blended with climatology. That makes it a <em>generous</em> baseline rather than a straw man, and the
+surface says so. It is also uncomfortably competitive:</p>
+<pre><code>  +0 h  brief 81.5 m   shore forecast 81.6 m
+ +24 h  brief 81.3 m   shore forecast 74.8 m
+ +48 h  brief 80.4 m   shore forecast 86.4 m
+ +96 h  brief 83.4 m   shore forecast 83.7 m
+</code></pre>
+<p>A frozen field from the quay side is within a few metres of the shore forecast at every lead
+time and beats it at two of them. The test prints both figures and asserts neither wins,
+because which of them wins is a measurement.</p>
+<h2>What this beat is really about</h2>
+<p>Three beats of numbers were optimistic because nobody had asked what the forecast was allowed
+to know. The harness did not hide it — there was nothing to hide, only a question nobody had
+put — and the moment the question was put, the machinery for reporting the answer was already
+there: the figures are printed by tests, the caveats are attached to the figures, and the note
+that was wrong now says it was wrong.</p>
+<p>That is the whole argument for building it this way.</p>
+<h2>Where it stands</h2>
+<p>227 headless tests, 26 shell tests, seven gates. Beat 010 next: the counterfactuals, where a
+reader gets to withhold the measurement and watch what it was worth.</p>
+
+      </article>
+    </main>
+    <footer>
+      <p>
+        j-ocean is a teaching harness. Its numerics are real but reduced, its domain small,
+        and its claims are about relative skill between references it computes itself. This
+        site is a claim about the tree; where the two disagree, the tree wins.
+      </p>
+    </footer>
+  </body>
+</html>

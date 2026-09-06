@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Beat 010: the quality control that was not excluding anything &middot; j-ocean</title>
+    <meta name="description" content="Withhold a measurement, drag a profile, break an instrument, redraw the track — and revert. Building the controls that exercise quality control showed that quality control had never changed a single number." />
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="wordmark" href="../index.html">j-ocean</a>
+      <p class="disclaimer">Not an operational forecast system.</p>
+      <nav>
+        <a href="../index.html">Overview</a>
+        <a href="../architecture.html">Architecture</a>
+        <a href="../data-model.html">Data model</a>
+        <a href="../glossary.html">Glossary</a>
+        <a href="../deferred.html">Deferred</a>
+        <a href="../blog/index.html" class="active">Notes</a>
+        <a class="external" href="https://github.com/DeepBlueCLtd/j-ocean">Repository</a>
+      </nav>
+    </header>
+    <main>
+      <article>
+      <p class="post-date"><time datetime="2026-09-14">2026-09-14</time></p>
+<h1>Beat 010: the quality control that was not excluding anything</h1>
+<p>This is the beat the harness was for. A reader can now withhold a measurement and read what it
+was worth, drag a measured profile and watch the consequence at every horizon, break an
+instrument and see whether it is caught, redraw the track and ask whether that was a better
+place to have sailed — and undo all of it in one action.</p>
+<p><img src="../images/010-difference.png" alt="The row with a measurement withheld: every panel showing edited minus recorded, with the moved region outlined"></p>
+<p>Every edit is a <strong>value applied to a fresh run</strong>, not a mutation of one. That is why &quot;revert
+produces byte-identical results&quot; is a property of the design rather than a promise about undo,
+and it is why the edits split the way they do: a bias, the quality-control toggle and a redrawn
+track are edits to the <em>declared configuration</em>, applied before anything is sampled; withholding
+and profile-dragging are edits to <em>what was measured</em>, applied after. Both halves end up in the
+manifest, in order, so an edited run replays.</p>
+<h2>Building the control that exercises quality control showed it was doing nothing</h2>
+<p>The declared checks flag <strong>levels</strong>. The analysis consumes an <strong>interface depth</strong> derived from a
+profile. Until this beat, the flags stopped at the levels.</p>
+<p>Here is a nine-degree bias on the XBT — enough for the gross-range check to catch its warm
+levels:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>interface depth the analysis assimilated</th>
+<th>its error bar</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Unedited</td>
+<td>406.9 m</td>
+<td>0.8 m</td>
+</tr>
+<tr>
+<td>Biased, <strong>quality control on</strong></td>
+<td>691.3 m</td>
+<td>2.4 m</td>
+</tr>
+<tr>
+<td>Biased, quality control off</td>
+<td>691.3 m</td>
+<td>2.4 m</td>
+</tr>
+</tbody></table>
+<p>Three of twelve levels failed. The operator skipped them. The remaining biased levels produced
+an interface depth <strong>285 m wrong</strong>, with a two-metre error bar, and the analysis believed it —
+with the checks running. Quality control changed what the surface said and nothing at all about
+what was computed.</p>
+<p>The fix is small and declared: a profile more than a declared fraction of whose levels failed a
+check is not trusted at any depth, and the interface derived from it carries the failing check&#39;s
+flag so the analysis excludes it. (<code>outside-record</code> does not count towards that fraction: it
+says the truth <em>record</em> stopped, not that the instrument lied, and every XBT that overshoots the
+record carries one.)</p>
+<h2>And a gross bias is caught by the arithmetic, not by the check</h2>
+<p>Turn the bias up to forty degrees and something quieter happens. Every level is now far outside
+the two-layer thermal structure, so the profile never crosses the thermocline, so the operator
+returns a <em>bound</em> rather than a depth and the observation is flagged <code>unresolved</code> — <strong>whether or
+not quality control is running</strong>. The two runs are byte-identical, and a test asserts that they
+are.</p>
+<p>So for a warm bias, the gross-range check can never be the thing that catches it: any bias large
+enough to trip the check is also large enough for the operator to refuse the profile, and the
+operator gets there first. The error propagation does the work, because a level that constrains
+nothing acquires an enormous depth error through the arithmetic rather than through a rule
+somebody remembered to write.</p>
+<p>Quality control&#39;s value here is in what it <em>says</em>, not in what it excludes. That is worth
+knowing and it is not what anybody assumed.</p>
+<h2>What one measurement was worth</h2>
+<pre><code>withholding ownship-xbt/0000/interface at +24 h:
+  inside  0.093 -&gt; 0.021
+  outside -0.019 -&gt; -0.039
+</code></pre>
+<p>Withholding one XBT costs three quarters of the skill within 120 km of where it was dropped, and
+moves the rest of the domain by two hundredths. That is AT-03, and it is the clearest result
+this project has: not &quot;observations help&quot; but <em>this observation was worth this much, here</em>.</p>
+<h2>Dragging a profile, with the measurement kept</h2>
+<p>Select an XBT and drag a point: temperature across, depth down. The measured profile stays drawn
+behind the edit as a dashed ghost, because the reader is stating what the instrument <em>would</em> have
+read, not erasing what it did read — and a picture that forgot the measurement would make the
+difference field meaningless. The drag is constrained to keep the profile monotone, and it stops
+rather than reordering.</p>
+<p><img src="../images/010-profile-editor.png" alt="The profile editor, with the measured profile behind it and the model&#39;s derived profile beneath"></p>
+<p>AT-06 expects that edit to be visible at 24 hours and negligible at 96. Measured:</p>
+<pre><code>an edited profile moves the influence region by 33.05 m at +24 h and 29.65 m at +96 h (90%)
+anywhere in the domain:                        33.05 m           and 32.29 m           (98%)
+</code></pre>
+<p>The first half holds. The second does not: the anomaly is <strong>advected, not dissipated</strong>, and four
+days is not long enough for this model to forget it. The test prints both readings and says the
+decline is absent — the same posture beat 006 took with AT-02, for the same reason.</p>
+<h2>Small things worth recording</h2>
+<ul>
+<li><strong>The edit is applied when the pointer is released.</strong> Each application reruns the analysis and
+re-integrates six horizons — about a second and a half. Doing that per mouse-move would make
+the drag the slowest thing in the harness.</li>
+<li><strong>The difference is against a run at the same issue instant</strong>, recomputed rather than
+remembered, so a difference field shows the edit and not the edit plus twelve hours of
+staleness.</li>
+<li><strong>The vessel-speed rule stretches rather than refuses.</strong> A reader dragging a waypoint is asking
+&quot;what if we had gone there&quot;, not &quot;could we have got there by Tuesday&quot;. The stretch is stated.</li>
+<li><strong>Withheld marks are struck through, not removed</strong>, and a recomputation no longer collapses an
+enlarged panel — that one was the converse of the mistake FR-014 forbids, and it had been
+doing it since beat 007.</li>
+</ul>
+<p><img src="../images/010-run-status.png" alt="The run status: what the reader did, and the way back"></p>
+<h2>Where it stands</h2>
+<p>237 headless tests, 30 shell tests, seven gates. Beat 011 next: manifest replay, where an edited
+run has to come back byte for byte from the file that describes it.</p>
+
+      </article>
+    </main>
+    <footer>
+      <p>
+        j-ocean is a teaching harness. Its numerics are real but reduced, its domain small,
+        and its claims are about relative skill between references it computes itself. This
+        site is a claim about the tree; where the two disagree, the tree wins.
+      </p>
+    </footer>
+  </body>
+</html>

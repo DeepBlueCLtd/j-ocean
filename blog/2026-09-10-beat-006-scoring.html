@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Beat 006: the harness loses &middot; j-ocean</title>
+    <meta name="description" content="Skill against persistence and climatology, with provenance. The model is worse than a two-month average, the skill curve does not decline, and both are reported rather than tuned away." />
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="wordmark" href="../index.html">j-ocean</a>
+      <p class="disclaimer">Not an operational forecast system.</p>
+      <nav>
+        <a href="../index.html">Overview</a>
+        <a href="../architecture.html">Architecture</a>
+        <a href="../data-model.html">Data model</a>
+        <a href="../glossary.html">Glossary</a>
+        <a href="../deferred.html">Deferred</a>
+        <a href="../blog/index.html" class="active">Notes</a>
+        <a class="external" href="https://github.com/DeepBlueCLtd/j-ocean">Repository</a>
+      </nav>
+    </header>
+    <main>
+      <article>
+      <p class="post-date"><time datetime="2026-09-10">2026-09-10</time></p>
+<h1>Beat 006: the harness loses</h1>
+<blockquote>
+<p><strong>Correction, beat 009.</strong> Every skill figure below was computed with observations the
+forecast could not have had. The analysis at the issue instant was being handed <em>all</em> of the
+run&#39;s observations, including those taken after it, and beat 009 found and fixed it. The
+corrected figures are worse: the model is roughly no better than persistence. See
+<a href="2026-09-13-beat-009-two-axes.html">Beat 009: a forecast that was using measurements it could not have had</a>.
+The reasoning below stands; the numbers in it do not.</p>
+</blockquote>
+<p>Constitution Principle VI says the harness is built so that failure is a reportable result,
+and that a path by which the model cannot be shown to be worse than persistence is a defect.
+Up to this beat that was an aspiration. This is the beat where it got exercised, and the
+answer came back:</p>
+<pre><code>worse than climatology by 247.8 per cent
+</code></pre>
+<p>The surface prints that verbatim. It has no way to phrase it more kindly, because the sentence
+is constructed in the scorer and rendered as-is.</p>
+<h2>First, the error was mostly an offset</h2>
+<p>The first scored run gave a forecast error of 141 m and a climatology error of 27 m. That
+disparity was suspicious, and it was: both figures were dominated by a <em>bias</em>.</p>
+<p>The model&#39;s mean interface sits at 331 m — a declared 500 m layer, modulated by sea-surface
+height. The thermocline that the two-layer operator diagnoses from the truth record sits at
+224 m. A hundred metres of the hundred and forty being reported was that difference.</p>
+<p>A reduced-gravity model has no absolute reference for its free surface. That is exactly why
+the domain mean is removed at initialisation, and scoring has to use the same convention or it
+measures an offset that neither field claims to determine.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Raw</th>
+<th>As anomalies</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Forecast error at 24 h</td>
+<td>135 m</td>
+<td><strong>79 m</strong></td>
+</tr>
+<tr>
+<td>Skill against persistence at 24 h</td>
+<td>0.036</td>
+<td><strong>0.145</strong></td>
+</tr>
+</tbody></table>
+<p>The means removed are published beside every score. A reader is entitled to know that the
+model&#39;s mean interface is a hundred metres deeper than the truth&#39;s, and to decide for
+themselves what that means.</p>
+<h2>Then, the model still loses to a two-month average</h2>
+<p>Even compared as anomalies, the model&#39;s error is 79 m and climatology&#39;s is 28 m. A mean over
+sixty-one days of the same box beats a four-day forecast comfortably, at every lead time.</p>
+<p>The reason is an amplitude mismatch between two numbers that were declared separately and
+never checked against each other.</p>
+<p>The model maps sea-surface height to interface depth by <code>g/g&#39;</code>, which with a reduced gravity of
+0.02 m/s² is <strong>490</strong>. A ±0.5 m sea-surface anomaly therefore becomes ±245 m of interface
+displacement. The truth&#39;s thermocline, as the declared two-layer structure diagnoses it, moves
+about ±50 m across the same front.</p>
+<p><strong>The model&#39;s anomaly is roughly three times too large.</strong> Nothing in the code is wrong; two
+declared numbers disagree about the same ocean.</p>
+<p>The obvious move at that point is to lower <code>g&#39;</code> until the amplitudes match and the skill figure
+improves. That would be fitting the model to its own score, and it would make this test suite a
+description of what somebody hoped for. It is recorded as a finding for the author instead. It
+is a configuration change and a re-run, not a code change — which is the property Principle X
+exists to give.</p>
+<h2>And the skill curve does not decline</h2>
+<p>AT-02 expects skill against persistence to fall across the row. Here is the row:</p>
+<pre><code>  0 h  forecast 91.9 m  persistence 91.9 m  climatology 26.4 m  |  0.000  -2.478
+ 12 h  forecast 80.0 m  persistence 92.2 m  climatology 26.7 m  |  0.133  -1.994
+ 24 h  forecast 79.1 m  persistence 92.6 m  climatology 27.6 m  |  0.145  -1.863
+ 48 h  forecast 83.7 m  persistence 92.3 m  climatology 27.6 m  |  0.093  -2.032
+ 72 h  forecast 79.3 m  persistence 94.7 m  climatology 26.7 m  |  0.163  -1.965
+ 96 h  forecast 81.8 m  persistence 96.8 m  climatology 30.0 m  |  0.155  -1.730
+</code></pre>
+<p>It rises. 0.133 at twelve hours, 0.155 at ninety-six.</p>
+<p>The figures say why. The forecast&#39;s error sits at about 80 m at <em>every</em> lead time, while
+persistence&#39;s grows slowly from 92 m to 97 m — so the ratio improves with lead time. The
+forecast error is dominated by the standing amplitude mismatch above, not by anything that
+decays, and four days is not long enough for lead-time decay to become the larger of the two.</p>
+<p>The test asserts what is true, prints the six figures, and says out loud that AT-02&#39;s decline
+is absent:</p>
+<blockquote>
+<p>AT-02 expects this to be non-increasing. It is not: 12 h gives 0.133 and 96 h gives 0.155.
+The forecast error is roughly constant across the row while persistence&#39;s grows slowly, so
+the ratio improves. This is recorded as a finding for the author, not asserted away.</p>
+</blockquote>
+<p>There was a tolerance available that would have made &quot;non-increasing&quot; pass — the values wander
+by about 0.07, so a tolerance of 0.08 would have done it. That tolerance would have been larger
+than the quantity being measured, and it would have hidden the one interesting thing in the
+row.</p>
+<h2>What did work</h2>
+<p>Two things, and the second is the one this project exists for.</p>
+<p><strong>The identities hold.</strong> A forecast equal to the initial field scores exactly zero against
+persistence. A forecast equal to truth scores one against both. A deliberately bad forecast
+scores negative <em>and</em> the statement contains the words &quot;worse than persistence&quot;. A perfect
+reference gives <code>null</code> and the words &quot;persistence is perfect here&quot;, rather than infinity.</p>
+<p><strong>A measurement is worth something, locally.</strong> AT-03&#39;s scoring half:</p>
+<blockquote>
+<p>Within 120 km of the third XBT drop, skill against persistence is <strong>0.335</strong> over 1 836 cells.
+Outside it, <strong>0.110</strong> over 5 722.</p>
+</blockquote>
+<p>That is the harness doing the thing it was built to do: pricing a measurement, in the
+neighbourhood where it was taken.</p>
+<h2>Provenance, because a score without it is an assertion</h2>
+<p><img src="../images/006-score.png" alt="The score panel: the statement verbatim, both references, the full provenance, the offsets removed, and the independence caveat"></p>
+<p>A <code>Score</code> cannot be constructed without provenance — reference, region, margin, window, metric,
+resolution floor, truth source, and the independence caveat. Every number on it is a <code>Figure</code>
+carrying its kind, and a test round-trips the whole object through JSON and asserts the kinds
+survive.</p>
+<p>The caveat, printed beside the figure and not in a document the surface does not carry:</p>
+<blockquote>
+<p>the analysis assimilated 15 external observations (Argo) inside this window, and the truth
+record this score is computed against assimilated the same profiles. Skill measured this way
+is not independent evidence. ADR-0007 records the choice and how to reverse it.</p>
+</blockquote>
+<p>And four refusals rather than four plausible numbers: a region finer than the truth&#39;s own
+resolution (<em>&quot;scoring inside it would be scoring interpolation, not the ocean&quot;</em>), a valid
+instant outside the record, a region with nothing in it, and division by a perfect reference.</p>
+<h2>M2</h2>
+<p>That completes <strong>M2, headless science</strong>: the harness has an answer before it has a picture. It
+is not the answer anybody was hoping for, which is rather the point — the first thing this
+machinery did once it could score anything was tell us that the model we had just built is
+worse than an average.</p>
+<p>Next: the horizon row. Six panels, the attribution as a field, and gate G-05 checking in a
+running browser that every declared horizon is drawn and no other.</p>
+
+      </article>
+    </main>
+    <footer>
+      <p>
+        j-ocean is a teaching harness. Its numerics are real but reduced, its domain small,
+        and its claims are about relative skill between references it computes itself. This
+        site is a claim about the tree; where the two disagree, the tree wins.
+      </p>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Beat 012: the beat that reports it should not be built yet &middot; j-ocean</title>
+    <meta name="description" content="Adaptive sampling was deferred behind a trigger. Twelve beats later the trigger is measured rather than remembered — and two of its three conditions fail, for one shared reason." />
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="wordmark" href="../index.html">j-ocean</a>
+      <p class="disclaimer">Not an operational forecast system.</p>
+      <nav>
+        <a href="../index.html">Overview</a>
+        <a href="../architecture.html">Architecture</a>
+        <a href="../data-model.html">Data model</a>
+        <a href="../glossary.html">Glossary</a>
+        <a href="../deferred.html">Deferred</a>
+        <a href="../blog/index.html" class="active">Notes</a>
+        <a class="external" href="https://github.com/DeepBlueCLtd/j-ocean">Repository</a>
+      </nav>
+    </header>
+    <main>
+      <article>
+      <p class="post-date"><time datetime="2026-09-16">2026-09-16</time></p>
+<h1>Beat 012: the beat that reports it should not be built yet</h1>
+<p>The last feature in the plan is adaptive sampling: perturb the observations within their
+declared error, integrate an ensemble, steer the vessel toward where the members disagree, and
+race that against a lawnmower track.</p>
+<p>It was deferred from the start, behind a trigger somebody wrote down:</p>
+<blockquote>
+<p>once scoring and the counterfactuals are landed and trusted, since the paired experiment is
+worthless without a skill score anyone believes. &quot;Trusted&quot; means AT-02, AT-03 and AT-06 have
+passed and been watched in the shell.</p>
+</blockquote>
+<p>So the work of this beat was to find out whether that had happened. It has not.</p>
+<h2>Measured, not judged</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>State</th>
+<th>Measured</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>AT-02</strong> — skill declines across the row</td>
+<td>not met</td>
+<td>0.000, −0.067, 0.089, −0.070, 0.024, −0.057. Positive at 24 h, as the central claim requires; the decline is absent.</td>
+</tr>
+<tr>
+<td><strong>AT-03</strong> — one measurement is worth something, locally</td>
+<td><strong>met</strong></td>
+<td>withholding one XBT takes local skill from 0.093 to 0.021 within 120 km of it, and moves the rest of the domain by two hundredths.</td>
+</tr>
+<tr>
+<td><strong>AT-06</strong> — an edit propagates near and fades far</td>
+<td>not met</td>
+<td>the edit moves the near horizon by 33.05 m and the far one by 32.29 m: 98 per cent of it.</td>
+</tr>
+</tbody></table>
+<p>Two of the three fail for the <strong>same</strong> reason, and it is not a defect in any code. The declared
+reduced gravity and the declared thermal structure disagree about amplitude: the model&#39;s
+interface anomaly is roughly three times the thermocline displacement the truth record carries,
+about a mean that is too deep. Beat 006 found it in the scores, beat 008 showed it as two
+profiles side by side, and beat 009 removed the future observations that had been flattering the
+figures.</p>
+<h2>Why building it anyway would have been worse</h2>
+<p>The paired experiment&#39;s entire content is <em>which track scored better</em>. Steering by a sensitivity
+field and then scoring the result with a skill score that is roughly zero, from a model that is
+worse than climatology at every horizon, produces a number with a winner in it and no
+information.</p>
+<p>ADR-0011 called that an advertisement before any of this was measured. The measurement has not
+changed the argument; it has only made it checkable.</p>
+<h2>A trigger that is measured on every run</h2>
+<p>The obvious failure mode for a deferral is that it becomes a decision nobody revisits. So the
+trigger is a test. It measures all three acceptance tests, asserts the state each is <em>actually</em>
+in, and prints the verdict in one place.</p>
+<p>Which means it <strong>fails when the figures improve</strong> — and its assertion messages say so:</p>
+<pre><code>if this is now true, AT-02 may be met: see ADR-0011 and plan beat 012
+</code></pre>
+<p>The day that test goes red is the day to plan the beat, not the day to relax the test.</p>
+<h2>And the deferrals go on the surface</h2>
+<p>All four of them, each with its trigger, where a reader meets the run:</p>
+<p><img src="../images/012-deferrals.png" alt="The four deferrals, each with the trigger that would end it"></p>
+<p>Two of those entries say something more specific than &quot;not yet&quot;. Dynamic depth levels are
+deferred behind a question about vertical structure <em>evolving in time</em> — and beat 008&#39;s visible
+disagreement between an XBT and the model&#39;s derived profile is explicitly <strong>not</strong> that trigger,
+because it is a static offset that advected structure would not move. A GPU kernel is deferred
+behind the frame budget binding, and at 100 × 100 it does not.</p>
+<p>Leaving those off the page would make the harness look more capable than it is, which is the
+failure mode this project has spent most of its effort avoiding.</p>
+<h2>Twelve beats</h2>
+<p>Every beat found something. In order: an ADR whose stability arithmetic was wrong twice; a
+truth record with two nine-hour gaps that had to be declared rather than smoothed; a leapfrog
+scheme unconditionally unstable for diffusion; a quality-control tolerance below the instrument
+noise it was checking; a single observation carrying 202 per cent of the weight in its own cell;
+a model worse than climatology by 250 per cent; a row that passed its tests while showing four
+and a half of six panels; five Argo profiles that measured nothing and were drawn as though they
+had; an analysis reading observations from its own future; quality control that had never
+excluded anything; and an analysis that meant two different things depending on when it was
+computed.</p>
+<p>None of those was found by inspection. Each was found because something in the tree measures
+what it claims and prints the figure beside the claim.</p>
+<p>The last one is this: the last feature should not be built yet, and here is the number that says
+so.</p>
+<p><strong>Seven questions remain for the author</strong>, in
+<a href="https://github.com/DeepBlueCLtd/j-ocean/blob/main/docs/questions-for-the-author.md"><code>docs/questions-for-the-author.md</code></a>.
+The first of them, settled, would change most of the rest.</p>
+
+      </article>
+    </main>
+    <footer>
+      <p>
+        j-ocean is a teaching harness. Its numerics are real but reduced, its domain small,
+        and its claims are about relative skill between references it computes itself. This
+        site is a claim about the tree; where the two disagree, the tree wins.
+      </p>
+    </footer>
+  </body>
+</html>

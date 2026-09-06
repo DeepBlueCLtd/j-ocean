@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Architecture &middot; j-ocean</title>
+    <meta name="description" content="The three rings, the four ports, and the seven gates that hold the boundaries between them." />
+    <link rel="stylesheet" href="assets/style.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="wordmark" href="index.html">j-ocean</a>
+      <p class="disclaimer">Not an operational forecast system.</p>
+      <nav>
+        <a href="index.html">Overview</a>
+        <a href="architecture.html" class="active">Architecture</a>
+        <a href="data-model.html">Data model</a>
+        <a href="glossary.html">Glossary</a>
+        <a href="deferred.html">Deferred</a>
+        <a href="blog/index.html">Notes</a>
+        <a class="external" href="https://github.com/DeepBlueCLtd/j-ocean">Repository</a>
+      </nav>
+    </header>
+    <main>
+<h1>Architecture</h1>
+<p>j-ocean is one TypeScript codebase, observable in one browser, with a single permitted
+second runtime — Python, for data preparation, as a build step and never at run time.</p>
+<h2>The dependency direction</h2>
+<p>The direction is one way and the gates are what keep it that way.</p>
+<pre><code>config  -&gt;  ports  -&gt;  model  -&gt;  instruments  -&gt;  analysis  -&gt;  scoring  -&gt;  harness
+                          \__________ run __________/
+</code></pre>
+<ul>
+<li><code>src/model/</code> imports the ports and nothing above them. It runs under vitest in Node with
+no DOM present, and that is a test rather than a convention.</li>
+<li><code>src/run/</code> owns determinism: the root seed, the RNG, the clock&#39;s advance handle and the
+kernel&#39;s stream. The model is handed a state and a step context and reaches for nothing.</li>
+<li><code>src/harness/</code> reads published fields through a declared results interface. Enlarging a
+panel or hovering a cell changes what is shown and never what is computed.</li>
+</ul>
+<h2>The four ports</h2>
+<p>A port is an interface with more than one <em>conceivable</em> implementation. There are four,
+<code>src/ports/</code> holds exactly those four, and a test fails if a fifth appears.</p>
+<table>
+<thead>
+<tr>
+<th>Port</th>
+<th>State in, what out</th>
+<th>Second implementation it is waiting for</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Model kernel</strong></td>
+<td>A state and a step context; the state advanced in place</td>
+<td>A GPU kernel, accepted against the CPU reference to a recorded tolerance</td>
+</tr>
+<tr>
+<td><strong>RNG</strong></td>
+<td>A name; an independently seeded stream</td>
+<td>A different generator family, or a recorded stream replayed from a file</td>
+</tr>
+<tr>
+<td><strong>Clock</strong></td>
+<td>Nothing; the simulation instant</td>
+<td>Any clock whose step is not a fixed interval</td>
+</tr>
+<tr>
+<td><strong>Truth source</strong></td>
+<td>A position, depth, instant and variable; a value</td>
+<td>Another reanalysis beside the committed HYCOM subset</td>
+</tr>
+</tbody></table>
+<p>Nothing else is dressed as a port. The analysis scheme, the renderer, the observation
+record format and the manifest format are choices, not ports, and introducing an
+abstraction over one of them requires an architecture decision record arguing why.</p>
+<h2>Determinism, and the two exemptions</h2>
+<p>All stochastic behaviour derives from seeded streams recorded in a run manifest, and a run
+reproduces from its manifest byte-identically for the same code version. Streams are named
+and derived from the root seed, so a stream is independent of every other stream&#39;s draw
+order, and asking twice for the same name replays it from the start rather than continuing
+it.</p>
+<p>The host clock is read in exactly two modules, each carrying an inline marker that the
+host-time gate honours nowhere else:</p>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Why</th>
+<th>What is done with the figure</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>src/harness/timing.ts</code></td>
+<td>Step-time measurement</td>
+<td>Reported, typographically marked as host time, never integrated</td>
+</tr>
+<tr>
+<td><code>src/harness/seed-provisioning.ts</code></td>
+<td>One entropy draw, before any run exists</td>
+<td>Written into a manifest; a run never reads entropy</td>
+</tr>
+</tbody></table>
+<p>A third request is evidence the principle is being eroded and has to be argued on its own
+merits, never by analogy.</p>
+<h2>The gates</h2>
+<p>Gates live in <code>scripts/gates/</code> and run with one command, <code>pnpm gates</code>. Gates that have not
+yet landed are <em>named</em> by the runner rather than omitted, because a gate absent because its
+beat has not happened is a known hole with a date on it, while a gate present but not run
+is a hole that looks like a pass.</p>
+<table>
+<thead>
+<tr>
+<th>Gate</th>
+<th>What it holds</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>G-01</td>
+<td>Truth and observation artefacts regenerate identically</td>
+<td>Build-step diff against a digest-verified raw subset</td>
+</tr>
+<tr>
+<td>G-02</td>
+<td>No truth value reaches the analysis except through an instrument</td>
+<td>Import boundary, single construction site, and a behavioural test</td>
+</tr>
+<tr>
+<td>G-03</td>
+<td>The model imports no rendering module</td>
+<td>Import scan over <code>src/model/</code></td>
+</tr>
+<tr>
+<td>G-04</td>
+<td>No host clock and no unseeded randomness in operational code</td>
+<td>Source scan with a bounded exemption marker</td>
+</tr>
+<tr>
+<td>G-05</td>
+<td>Every declared horizon is rendered, and no other</td>
+<td>Playwright, against the running shell</td>
+</tr>
+<tr>
+<td>G-06</td>
+<td>Attribution is read from the analysis&#39;s own weights</td>
+<td>Single construction site, no writer in the harness</td>
+</tr>
+<tr>
+<td>vocabulary</td>
+<td>No tracked entities, no customer material</td>
+<td>Word list beside the gate, half plaintext and half hashed</td>
+</tr>
+</tbody></table>
+<p>Each has a directory of planted violations under <code>scripts/gates/fixtures/</code>, and the test
+suite runs every gate against its fixture and requires it to fail.</p>
+<h2>Why the word list has two halves</h2>
+<p>A list of words that must not appear in the repository cannot itself be a list of those
+words. So the tracked-entity vocabulary is plaintext, with a reviewed exemption for the
+documents whose subject <em>is</em> the prohibition; and customer, project or bid material is a
+salted SHA-256 with no exemption anywhere, checked by hashing every word and adjacent word
+pair of every scanned file. A hit on the hashed half is reported without quoting the line
+back.</p>
+
+    </main>
+    <footer>
+      <p>
+        j-ocean is a teaching harness. Its numerics are real but reduced, its domain small,
+        and its claims are about relative skill between references it computes itself. This
+        site is a claim about the tree; where the two disagree, the tree wins.
+      </p>
+    </footer>
+  </body>
+</html>

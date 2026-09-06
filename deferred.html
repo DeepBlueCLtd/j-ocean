@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Deferred &middot; j-ocean</title>
+    <meta name="description" content="What this harness does not do, why, and exactly what would have to be true before it did." />
+    <link rel="stylesheet" href="assets/style.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="wordmark" href="index.html">j-ocean</a>
+      <p class="disclaimer">Not an operational forecast system.</p>
+      <nav>
+        <a href="index.html">Overview</a>
+        <a href="architecture.html">Architecture</a>
+        <a href="data-model.html">Data model</a>
+        <a href="glossary.html">Glossary</a>
+        <a href="deferred.html" class="active">Deferred</a>
+        <a href="blog/index.html">Notes</a>
+        <a class="external" href="https://github.com/DeepBlueCLtd/j-ocean">Repository</a>
+      </nav>
+    </header>
+    <main>
+<h1>Deferred, and what would trigger it</h1>
+<p>Four capabilities are <strong>assessed, deferred and cheap to adopt</strong>. That posture is a requirement
+rather than a habit: a deferral without a trigger is a wish, and a deferral without an
+assessment is an excuse. Each has an ADR, each quotes its trigger, and one of them is
+<em>measured</em> on every test run.</p>
+<h2>Adaptive sampling — the trigger is measured, and not met</h2>
+<p>Perturb the observations within their declared error, integrate an ensemble, and steer the
+vessel toward where the members disagree; then race that against a lawnmower track and report
+which won.</p>
+<p>The trigger is that <strong>scoring be trusted</strong>, and the development plan says what that means:
+AT-02, AT-03 and AT-06 have passed. <code>tests/run/deferral-trigger.test.ts</code> measures all three on
+every run:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>State</th>
+<th>Measured</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>AT-02</strong> — skill declines across the row</td>
+<td>not met</td>
+<td>0.000, −0.067, 0.089, −0.070, 0.024, −0.057. Positive at 24 h, as the central claim requires; the decline is absent.</td>
+</tr>
+<tr>
+<td><strong>AT-03</strong> — one measurement is worth something, locally</td>
+<td><strong>met</strong></td>
+<td>withholding one XBT takes local skill from 0.093 to 0.021 within 120 km of it, and moves the rest of the domain by two hundredths.</td>
+</tr>
+<tr>
+<td><strong>AT-06</strong> — an edit propagates near and fades far</td>
+<td>not met</td>
+<td>the edit moves the near horizon by 33.05 m and the far one by 32.29 m: 98 per cent of it. Advected, not dissipated.</td>
+</tr>
+</tbody></table>
+<p>Two of the three fail for the <strong>same reason</strong>, and it is not a defect in any code: the declared
+reduced gravity and the declared thermal structure disagree about amplitude, so the model&#39;s
+interface anomaly is roughly three times the thermocline displacement the truth record carries,
+about a mean that is too deep. That is <a href="https://github.com/DeepBlueCLtd/j-ocean/blob/main/docs/questions-for-the-author.md">question 1 for the author</a>.</p>
+<p>An adaptive-sampling result steered by a skill score in that state would be an advertisement,
+which is exactly what ADR-0011 was written to avoid. The specification for the beat exists in
+full — written <em>before</em> the trigger was met, so that the capability is not re-invented from
+scratch on the day it is.</p>
+<p><strong>The trigger test asserts the current state, so it fails when the figures improve.</strong> That is
+deliberate. The day it fails is the day to plan the beat, and the assertion says so rather than
+leaving somebody to relax it.</p>
+<h2>Dynamic depth levels</h2>
+<p>Vertical structure that is advected rather than diagnosed. The trigger is a question about
+vertical structure <em>evolving in time</em> — a counterfactual whose answer the harness cannot give.</p>
+<p>Beat 008 put the measured profile beside the model&#39;s derived one and they disagree plainly: the
+probe&#39;s thermocline is near 300 m and the model&#39;s near 590 m. <strong>That is not the trigger.</strong> It is
+a static offset — the interface is in the wrong place, not resolved at the wrong number of
+levels — and advected vertical structure would not move it. The deferral now stands on that
+observation rather than on an assumption.</p>
+<h2>A GPU kernel</h2>
+<p>The trigger is the declared frame budget binding at a grid somebody wants. At 100 × 100 it does
+not: the kernel port is <code>createState</code> and <code>step</code>, a second kernel is accepted only against the
+CPU reference to a tolerance recorded before anybody is invested in it, and that acceptance path
+already exists.</p>
+<h2>Observation latency and arrival order</h2>
+<p>Observations arriving <em>late</em> rather than not at all. Withholding is its special case, and beat
+010 built that, which is why this one&#39;s trigger is the withhold counterfactual being in use.</p>
+<hr>
+<p>Each of these is an ADR in <a href="https://github.com/DeepBlueCLtd/j-ocean/tree/main/docs/adr"><code>docs/adr/</code></a>,
+written in the same shape: what it would be, why it is deferred, why it stays cheap, what the
+trigger is, and what the honest limitation is in the meantime. The surface states all four where
+a reader meets the run, because leaving them off would make the harness look more capable than it
+is.</p>
+
+    </main>
+    <footer>
+      <p>
+        j-ocean is a teaching harness. Its numerics are real but reduced, its domain small,
+        and its claims are about relative skill between references it computes itself. This
+        site is a claim about the tree; where the two disagree, the tree wins.
+      </p>
+    </footer>
+  </body>
+</html>

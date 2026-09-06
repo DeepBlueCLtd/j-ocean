@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Beat 001: a foundation you can watch fail &middot; j-ocean</title>
+    <meta name="description" content="Four ports, a manifest that holds no state, and three gates that were planted with violations before anybody trusted them." />
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="wordmark" href="../index.html">j-ocean</a>
+      <p class="disclaimer">Not an operational forecast system.</p>
+      <nav>
+        <a href="../index.html">Overview</a>
+        <a href="../architecture.html">Architecture</a>
+        <a href="../data-model.html">Data model</a>
+        <a href="../glossary.html">Glossary</a>
+        <a href="../deferred.html">Deferred</a>
+        <a href="../blog/index.html" class="active">Notes</a>
+        <a class="external" href="https://github.com/DeepBlueCLtd/j-ocean">Repository</a>
+      </nav>
+    </header>
+    <main>
+      <article>
+      <p class="post-date"><time datetime="2026-09-05">2026-09-05</time></p>
+<h1>Beat 001: a foundation you can watch fail</h1>
+<p>The first beat of j-ocean delivers no ocean. It delivers the shape every later beat fills
+in, and the proof that the shape is enforced. Three decisions in it are worth writing down,
+because each one was a choice between something obvious and something slightly awkward, and
+in all three the awkward option was right.</p>
+<h2>The manifest holds no state</h2>
+<p>A run manifest records the root seed, every derived seed, the generator version, the clock
+configuration, the configuration digest and the step count. It does not record the fields.</p>
+<p>The obvious design records a snapshot, because then &quot;replay&quot; is fast and cannot go wrong.
+That is exactly the problem: a snapshot compared with itself proves nothing. What the
+requirements ask for is that a run <em>reproduces</em> from its manifest, and the only test of
+that is to rebuild the run by re-computation and compare the result byte for byte.</p>
+<pre><code>tests/run/replay.test.ts
+  rebuilds a run from its manifest byte-identically at 1,000 steps
+  replays a run that was itself started from a drawn seed
+  does not replay a different seed into the same state
+  does not replay a different number of steps into the same state
+  advances in pieces exactly as it advances in one call
+</code></pre>
+<p>The last three are the ones that matter. A determinism test with no negative half passes
+just as happily when the machinery is broken.</p>
+<h2>Streams are named, not counted</h2>
+<p>The RNG port hands out named streams. A stream&#39;s seed is derived from the root seed and the
+stream&#39;s name — <code>splitmix64(rootSeed XOR fnv1a64(name))</code> — and never from a counter or a
+call order.</p>
+<p>Two properties fall out of that rather than being arranged. A component&#39;s values do not
+depend on whether some other component drew first, so adding a draw in one place cannot
+silently change the numbers somewhere else. And asking twice for the same name replays that
+stream <em>from the start</em>, because <code>stream(name)</code> is a construction and not a lookup.</p>
+<p>A single shared generator handed out to callers has neither property, and a run whose
+determinism depends on call order is reproducible in theory and not in practice.</p>
+<h2>The trivial kernel draws from its stream</h2>
+<p>Beat 001&#39;s kernel is a placeholder: a scalar tracer diffusing on a periodic grid, replaced
+outright by the reduced-gravity model in beat 003. It would have been simpler to make it
+purely deterministic arithmetic.</p>
+<p>It draws two values from its stream every step instead, and that is deliberate. A kernel
+that ignored its stream would replay identically no matter how broken the RNG was, and the
+replay test would pass for the wrong reason for however many beats it took somebody to
+notice.</p>
+<h2>The gates, watched failing</h2>
+<p>A check that has never been seen to fail is worth nothing. Each of the three gates in this
+beat was planted with a violation, watched failing, cleaned, and watched passing:</p>
+<pre><code>FAIL  G-04 host time and unseeded randomness  (1 file scanned)
+      src/model/planted.ts:3:10  Date.now is a host read; constitution Principle I:
+      simulation time comes from the clock port and every generator from the RNG port
+        return Date.now() - startedAt;
+</code></pre>
+<p><code>tests/gates/gates.test.ts</code> keeps doing it, and spawns each gate as a <em>program</em> rather than
+calling its function, so that an argument-parsing or exit-code mistake is caught too. It
+also asserts each gate scanned a non-zero number of files, because a gate that passes
+because its walk found nothing is the most comfortable kind of broken.</p>
+<h3>The word list problem</h3>
+<p>The vocabulary gate holds a list of words that must not appear in the repository. Some of
+those words are customer names, which must not appear in the repository — including in the
+word list.</p>
+<p>So the list has two halves. The tracked-entity vocabulary is plaintext, with a reviewed
+exemption for the documents whose subject <em>is</em> the prohibition. Customer material is a
+salted SHA-256, checked by hashing every word and adjacent word pair of every scanned file,
+with no exemption anywhere. A hit on the hashed half is reported without quoting the line
+back:</p>
+<pre><code>FAIL  forbidden vocabulary  (1 file scanned)
+      src/planted.md:4  a term on the hashed forbidden list appears here (Principle VII)
+        (the line is not quoted, because the word on it must not be)
+</code></pre>
+<h2>What the shell says</h2>
+<p><img src="../images/001-shell-on-arrival.png" alt="The j-ocean shell on arrival, showing the not-operational statement, the run&#39;s root seed and the manifest it replays from"></p>
+<p>The page states its seed, whether this is the recorded case, and the manifest it would
+replay from. The statement of what j-ocean is not is the first thing in the document and
+has no dismiss control, because nothing about it stops being true while the page is open.</p>
+<p>Declared, computed and host-time figures are typographically distinct from this beat
+onwards, so that the horizon row in beat 007 inherits the convention rather than inventing
+one.</p>
+<h2>What it cost</h2>
+<p>Fourteen source files, seven Playwright tests, seventy-one headless ones, and a CI failure
+worth recording: the shell job timed out waiting on its own preview server, because
+Playwright polled <code>127.0.0.1</code> while <code>vite preview</code> had been left on its default host of
+<code>localhost</code> — which on a GitHub runner resolves to <code>::1</code> first. The development machine has
+no IPv6 loopback at all, which is precisely why the same command passed locally and hung in
+CI. Naming the host on both sides removed the resolution from the question.</p>
+<p>Next: the truth record. Two external datasets, both freely obtainable, converted at build
+time and committed as derived artefacts with a drift gate over them.</p>
+
+      </article>
+    </main>
+    <footer>
+      <p>
+        j-ocean is a teaching harness. Its numerics are real but reduced, its domain small,
+        and its claims are about relative skill between references it computes itself. This
+        site is a claim about the tree; where the two disagree, the tree wins.
+      </p>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Beat 008: five profiles that measured nothing, drawn as though they had &middot; j-ocean</title>
+    <meta name="description" content="The observation footprint — the track, needles at the depths actually reached, and everything flagged drawn as flagged. Drawing the observations found a defect in what the harness said about them." />
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="wordmark" href="../index.html">j-ocean</a>
+      <p class="disclaimer">Not an operational forecast system.</p>
+      <nav>
+        <a href="../index.html">Overview</a>
+        <a href="../architecture.html">Architecture</a>
+        <a href="../data-model.html">Data model</a>
+        <a href="../glossary.html">Glossary</a>
+        <a href="../deferred.html">Deferred</a>
+        <a href="../blog/index.html" class="active">Notes</a>
+        <a class="external" href="https://github.com/DeepBlueCLtd/j-ocean">Repository</a>
+      </nav>
+    </header>
+    <main>
+      <article>
+      <p class="post-date"><time datetime="2026-09-12">2026-09-12</time></p>
+<h1>Beat 008: five profiles that measured nothing, drawn as though they had</h1>
+<p>The harness has never been allowed to sample truth except through an instrument. This beat
+draws what those instruments did: where the vessel went, what it measured on the way, how deep
+each probe actually got, and which observations failed a check.</p>
+<p><img src="../images/008-footprint-row.png" alt="The row with the footprint over every panel: the track, its measurements, and depth-coded glyphs for each profile"></p>
+<h2>Drawing the observations found a defect in what we said about them</h2>
+<p>The recorded case carries twenty-five Argo profiles. <strong>Five of them report a temperature at no
+level at all</strong> — every level null, with an Argo quality flag of 4. They are delayed-mode files
+from a single float; they have real positions and real instants and no usable measurement.</p>
+<p>Beat 004 handled them correctly where it mattered. The <em>derived</em> interface-depth observation —
+the thing the analysis consumes — is flagged <code>unresolved</code>, is not usable, and is excluded from
+the analysis and recorded as excluded. No number anywhere was wrong.</p>
+<p>But the flag lived on the derived observation, and the thing the footprint draws is the
+<strong>profile</strong>, which carried no flag at all. Drawn faithfully, a profile that measured nothing
+would have looked exactly like one that measured everything, and its needle would have had zero
+extent — which reads as a probe that reached the surface and stopped.</p>
+<p>So the flag moved to where the drawing is. Any profile with no usable level now carries
+<code>unresolved</code> in its own right, the footprint marks it as having measured nothing, and it is
+drawn as a cross at the surface rather than a needle of no length.</p>
+<p>Nothing about the analysis changed, and that is the point. This was a defect in what the
+harness <em>said</em>, not in what it computed, and it only became visible when somebody had to draw
+it.</p>
+<h2>Needles at the depths actually reached</h2>
+<p>At row width a drop is a glyph whose length is the depth it reached — never an
+undifferentiated dot, because a drop flattened to the surface discards the dimension it exists
+for. Enlarge a panel and it gains a depth elevation: one needle per profile, extending exactly
+as far as that probe got, with a tick at every level it sampled and a barb where a float
+carried on past the floor of the displayed volume.</p>
+<p><img src="../images/008-needles.png" alt="An enlarged panel with its depth elevation: XBT needles to about 660 m, Argo needles running past the floor, and five crosses for the profiles that measured nothing"></p>
+<p>The projection is a <strong>side elevation</strong>, not a scene: it shares the field&#39;s horizontal axis and
+puts depth downward, so latitude is not shown. That is a real loss and the caption says so — a
+perspective volume would have implied a viewpoint and a set of distances the harness does not
+have, and would have made a needle&#39;s length depend on where the reader was standing rather
+than on how deep the probe went.</p>
+<p>An XBT infers its depth from a fall-rate equation, so no two of these reach the same depth and
+none reaches the depth it was asked for: 665 m for a probe asked for 650, 613 m for one asked
+for 600. The needle is drawn to what it reached.</p>
+<h2>The derived profile, beside the measurement</h2>
+<p>Hover — or click, which pins it — and the panel shows the measured profile beside the model&#39;s
+own diagnosed one, with every level&#39;s kind on it.</p>
+<p><img src="../images/008-profile-comparison.png" alt="The measured profile beside the model derived profile, each level labelled computed or derived"></p>
+<p>They disagree, plainly:</p>
+<table>
+<thead>
+<tr>
+<th>Depth</th>
+<th>Measured</th>
+<th>Model</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0 m</td>
+<td>27.99 °C</td>
+<td>26.00 °C <em>(computed)</em></td>
+</tr>
+<tr>
+<td>200 m</td>
+<td>19.83 °C at 196 m</td>
+<td>26.00 °C <em>(derived)</em></td>
+</tr>
+<tr>
+<td>400 m</td>
+<td>16.68 °C at 394 m</td>
+<td>25.43 °C <em>(derived)</em></td>
+</tr>
+<tr>
+<td>600 m</td>
+<td>14.20 °C at 613 m</td>
+<td>11.05 °C <em>(derived)</em></td>
+</tr>
+<tr>
+<td>700 m</td>
+<td>13.96 °C at 665 m</td>
+<td>8.30 °C <em>(computed)</em></td>
+</tr>
+</tbody></table>
+<p>The probe&#39;s thermocline is near 300 m. The model&#39;s is near 590 m.</p>
+<p>This is exactly the situation SRD §10 described: <em>a reader sees the derived profile disagree
+with the XBT beside it, and it is a finding rather than a defect, because the surface said the
+profile was derived.</em> That label is on every interpolated level, in its own typographic style,
+and it was there before the capability to do better was.</p>
+<p>It is <strong>not</strong> the trigger for adopting dynamic depth levels. That trigger is a question about
+vertical structure evolving in time; this is a static offset — the interface is in the wrong
+<em>place</em>, not resolved at the wrong number of levels, and advected vertical structure would not
+move it. The cause is the mismatch beat 006 traced between two declared numbers, the reduced
+gravity and the thermal structure, which makes the model&#39;s interface anomaly about three times
+too large about a mean that is already too deep. ADR-0009 now records the observation and says
+the deferral stands for a reason that is evidence rather than assumption.</p>
+<h2>What was rejected is part of what was done</h2>
+<p>Eleven of the fifty-six observations in the recorded case carry a flag, and every one is drawn.
+A flagged mark is white-filled inside a ring where an unflagged one is filled dark, so the
+distinction is a luminance difference and survives a monochrome print. The test measures it on
+the rendered pixels: <strong>218.4</strong> of 255, against a declared margin of 40.</p>
+<p>Two smaller things worth recording. Every panel now carries a visually hidden <strong>list</strong> of its
+marks — one entry per observation, with kind, flag state and position — because a canvas says
+nothing to a reader who cannot see it, and nothing to a test either; the counts in the shell
+tests are asserted against that list. And measured levels are matched to the model&#39;s display
+levels <strong>by depth, not by index</strong>: an XBT&#39;s declared depths and the model&#39;s declared display
+levels happen to be nearly the same list, but an Argo profile&#39;s five hundred levels are not,
+and lining them up by position would have invented a correspondence.</p>
+<h2>Where it stands</h2>
+<p>217 headless tests, 23 shell tests, seven gates. Beat 009 gives the row a second axis: the
+shore forecast, and what a forecast is worth when it was issued rather than when it was scored.</p>
+
+      </article>
+    </main>
+    <footer>
+      <p>
+        j-ocean is a teaching harness. Its numerics are real but reduced, its domain small,
+        and its claims are about relative skill between references it computes itself. This
+        site is a claim about the tree; where the two disagree, the tree wins.
+      </p>
+    </footer>
+  </body>
+</html>

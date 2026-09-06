@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Beat 007: six panels, and the test that was counting instead of measuring &middot; j-ocean</title>
+    <meta name="description" content="The row is the primary surface — one panel per declared horizon, all visible at once. It passed its tests while showing four and a half panels, because nothing was measuring geometry." />
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="wordmark" href="../index.html">j-ocean</a>
+      <p class="disclaimer">Not an operational forecast system.</p>
+      <nav>
+        <a href="../index.html">Overview</a>
+        <a href="../architecture.html">Architecture</a>
+        <a href="../data-model.html">Data model</a>
+        <a href="../glossary.html">Glossary</a>
+        <a href="../deferred.html">Deferred</a>
+        <a href="../blog/index.html" class="active">Notes</a>
+        <a class="external" href="https://github.com/DeepBlueCLtd/j-ocean">Repository</a>
+      </nav>
+    </header>
+    <main>
+      <article>
+      <p class="post-date"><time datetime="2026-09-11">2026-09-11</time></p>
+<h1>Beat 007: six panels, and the test that was counting instead of measuring</h1>
+<p>The harness has had an answer since beat 006. This is the beat where a reader can see it: six
+panels, one per declared horizon, left to right in lead-time order, each stating what instant
+it is valid for, what it was initialised from, what its skill is against both references, and
+where its answer came from.</p>
+<p><img src="../images/007-horizon-row.png" alt="The row: six panels at the declared horizons, each with its absolute instants and both skill figures"></p>
+<h2>Why a row</h2>
+<p>ADR-0003 records the argument, and it is short. A <strong>slider</strong> shows one lead time and asks the
+reader to remember the others; what is not on screen is what the eye forgets, and a claim
+about a trend delivered one frame at a time is a claim taken on trust — which is the thing
+this harness exists not to require. A <strong>grid</strong> loses the axis: lead time is one-dimensional
+and monotone, and two rows of three invents a second ordering the data does not have while
+putting +24 h directly above +96 h.</p>
+<p>The row keeps the axis and pays for it in panel size. Enlarge in place is the answer to that,
+and it is deliberately not a modal — an enlargement that hid the row would be a slider with
+extra steps.</p>
+<p><img src="../images/007-enlarged.png" alt="One panel enlarged; the other five stay visible and shrink to their declared minimum"></p>
+<h2>The row passed its tests and did not fit</h2>
+<p>The first version was tested: six panels, in horizon order, each with its instants and its
+scores, asserted in a browser. All green. It was also showing four and a half panels.</p>
+<p>The page&#39;s prose column is 46 rem, six panels at a legible width need about 1 200 px, and the
+row had quietly become the thing the spec allows only as a last resort — a container that
+scrolls. The gate that exists for exactly this area, G-05, did not catch it either, and
+correctly so: G-05 asks whether the rendered horizons are the declared ones, and they were.</p>
+<p>The test was asserting membership and order, because those are easy to assert. <strong>&quot;All visible
+at once&quot; is a claim about geometry, and nothing in the suite was measuring geometry.</strong></p>
+<p>The fix is not a wider stylesheet. The geometry is now declared —</p>
+<pre><code class="language-json">&quot;presentation&quot;: {
+  &quot;referenceViewportWidthPx&quot;: 1400,
+  &quot;minimumPanelWidthPx&quot;: 190,
+  &quot;panelGapPx&quot;: 10,
+  &quot;pageGutterPx&quot;: 48
+}
+</code></pre>
+<p>— handed to the stylesheet as custom properties so that no width is a literal in CSS, and
+three things now check it:</p>
+<ul>
+<li>the <strong>schema</strong> refuses a configuration whose reference width cannot hold every declared
+horizon at the declared minimum. Adding a seventh horizon without widening the row is a
+startup failure with the arithmetic in the message, not a row that silently scrolls;</li>
+<li>a <strong>browser test</strong> sets the window to the declared reference width and measures the
+rendered boxes: the row may not scroll, every panel must be at least the declared minimum
+wide and inside its container, and the <em>page</em> may not scroll horizontally at all;</li>
+<li>the <strong>screenshot above</strong> is captured at that same declared width, so a figure in this post
+cannot show a row that fits when the shell&#39;s does not.</li>
+</ul>
+<p>That last one matters more than it looks. A documentation site whose figures are captured at
+a flattering window is a documentation site that will eventually disagree with the product.</p>
+<h2>The fallback nobody had ever run</h2>
+<p>FR-010 confines rendering to one module so the choice is cheap to revisit. It uses WebGL2
+where it exists and falls back to canvas2d where it does not.</p>
+<p>Headless Chromium here <em>has</em> WebGL2 — ANGLE over SwiftShader — so every test took the fast
+path, and the fallback was code that had never executed anywhere. &quot;A check that has never been
+seen to fail is worth nothing&quot; cuts both ways: a fallback that has never been seen to run is
+worth nothing either. So one test refuses <code>getContext(&#39;webgl2&#39;)</code> in an init script, asserts
+the surface reports <code>canvas2d</code>, and counts distinct colours to confirm it painted a field
+rather than a rectangle.</p>
+<h2>Attribution, and the second channel</h2>
+<p>Each panel can show where its answer came from: the weight observations carried in every cell,
+read from the analysis&#39;s own attribution and computed nowhere else. Colour alone would not
+survive a monochrome print, so the cells where observations lead both other sources are
+<strong>hatched</strong> — a second channel, in the shader, keyed on the analysis&#39;s weights.</p>
+<p><img src="../images/007-attribution-row.png" alt="The attribution layer: weight carried by observations, hatched where observations lead"></p>
+<p>The greyscale claim is measured rather than asserted. A test reads the rendered pixels, takes
+the luminance of an observed patch and of the unvisited north-west corner, and requires the
+difference to clear a declared margin of 40 in 255. It measures <strong>150.0</strong>.</p>
+<h2>What this beat could not do, and says so</h2>
+<p>The spec expects a cell&#39;s background and climatology weights to differ between horizons. They
+cannot yet: the recorded case runs <strong>one</strong> analysis, at the issue instant, and the row draws
+that one field on all six panels.</p>
+<p>Six identical fields side by side is a picture that implies six analyses. The row therefore
+says, in the legend, that it is the same field on every panel, names the instant it was
+analysed at, and says attribution becomes per horizon once the forecast cycles — which is beat
+009&#39;s job.</p>
+<p>The alternative was to synthesise a per-panel attribution by decaying the weights with lead
+time. It would have looked better and it would have been a figure with no provenance, which
+Principle V forbids and gate G-06 would have caught on its way in.</p>
+<h2>Where it stands</h2>
+<p>Seven gates, eighteen shell tests, nothing deferred — the first beat where <code>pnpm gates</code>
+reports no gate still waiting for the feature it guards. G-05 runs in a real browser on every
+run, including its planted violation, which took two attempts: the first plant added an extra
+horizon to the configuration the page received, and the row rendered seven panels, because it
+is properly data-driven and does what it is told. Nothing had been planted at all.</p>
+
+      </article>
+    </main>
+    <footer>
+      <p>
+        j-ocean is a teaching harness. Its numerics are real but reduced, its domain small,
+        and its claims are about relative skill between references it computes itself. This
+        site is a claim about the tree; where the two disagree, the tree wins.
+      </p>
+    </footer>
+  </body>
+</html>

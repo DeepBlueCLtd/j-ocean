@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Beat 011: the replay that found an analysis meaning two different things &middot; j-ocean</title>
+    <meta name="description" content="Export a run, import it in a fresh browser context, get the same fields back. Testing that properly found a defect nothing else in the suite could have found — and a gate that had been allowed to test a build that was not the tree." />
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="wordmark" href="../index.html">j-ocean</a>
+      <p class="disclaimer">Not an operational forecast system.</p>
+      <nav>
+        <a href="../index.html">Overview</a>
+        <a href="../architecture.html">Architecture</a>
+        <a href="../data-model.html">Data model</a>
+        <a href="../glossary.html">Glossary</a>
+        <a href="../deferred.html">Deferred</a>
+        <a href="../blog/index.html" class="active">Notes</a>
+        <a class="external" href="https://github.com/DeepBlueCLtd/j-ocean">Repository</a>
+      </nav>
+    </header>
+    <main>
+      <article>
+      <p class="post-date"><time datetime="2026-09-15">2026-09-15</time></p>
+<h1>Beat 011: the replay that found an analysis meaning two different things</h1>
+<p>Nothing persists between visits. The manifest is the only thing that leaves the browser and the
+only thing that comes back: a seed, some derived seeds, a clock, a configuration digest, an
+issue instant, an ordered list of the reader&#39;s edits, and now the build&#39;s own commit and the
+domain. No fields, no scores, no observations — those are derived, and replay is re-computation
+rather than the restoration of a snapshot.</p>
+<p>That distinction is the reason the byte-identity test means anything. A snapshot compared with
+itself proves nothing.</p>
+<h2>The defect the replay found</h2>
+<p>The test that matters is the one a reader would perform: export from one browser context, import
+into another, and compare. It compares a digest of the run&#39;s fields and its analysed field,
+which the page shows so a reader can do the same by looking at two tabs.</p>
+<p>It did not match. The seed matched, the step count matched, the instant matched. The analysis
+did not.</p>
+<p>The shell built its analysis from <em>the state as it stood when the run was constructed</em>. For a
+fresh run that is the initial state, which is what the analysis instant was declared to be. For
+a <strong>replayed</strong> run it is the state after the replay has advanced it to the step the manifest
+records — so the same run, rebuilt from its own manifest, produced a different analysis from the
+one it had exported.</p>
+<p>Neither run was lying about anything it said. The analysis panel simply meant something
+different in each of them.</p>
+<p>The fix is one line: take the background before anything advances the state. The interesting
+part is that <strong>nothing else in the suite could have found this</strong>. The headless replay test
+compares run state and manifests, and both agreed. No single-visit test can tell an
+analysis-at-step-0 from an analysis-at-step-72, because a single visit only ever makes one of
+them. It took two visits and a comparison, which is exactly what AT-04 asks for and exactly the
+kind of acceptance test that looks redundant until it isn&#39;t.</p>
+<h2>And a gate that had been allowed to lie</h2>
+<p>Gate G-05 runs in a real browser. Playwright, outside CI, reuses an already-running preview
+server by default — and a server left over from an earlier command serves the <code>dist/</code> that
+existed when <em>it</em> started. So the gate could ask its question of a build that is not the tree.</p>
+<p>It did, once, during this beat: G-05 failed against a stale build and passed a minute later
+against a fresh one, with nothing changed in between. That is the worst kind of check — one
+whose result is not about the code.</p>
+<p>The gate now sets an environment variable and the Playwright configuration refuses to reuse a
+server when it is set. <em>A check that can pass for reasons nothing in the tree explains is worth
+nothing</em> is the same sentence this project already had about checks that have never been seen to
+fail.</p>
+<h2>What the manifest is now</h2>
+<p>A <strong>strict</strong> schema, which is what makes &quot;the manifest contains no field data&quot; true rather than
+merely intended: a manifest carrying a field, a score or an observation is rejected for carrying
+a key the schema does not know, not because somebody remembered to look for those three words.</p>
+<p>There is one definition of that schema — the zod object in the code — and a committed JSON
+Schema generated from it for anybody who wants to validate a manifest without this code, with a
+test that regenerates and compares. It is the same arrangement the data artefacts have under
+gate G-01, for the same reason: a copy nobody regenerates is a document about what the code used
+to do.</p>
+<h2>Four refusals and one warning</h2>
+<p>The checks happen before anything is provisioned, so a refused import leaves the run you have
+alone:</p>
+<ol>
+<li><strong>the schema</strong>, naming the field at fault;</li>
+<li><strong>the format version</strong>, checked before the shape, so a manifest from another version is told
+what it is rather than told about a field that moved;</li>
+<li><strong>the configuration digest</strong> — refused, because the declared values differ and a run made
+against other values is a different run;</li>
+<li><strong>the domain</strong>, naming the one the manifest asked for and the ones this build has.</li>
+</ol>
+<p>And one that is deliberately not a refusal. A <strong>code-version</strong> difference is a warning printed
+beside the run: a reader holding a manifest from last month is better served by a replay that
+says identity is only promised for the same code than by a door.</p>
+<h2>Nothing persists, and now it is measured</h2>
+<p>NFR-02 says nothing persists between visits — no storage, no cookie, no run in the URL. That was
+a claim about intent until this beat. A test now replaces <code>localStorage.setItem</code>,
+<code>sessionStorage.setItem</code>, <code>document.cookie</code> and <code>indexedDB.open</code> before the page loads, drives a
+whole visit — integrate, build the row, draw a new run — and asserts that nothing was written.</p>
+<h2>Where it stands</h2>
+<p>241 headless tests, 34 shell tests, seven gates. One beat remains: 012, adaptive sampling, which
+is deferred behind a trigger the SRD wrote and which this project has not met.</p>
+
+      </article>
+    </main>
+    <footer>
+      <p>
+        j-ocean is a teaching harness. Its numerics are real but reduced, its domain small,
+        and its claims are about relative skill between references it computes itself. This
+        site is a claim about the tree; where the two disagree, the tree wins.
+      </p>
+    </footer>
+  </body>
+</html>

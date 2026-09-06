@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Beat 003: an ocean, and three things it refused to do &middot; j-ocean</title>
+    <meta name="description" content="A one-and-a-half layer reduced-gravity model initialised from HYCOM. It blew up twice and outcropped once, and each refusal was more useful than the fix." />
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="wordmark" href="../index.html">j-ocean</a>
+      <p class="disclaimer">Not an operational forecast system.</p>
+      <nav>
+        <a href="../index.html">Overview</a>
+        <a href="../architecture.html">Architecture</a>
+        <a href="../data-model.html">Data model</a>
+        <a href="../glossary.html">Glossary</a>
+        <a href="../deferred.html">Deferred</a>
+        <a href="../blog/index.html" class="active">Notes</a>
+        <a class="external" href="https://github.com/DeepBlueCLtd/j-ocean">Repository</a>
+      </nav>
+    </header>
+    <main>
+      <article>
+      <p class="post-date"><time datetime="2026-09-07">2026-09-07</time></p>
+<h1>Beat 003: an ocean, and three things it refused to do</h1>
+<p>This is the first beat with something to look at.</p>
+<p><img src="../images/003-field-initial.png" alt="Sea-surface height anomaly over the Gulf Stream domain, initialised from the truth record: cold shelf water to the north-west, warm Sargasso water to the south-east, and a meandering front between them"></p>
+<p>That is a real Gulf Stream meander, initialised from the HYCOM sea-surface height of
+2013-09-01 through the reduced-gravity relation, and it is what a one-and-a-half layer ocean
+looks like when you give it a front to hold. There is no fixture behind it.</p>
+<p>The interesting part of the beat, though, is the three times the code refused to run.</p>
+<h2>One: the cells are not square</h2>
+<p>ADR-0001 had done the feasibility arithmetic in advance, as an ADR should: reduced gravity
+0.02 m/s² over a 500 m layer gives a gravity-wave speed of about 3.2 m/s, and on 5 500 m
+cells that admits a timestep of order twenty minutes. Ten minutes was declared, with margin.</p>
+<p>The stability check refused it on its first run:</p>
+<pre><code>the declared timestep of 600.0 s exceeds the largest stable timestep of 549.9 s
+for this grid and these parameters (gravity-wave speed 3.162 m/s ...)
+No integration was started.
+</code></pre>
+<p>A five-degree box at 36.5 °N is <strong>4 474 m per cell east–west</strong> and 5 529 m north–south. It is
+square in degrees and not in kilometres, and the stability limit is set by the smaller of the
+two. The ADR&#39;s 5 500 m was a nominal figure that nobody had ever made the code evaluate.</p>
+<p><code>GridSpec</code> now carries two cell sizes and configuration declares none, because declaring one
+number for both would be declaring something untrue.</p>
+<h2>Two: the criterion had no teeth</h2>
+<p>The replacement, 540 s, was inside the limit. The model blew up in fifty steps.</p>
+<pre><code>step    0  h [4.651e+2, 5.200e+2]  u [0.000e+0, 0.000e+0]
+step   25  h [5.000e+1, 9.418e+2]  u [-2.160e+0, 2.186e+0]
+step   50  h [Infinity, -Infinity] bad=192
+</code></pre>
+<p>The criterion had been written as <code>cfl / (c · sqrt(dx⁻² + dy⁻²))</code>. The discrete gradient on a
+C-grid has a largest eigenvalue of <code>2/dx</code>, not <code>1/dx</code>, so that expression returns the linear
+stability boundary <em>itself</em> — and a declared CFL of 0.5 was buying no margin at all. The
+model was being asked to run exactly on the neutral curve, where the nonlinear terms tip it
+over within a few hours.</p>
+<p>With the factor of two restored: boundary 549.9 s, the declared criterion admits 275.0 s,
+and 240 s is declared — which also divides an hour, so FR-006&#39;s &quot;diagnose each hour&quot; is exact
+rather than approximately every 3.33 steps.</p>
+<p>Two amendments to one ADR in one afternoon, both made by the tree rather than by a reviewer.
+That is what &quot;the tree is the authority and the record is a claim about it&quot; is <em>for</em>.</p>
+<h2>Three: leapfrog will not diffuse</h2>
+<p>The third failure was subtler and would have been much more expensive to find later.</p>
+<p>Leapfrog is unconditionally unstable for a diffusion term evaluated at the current time
+level. Not conditionally — unconditionally: the grid-scale mode grows like <code>(1 + 2r)^n</code> for
+any positive <code>r</code>. The first kernel evaluated its Laplacian at time <em>n</em>, as the equations are
+usually written, and blew up from grid-scale initial noise inside two hundred steps.</p>
+<p>Lagging viscosity and bottom drag to the previous level makes them forward-Euler over <code>2Δt</code>,
+which is stable while the viscous number stays under a half. It is 0.032 as declared. That
+number is now computed by <code>assessStability</code> and the run refuses if it is not met, beside the
+wave-speed criterion, because a criterion that only checks one of the two things that can
+destabilise a scheme is a criterion that will be believed when it should not be.</p>
+<h2>What the model actually does</h2>
+<p>96 hours over both domains, every figure printed by the test rather than merely asserted:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Gulf Stream front</th>
+<th>Open gyre</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Initial layer thickness from truth</td>
+<td>111–804 m</td>
+<td>439–558 m</td>
+</tr>
+<tr>
+<td>Volume drift, sponge on</td>
+<td>1.6 × 10⁻²</td>
+<td>5.5 × 10⁻⁴</td>
+</tr>
+<tr>
+<td>Energy over 96 h</td>
+<td>−25.9 %</td>
+<td>−26.4 %</td>
+</tr>
+<tr>
+<td>Sea-surface height variance, 96 h ÷ initial</td>
+<td>0.66</td>
+<td>0.59</td>
+</tr>
+<tr>
+<td>Outcrop clamps</td>
+<td>261</td>
+<td>0</td>
+</tr>
+</tbody></table>
+<p>Energy falls and never rises, which is the assertion that would catch a sign error in the
+nonlinear terms: viscosity, drag and the Robert–Asselin filter all remove energy and nothing
+adds any.</p>
+<h2>The conservation test that was measuring the wrong thing</h2>
+<p>The volume-conservation test started at a tolerance of 10⁻⁹ and failed at 1.6 × 10⁻². The
+tempting fix is to widen the tolerance until it passes. What that would have bought is a test
+that could no longer distinguish an open boundary from a bug.</p>
+<p>So the claim was split, because there were two claims hiding in it.</p>
+<p><strong>The scheme conserves volume.</strong> Tested on a smooth bump with the sponge off and the layer
+deep enough that the clamp cannot fire. Drift over a day: <strong>7.8 × 10⁻¹⁵</strong>. That is round-off,
+and it is a real statement about the flux-divergence form of continuity.</p>
+<p><strong>The shipping configuration exchanges mass with the outside</strong>, because it has an open
+boundary — that is what a sponge <em>is</em>. That drift is bounded and reported, not conflated with
+the first claim.</p>
+<p>And a third thing fell out of splitting them, which is the finding of the beat:</p>
+<blockquote>
+<p>With the sponge switched off, a closed box around the Gulf Stream front outcrops the layer
+within twelve hours. The clamp fires twenty-eight times.</p>
+</blockquote>
+<p>FR-012&#39;s sponge is not tidiness. Without it the domain is a bathtub, and a bathtub with a
+front in it empties one end.</p>
+<h2>What the truth&#39;s velocity is for</h2>
+<p>FR-013 says to map the truth&#39;s sea-surface height <em>and velocity</em> onto the model. The height
+maps cleanly through the reduced-gravity relation, with the domain mean removed because a
+reduced-gravity model has no absolute reference for its free surface.</p>
+<p>The velocity is not imposed. HYCOM&#39;s surface velocity carries barotropic, ageostrophic and
+tidal motions this model has no layer for, and putting them into a balanced two-layer state
+launches a gravity-wave shock that the first day of every forecast would be spent radiating
+away. The model&#39;s velocity is put in geostrophic balance with the thickness it actually
+holds.</p>
+<p>The truth&#39;s velocity is used to <em>check</em> that:</p>
+<pre><code>geostrophic initialisation against the truth surface velocity:
+  gulf-stream-front  correlation 0.904 over 19980 components;
+                     mean speed 0.445 m/s against 0.492 m/s
+  open-gyre          correlation 0.741 over 20000 components;
+                     mean speed 0.122 m/s against 0.125 m/s
+</code></pre>
+<p>0.904 across a strong front is a better use of that field than imposing it would have been,
+and it is a number the harness can show.</p>
+<h2>A kind that does not move</h2>
+<p>Depth is displayed, never integrated: the profile is a warm layer over a cold one, joined by
+a <code>tanh</code> centred on the layer thickness. NFR-05 says a figure does not change kind between
+states, which forces a decision that is easy to get wrong. A level cannot be <code>computed</code> when
+the interface happens to sit on it and <code>derived</code> when it does not. So the surface and the
+deepest declared level are the model&#39;s own two layers and are always <code>computed</code>; everything
+between is always <code>derived</code>.</p>
+<p>The relation inverts, which is what beat 004&#39;s observation operator will need — and the
+inverse reports whether it <strong>resolved</strong> anything. A <code>tanh</code> saturates: a thermometer at 100 m
+in an ocean whose interface is at 700 m reads the upper layer&#39;s own temperature and infers
+680 m with no confidence whatever. It now says so. An observation that constrains nothing
+must not be allowed to look as though it did, and beat 005 will be weighting these.</p>
+<h2>One deviation, recorded</h2>
+<p>The field is drawn on a 2-D canvas, and the constitution&#39;s Technology section names WebGL. A
+single 100 × 100 field costs about a tenth of a millisecond through <code>ImageData</code>; taking on a
+GL context, a shader pipeline and a headless software rasteriser to save that would be paying
+for beat 007&#39;s problem three beats early. <code>FieldView</code> is one component, so the swap is one
+file when six panels make it earn its keep.</p>
+<p>Next: instruments. Truth becomes observations in exactly one place, and gate G-02 arrives to
+make sure it stays that way.</p>
+
+      </article>
+    </main>
+    <footer>
+      <p>
+        j-ocean is a teaching harness. Its numerics are real but reduced, its domain small,
+        and its claims are about relative skill between references it computes itself. This
+        site is a claim about the tree; where the two disagree, the tree wins.
+      </p>
+    </footer>
+  </body>
+</html>

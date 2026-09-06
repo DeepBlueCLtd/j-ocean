@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Beat 005: a share of 202 per cent &middot; j-ocean</title>
+    <meta name="description" content="Optimal interpolation, and the attribution field that is literally the gain's row sums. The first working analysis produced weights that could not be weights, and the reason was a number nobody had declared." />
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="wordmark" href="../index.html">j-ocean</a>
+      <p class="disclaimer">Not an operational forecast system.</p>
+      <nav>
+        <a href="../index.html">Overview</a>
+        <a href="../architecture.html">Architecture</a>
+        <a href="../data-model.html">Data model</a>
+        <a href="../glossary.html">Glossary</a>
+        <a href="../deferred.html">Deferred</a>
+        <a href="../blog/index.html" class="active">Notes</a>
+        <a class="external" href="https://github.com/DeepBlueCLtd/j-ocean">Repository</a>
+      </nav>
+    </header>
+    <main>
+      <article>
+      <p class="post-date"><time datetime="2026-09-09">2026-09-09</time></p>
+<h1>Beat 005: a share of 202 per cent</h1>
+<p>The analysis combines a background, some observations and a climatology, and in doing so
+decides how much each was worth in each cell. Constitution Principle IV says those decisions
+<em>are</em> the attribution field — not a picture computed to illustrate the answer, but the same
+arithmetic that produced it.</p>
+<p>That is a stronger requirement than it sounds, and it is why ADR-0006 chose optimal
+interpolation over 3D-Var, which gives identical numbers by a route that does not hand you
+them.</p>
+<h2>The identity the whole beat rests on</h2>
+<p>Write the analysis as</p>
+<pre><code>x_a = (I − K H) x_p + K y
+</code></pre>
+<p><code>H</code> selects the cell an observation sits in, so <code>H·1 = 1</code>, and therefore at every cell</p>
+<pre><code>Σ_k (I − K H)_ik + Σ_j K_ij = 1
+</code></pre>
+<p><strong>The row sum of the gain is the weight the observations carried there.</strong> One minus it is the
+prior&#39;s weight, which the declared blend splits between background and climatology. Nothing
+is estimated, smoothed or normalised by hand.</p>
+<p>The test does not assert the attribution is plausible. It recomputes the weights from the
+gain by a different piece of code and asserts they are <em>equal</em>:</p>
+<pre><code>largest difference between gain row sum and exported weight: 0.000e+0
+</code></pre>
+<p>An attribution that agreed with the analysis only approximately would be a picture that could
+disagree with it.</p>
+<h2>Then the first real run</h2>
+<pre><code>observations 63.1%, background 31.4%, climatology 5.5% — of which
+argo/5903997/123/14/interface 202.5%, argo/5903997/121/7/interface 86.2%,
+ownship-xbt/0003/interface 48.5%
+</code></pre>
+<p>A single observation carrying <strong>202 per cent</strong> of a cell&#39;s weight, against others carrying
+negative shares in the same cell. And 1 342 of 10 000 cells with a total weight outside nought
+and one.</p>
+<p>Row sums slightly outside <code>[0, 1]</code> are a known feature of optimal interpolation. Shares of two
+hundred per cent are not. Something was wrong.</p>
+<h2>An observation&#39;s formal error is not what it is worth</h2>
+<p>It was not the code. It was a number nobody had declared.</p>
+<p>Beat 004&#39;s observation operator propagates an interface-depth error from the temperature
+errors, and it does that correctly:</p>
+<pre><code>interface at 350 m recovered as 350.0 m (±0.9 m) from 5 levels
+</code></pre>
+<p><strong>±0.9 m is genuinely what the instrument could not know.</strong> It is nothing like what the
+observation is worth to a grid of 4.5 km cells. A point sounding of the thermocline differs
+from a cell&#39;s <em>mean</em> interface depth by tens of metres of mesoscale variability, and no
+thermometer, however good, could have resolved that.</p>
+<p>So the analysis believed each observation about fifty times more than the background. Two
+Argo profiles twenty kilometres apart, each trusted to a metre, became nearly collinear
+constraints inside a covariance with a 60 km length scale — and an ill-conditioned system does
+exactly what this one did: enormous positive and negative weights that very nearly cancel.</p>
+<p><code>analysis.interfaceRepresentativenessMetres</code> is now a declared value, 25 m, added in
+quadrature with the propagated error:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Before</th>
+<th>After</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Largest single share</td>
+<td><strong>202.5 %</strong></td>
+<td>78.9 %</td>
+</tr>
+<tr>
+<td>Most negative share</td>
+<td>large</td>
+<td>−18.8 %</td>
+</tr>
+<tr>
+<td>Cells clamped</td>
+<td>1 342 (13 %)</td>
+<td>287 (2.9 %)</td>
+</tr>
+</tbody></table>
+<p>The lesson generalises past this project. <strong>The formal error an operator propagates is a
+lower bound on an observation&#39;s error, and using it as the whole of the error is a way of
+telling an analysis to trust a measurement more than the measurement deserves.</strong> Operational
+systems call the difference representativeness error, and they declare it, and now so does
+this one.</p>
+<h2>What the test asserts, and what it deliberately does not</h2>
+<p>287 clamped cells remain, and the test does not demand zero. Optimal interpolation with a
+Gaussian covariance and clustered observations genuinely produces row sums a little outside
+nought and one in the shadows between them; that is a property of the scheme. The spec&#39;s own
+edge case anticipated it and asked for the clamp count to be a <strong>published diagnostic</strong> rather
+than for the clamp never to fire. So it is on the surface, and the test bounds it below five
+per cent of the domain.</p>
+<p>The &quot;perfect observation&quot; scenario also changed, and the new assertion is stronger than the
+one it replaced. The spec says a zero-error observation gives the analysis its own value. With
+representativeness declared, a zero-<em>instrument</em>-error observation carries</p>
+<pre><code>80.0% of the weight at its own cell, against a background error of 50 m
+and a declared representativeness of 25 m
+</code></pre>
+<p>which is exactly <code>σ_b² / (σ_b² + σ_r²)</code>. The test asserts that identity rather than the
+approximation the spec described.</p>
+<h2>Where the answer came from</h2>
+<p><img src="../images/005-attribution.png" alt="The attribution field: observation weight in each cell, drawn ink-on-paper, with the XBT drops and Argo profiles marked and a selected cell&#39;s breakdown below"></p>
+<p>Two presentation decisions in that picture are load-bearing.</p>
+<p><strong>A sequential palette, not a diverging one.</strong> The anomaly fields use blue–white–red because
+the sign is the meaning. A weight has no sign — it runs from nothing to all of it — so a
+diverging scale would give it a blue half that means nothing. Monotone lightness is also what
+makes it greyscale-legible, which FR-17 requires of exactly this field.</p>
+<p><strong>The breakdown appears only for a selected cell.</strong> FR-16 forbids a per-panel summary bar as
+the primary attribution display, and the SRD says why: it was specified first and was wrong. A
+summary can be computed from something other than the analysis; a field drawn from the gain
+cannot. G-06 enforces it — the gate fails if anything under <code>src/harness/</code> so much as contains
+a function producing an attribution.</p>
+<h2>The half of G-02 that had been waiting</h2>
+<p>Beat 004 landed gate G-02&#39;s two static halves and printed, on every run, that the third was
+not there yet. It is now:</p>
+<pre><code>with observation errors at 1e9 m: largest departure from the no-observation
+blend 7.958e-13 m; largest observation weight 5.831e-15
+</code></pre>
+<p>A gate that reads source cannot check that. An implementation could import nothing forbidden
+and still leak truth through some path nobody thought of, and only running it would show.</p>
+<h2>What does not enter the analysis, and why</h2>
+<p>The ownship&#39;s surface thermometer takes 25 measurements along the track, and <strong>none of them
+enters the analysis</strong>. In a two-layer model the surface temperature is the upper layer&#39;s own
+declared temperature: it does not depend on where the interface is, so it constrains nothing.
+The operator reports every one as unresolved, and the analysis record excludes them with that
+reason attached.</p>
+<p>That is not a shortcoming of the instrument. It is a fact about the model that the harness
+exists to make visible — and a preview of what beat 006 will be asking about every figure on
+the screen.</p>
+<p>Next: scoring. Skill against persistence and against climatology, with the caveat ADR-0007
+promised, and the first opportunity for this harness to report that it is worse than a
+reference.</p>
+
+      </article>
+    </main>
+    <footer>
+      <p>
+        j-ocean is a teaching harness. Its numerics are real but reduced, its domain small,
+        and its claims are about relative skill between references it computes itself. This
+        site is a claim about the tree; where the two disagree, the tree wins.
+      </p>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,751 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Data model &middot; j-ocean</title>
+    <meta name="description" content="The types that cross the boundaries between the rings, and what each of them promises." />
+    <link rel="stylesheet" href="assets/style.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="wordmark" href="index.html">j-ocean</a>
+      <p class="disclaimer">Not an operational forecast system.</p>
+      <nav>
+        <a href="index.html">Overview</a>
+        <a href="architecture.html">Architecture</a>
+        <a href="data-model.html" class="active">Data model</a>
+        <a href="glossary.html">Glossary</a>
+        <a href="deferred.html">Deferred</a>
+        <a href="blog/index.html">Notes</a>
+        <a class="external" href="https://github.com/DeepBlueCLtd/j-ocean">Repository</a>
+      </nav>
+    </header>
+    <main>
+<h1>Data model</h1>
+<p>Every type here crosses a boundary between rings. Types internal to one module are not
+listed: they are that module&#39;s business and may change without anybody being told.</p>
+<h2>Configuration</h2>
+<p>Loaded by one module, validated against a schema before any computation, and digested into
+every run manifest. Every number the requirements call <span class="declared">declared</span>
+lives here, and no component in the tree holds a literal for one.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>schemaVersion</code></td>
+<td>The shape of this file. A version this code does not know is a startup failure.</td>
+</tr>
+<tr>
+<td><code>run.defaultSeed</code></td>
+<td>Sixteen hex characters. The recorded case: the run a reader gets who does not ask for another.</td>
+</tr>
+<tr>
+<td><code>run.recordedCaseLabel</code></td>
+<td>What the surface calls that run.</td>
+</tr>
+<tr>
+<td><code>clock.epoch</code></td>
+<td>The instant step zero is valid for.</td>
+</tr>
+<tr>
+<td><code>clock.timestepSeconds</code></td>
+<td>The stated timestep.</td>
+</tr>
+<tr>
+<td><code>clock.stabilityCriterionCfl</code></td>
+<td>The stated stability criterion the kernel must satisfy.</td>
+</tr>
+<tr>
+<td><code>grid.nx</code>, <code>grid.ny</code></td>
+<td>The grid, configurable and starting at 100 x 100. There is no declared cell size: a five-degree box is not square in kilometres at Gulf Stream latitudes, so <code>dx</code> and <code>dy</code> are computed from the box and the grid and reported as computed figures.</td>
+</tr>
+<tr>
+<td><code>horizons.leadHours</code></td>
+<td>Strictly increasing. Every one is rendered; no panel is drawn for anything else.</td>
+</tr>
+<tr>
+<td><code>budget.frameBudgetMs</code></td>
+<td>The frame budget, a number rather than a judgement made at review time.</td>
+</tr>
+<tr>
+<td><code>presentation.referenceViewportWidthPx</code></td>
+<td>The window width at which <em>all six visible at once</em> is a promise. The schema refuses a value too narrow for the declared horizons; a browser test measures the rendered geometry at it.</td>
+</tr>
+<tr>
+<td><code>presentation.minimumPanelWidthPx</code></td>
+<td>Below this a panel stops being legible, so the row stops shrinking panels and its own container scrolls. The page never does.</td>
+</tr>
+<tr>
+<td><code>presentation.panelGapPx</code>, <code>presentation.pageGutterPx</code></td>
+<td>The rest of the row&#39;s arithmetic, so that no width is a literal in the stylesheet.</td>
+</tr>
+<tr>
+<td><code>presentation.anomalyLimitMetres</code></td>
+<td>The half-range the panels draw interface-depth anomalies against.</td>
+</tr>
+<tr>
+<td><code>presentation.attributionHatchThreshold</code></td>
+<td>The weight above which a cell is hatched rather than merely tinted — the second channel that makes the layer readable without colour.</td>
+</tr>
+<tr>
+<td><code>presentation.footprint.colocationToleranceDegrees</code></td>
+<td>Two profiles this close are the same place as far as the drawing is concerned, and are offset so both are visible.</td>
+</tr>
+<tr>
+<td><code>presentation.footprint.needleOffsetPx</code>, <code>elevationHeightPx</code></td>
+<td>The offset applied to co-located needles, and the height of the enlarged panel&#39;s depth elevation.</td>
+</tr>
+<tr>
+<td><code>forecast.validityWindowHours</code></td>
+<td>How far past its issue instant a forecast claims to be valid. A panel beyond it says so and draws nothing.</td>
+</tr>
+<tr>
+<td><code>forecast.quaysideOffsetHours</code></td>
+<td>The departure brief&#39;s instant: the analysis there, held constant and never refreshed.</td>
+</tr>
+<tr>
+<td><code>forecast.issueTimeControl</code></td>
+<td>The range and step of the one issue-time control. The schema refuses a default issue time it cannot reach.</td>
+</tr>
+<tr>
+<td><code>presentation.footprint.levelTickLimit</code></td>
+<td>Above this many levels a needle draws its ticks only while hovered. An Argo profile carries five hundred; drawn always they are a solid bar.</td>
+</tr>
+<tr>
+<td><code>domains.list[]</code></td>
+<td>Extents in degrees, and a declared <code>character</code> of <code>eventful</code> or <code>bland</code>.</td>
+</tr>
+</tbody></table>
+<p>The <strong>configuration digest</strong> is a SHA-256 over a canonical serialisation: object keys in
+code-unit order, no insignificant whitespace, arrays in their own order. Reformatting the
+file does not change it; changing any value always does. It is computed in pure TypeScript
+so that the browser and Node agree, which they must, because a manifest exported from one
+is imported by the other.</p>
+<h2>RunManifest</h2>
+<p>Everything needed to rebuild a run, and none of its state.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>formatVersion</code></td>
+<td>The manifest shape. A version this code cannot read is refused, naming both.</td>
+</tr>
+<tr>
+<td><code>generatorVersion</code></td>
+<td>The RNG family and parameters. A mismatch is refused: the same seed would not mean the same numbers.</td>
+</tr>
+<tr>
+<td><code>kernelId</code></td>
+<td>The kernel that ran. A mismatch is refused: the same seed would not mean the same fields.</td>
+</tr>
+<tr>
+<td><code>rootSeed</code></td>
+<td>Sixteen hex characters.</td>
+</tr>
+<tr>
+<td><code>derivedSeeds</code></td>
+<td>Every named stream the run asked for, with the seed derived for it.</td>
+</tr>
+<tr>
+<td><code>clock</code></td>
+<td>The epoch and timestep the run used.</td>
+</tr>
+<tr>
+<td><code>configDigest</code></td>
+<td>The digest above. A mismatch is refused, naming both digests.</td>
+</tr>
+<tr>
+<td><code>steps</code></td>
+<td>How far the run had got.</td>
+</tr>
+<tr>
+<td><code>codeVersion</code></td>
+<td>The build&#39;s own commit, injected at build time. &quot;Byte-identical&quot; is a promise about the same code, so the manifest says which code. A difference is a warning beside the run, not a refusal.</td>
+</tr>
+<tr>
+<td><code>domainId</code></td>
+<td>The domain the run was made in. A manifest naming one this build lacks is refused, naming both.</td>
+</tr>
+<tr>
+<td><code>issueInstantMs</code></td>
+<td>The instant the shore forecast was issued. A reader&#39;s choice rather than a property of the integration, so a manifest that did not record it could not rebuild the fields it describes.</td>
+</tr>
+<tr>
+<td><code>recordedCase</code></td>
+<td>False once a reader has asked for a new run.</td>
+</tr>
+<tr>
+<td><code>counterfactual</code></td>
+<td>The reader&#39;s edits, in order. Empty for the recorded case; the slot was present from beat 001, so a manifest exported before the counterfactuals existed and one after have the same shape.</td>
+</tr>
+</tbody></table>
+<p><strong>Replay is re-computation, not the restoration of a snapshot.</strong> That is why the manifest
+holds no state: a snapshot compared with itself would prove nothing, whereas a rebuilt run
+compared byte for byte proves the property the whole system rests on.</p>
+<p>Every refusal happens before anything is constructed, so a refused load leaves no run
+behind. In order: the <strong>schema</strong> (strict, so a manifest carrying a field, a score or an
+observation is rejected for carrying a key that does not belong), the <strong>format version</strong>
+(before the shape, so a manifest from another version is told what it is), the
+<strong>configuration digest</strong>, and the <strong>domain</strong>. The <strong>code version</strong> is the one difference that
+warns rather than refuses.</p>
+<p>The committed <a href="https://github.com/DeepBlueCLtd/j-ocean/blob/main/schemas/run-manifest.schema.json"><code>schemas/run-manifest.schema.json</code></a>
+is generated from the same definition by <code>pnpm manifest-schema</code>, and a test regenerates and
+compares it, so the portable copy cannot drift from the code.</p>
+<h2>Ports</h2>
+<h3><code>RandomStream</code></h3>
+<p><code>name</code>, <code>seed</code>, and <code>nextU32</code> / <code>nextFloat</code> / <code>nextGaussian</code>. Constructed, never looked up:
+<code>stream(name)</code> twice returns two streams that both start at the beginning.</p>
+<h3><code>SimulationClock</code> and <code>ClockControl</code></h3>
+<p><code>SimulationClock</code> is what every consumer sees — <code>epochMs</code>, <code>timestepSeconds</code>, <code>step</code>,
+<code>instantMs()</code>, <code>instantIso()</code> — and it has no method that moves it. <code>ClockControl</code>, which
+carries <code>advance</code>, is held by the run and handed to nobody. That &quot;no consumer can advance
+the clock&quot; is a fact about the types, not a convention to be remembered.</p>
+<h3><code>ModelState</code> and <code>StepContext</code></h3>
+<p><code>ModelState</code> is a <code>GridSpec</code> and a record of named <code>Float64Array</code> fields: typed arrays,
+never arrays of objects. <code>StepContext</code> is the step index, the instant, the timestep and one
+stream — everything a kernel is permitted to know about, and nothing else.</p>
+<h3><code>TruthSource</code></h3>
+<p><code>sample(query)</code> for a variable at a position, depth and instant; <code>coverage()</code> for the box
+and window it covers; and <code>nativeResolutionDegrees</code>, recorded from the artefact rather than
+inferred, because scoring refuses to make claims below it and a refusal cannot rest on a
+number the code guessed.</p>
+<h2>The committed field container</h2>
+<p>One file per field artefact — a domain&#39;s truth record, a domain&#39;s climatology. Deliberately
+small enough to read with <code>DataView</code>, <code>TextDecoder</code> and a typed array, because an artefact
+format that needs a parser is one a reader cannot check by hand.</p>
+<pre><code class="language-text">bytes 0..7      magic, ASCII &quot;JOCEAN01&quot;
+bytes 8..11     uint32 little-endian: the header length in bytes
+bytes 12..      the header, UTF-8 JSON, exactly that many bytes
+                zero padding to the next multiple of 4
+then            the payload: each variable at the byte offset the header declares
+</code></pre>
+<p>The header carries:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>kind</code></td>
+<td><code>truth</code> or <code>climatology</code></td>
+</tr>
+<tr>
+<td><code>domain</code></td>
+<td>Which declared domain this is</td>
+</tr>
+<tr>
+<td><code>nativeResolutionDegrees</code></td>
+<td>The source&#39;s own resolution, recorded from the artefact and never inferred</td>
+</tr>
+<tr>
+<td><code>coordinates</code></td>
+<td><code>timeMs</code> (absent for a climatology), <code>depthMetres</code>, <code>latDegrees</code>, <code>lonDegrees</code></td>
+</tr>
+<tr>
+<td><code>variables[]</code></td>
+<td>Per variable: <code>dims</code>, <code>shape</code>, <code>dtype</code>, <code>scaleFactor</code>, <code>addOffset</code>, <code>fillValue</code>, <code>byteOffset</code>, <code>byteLength</code></td>
+</tr>
+<tr>
+<td><code>provenance</code></td>
+<td>Source, service, every raw input with its digest and URL, and the window</td>
+</tr>
+</tbody></table>
+<p><strong>The payload is <code>int16</code> with a declared scale and offset</strong>, which is exactly how the source
+product stores these fields. Widening to <code>float32</code> would double the artefact in order to
+invent precision the source does not have. Land carries the declared fill value, and the
+reader turns it into <code>NaN</code> rather than into a plausible number.</p>
+<h3>What the truth record&#39;s provenance says about itself</h3>
+<p>Two things are recorded because they would otherwise be assumed:</p>
+<ul>
+<li><strong>The instants are not evenly spaced.</strong> The reanalysis is missing occasional snapshots, so
+a six-hourly stride lands on a nine-hour step twice in a fortnight. The record carries the
+instants as the source has them, <code>instantSpacingHours</code> states which spacings occur, and the
+build refuses any gap larger than the declared maximum, naming the instants. Nothing is
+interpolated at build time.</li>
+<li><strong>The truth is coarser than the model.</strong> At 1/12° on a five-degree box the record is about
+64 x 64 while the model grid is 100 x 100 — a ratio of 1.6, declared in configuration and
+checked by the schema against the box and the grid. Scoring declines to resolve below the
+truth&#39;s own resolution.</li>
+</ul>
+<h2>The observation record</h2>
+<p>Argo profiles, as JSON rather than as the binary container: profiles are ragged, different
+floats report different numbers of levels, and a ragged binary layout is a parser.</p>
+<pre><code class="language-jsonc">{
+  &quot;format&quot;: &quot;j-ocean/observations&quot;,
+  &quot;domain&quot;: &quot;gulf-stream-front&quot;,
+  &quot;provenance&quot;: { &quot;source&quot;: &quot;...&quot;, &quot;flagNote&quot;: &quot;...&quot;, &quot;levelsInRaw&quot;: 9058, &quot;temperatureFlagCountsInRaw&quot;: { &quot;1&quot;: 5082, &quot;4&quot;: 3976 } },
+  &quot;profiles&quot;: [
+    {
+      &quot;platform&quot;: &quot;1901584&quot;, &quot;cycle&quot;: 54,
+      &quot;instant&quot;: &quot;2013-09-02T...Z&quot;,       // as reported; a float drifts through its cycle
+      &quot;latDegrees&quot;: 36.1, &quot;lonDegrees&quot;: -72.4,
+      &quot;levels&quot;: [ { &quot;pressureDbar&quot;: 4.9, &quot;pressureFlag&quot;: 1, &quot;temperatureDegC&quot;: 26.3, &quot;temperatureFlag&quot;: 1 } ]
+    }
+  ]
+}
+</code></pre>
+<p><strong>A quality flag is carried through at every level and is never used to drop one.</strong> A flagged
+observation is drawn as flagged, not omitted — a reader who cannot see the flagged ones
+cannot see what the analysis chose to ignore. The provenance carries a flag histogram
+computed from the raw NetCDF arrays <em>before</em> conversion, so a test can count the same thing
+from the committed record and compare: two independent computations of one fact.</p>
+<h2>The model</h2>
+<h3><code>ModelState</code></h3>
+<p>Three prognostic fields, all <code>Float64Array</code> on the declared grid: <code>thickness</code> at cell
+centres, <code>velocityU</code> on the eastern face, <code>velocityV</code> on the northern face. That is an
+Arakawa C-grid, and the arrangement is the point — it puts the pressure gradient and the
+divergence on adjacent points rather than averaged ones, which is what stops a
+two-grid-interval checkerboard from being invisible to the scheme.</p>
+<h3><code>GridSpec</code></h3>
+<p><code>nx</code> and <code>ny</code> come from configuration; <code>cellSizeXMetres</code> and <code>cellSizeYMetres</code> are computed
+from the declared domain box and reported as computed. <strong>They differ.</strong> A five-degree box at
+36.5 °N is 4 474 m east–west and 5 529 m north–south, so there is no single declared cell
+size — declaring one would be declaring something untrue, and the stability limit is set by
+the smaller of the two.</p>
+<h3><code>StabilityAssessment</code></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>gravityWaveSpeedMetresPerSecond</code></td>
+<td><code>sqrt(g&#39;H)</code>, 3.162 m/s as declared</td>
+</tr>
+<tr>
+<td><code>linearStabilityBoundarySeconds</code></td>
+<td>Where leapfrog on a C-grid becomes unstable: 549.9 s</td>
+</tr>
+<tr>
+<td><code>largestStableTimestepSeconds</code></td>
+<td>That boundary times the declared CFL: 275.0 s</td>
+</tr>
+<tr>
+<td><code>declaredTimestepSeconds</code></td>
+<td>240 s, which also divides an hour so the hourly diagnosis is exact</td>
+</tr>
+<tr>
+<td><code>viscousNumber</code></td>
+<td><code>A · 2Δt · (4/dx² + 4/dy²)</code>, stable below a half</td>
+</tr>
+</tbody></table>
+<p>Initialisation fails with all of these figures if either criterion is missed. It has done so
+twice.</p>
+<h3><code>ModelResults</code></h3>
+<p>The published interface. Everything it hands out is a <strong>copy</strong>, so the integration buffers
+are not reachable from the harness — a test asserts that writing into a published array
+leaves the model unchanged. It carries the sea-surface height, the thickness, the two
+velocity components, the sponge weight and its width in cells (the margin scoring must
+exclude), the invariants, the outcrop count <em>and the volume those clamps added</em>, and the
+diagnosed profile at any cell.</p>
+<h3><code>DiagnosedProfile</code></h3>
+<p>Depth is displayed, never integrated. The profile is a warm upper layer over a cold deep one
+joined by a <code>tanh</code> transition of declared thickness centred on the layer thickness, evaluated
+at the declared display levels.</p>
+<p><strong>A level&#39;s kind does not move.</strong> The surface and the deepest declared level are the model&#39;s
+own two layers and are <code>computed</code>; every level between them is <code>derived</code>, always, whatever
+the interface is doing. A kind that tracked the interface would be a kind a reader could not
+learn.</p>
+<p>The relation inverts, which is what beat 004&#39;s observation operator needs — and the inverse
+reports whether it <strong>resolved</strong> anything. A <code>tanh</code> saturates: a thermometer at 100 m in an
+ocean whose interface is at 700 m reads the upper layer&#39;s own temperature and constrains the
+interface hardly at all. An observation that constrains nothing must not be allowed to look
+as though it did.</p>
+<h2>Observations</h2>
+<p>The only currency the analysis accepts, and the only thing <code>src/instruments/</code> produces.</p>
+<p>The type is <strong>opaque</strong>: it carries a brand keyed by a symbol that
+<code>src/instruments/observation.ts</code> declares and never exports, so a module that cannot name the
+key cannot construct one. Gate G-02 fails if that symbol&#39;s name appears anywhere else.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>kind</code></td>
+<td><code>surface</code>, <code>profile</code>, or <code>interface-depth</code></td>
+</tr>
+<tr>
+<td><code>value</code>, <code>lonDeg</code>, <code>latDeg</code>, <code>depthMetres</code>, <code>instantMs</code></td>
+<td>What was measured, and where</td>
+</tr>
+<tr>
+<td><code>error</code></td>
+<td>Three declared parts, never one opaque figure — see below</td>
+</tr>
+<tr>
+<td><code>flags</code></td>
+<td>What each declared check found. A flag is carried; it never drops the observation</td>
+</tr>
+<tr>
+<td><code>external</code></td>
+<td>True for Argo: a real measurement the truth record itself assimilated</td>
+</tr>
+<tr>
+<td><code>streamName</code></td>
+<td>Which named RNG stream drew this observation&#39;s noise</td>
+</tr>
+<tr>
+<td><code>levels</code></td>
+<td>For a profile: the depth actually <strong>reached</strong>, the depth requested, the value, and per-level flags</td>
+</tr>
+<tr>
+<td><code>bound</code></td>
+<td>For an unresolved interface: <em>below 150 m</em>, say — a fact where a depth would not be</td>
+</tr>
+</tbody></table>
+<h3><code>ObservationError</code></h3>
+<p><code>instrumentNoiseSd</code> is what the device does. <code>representativenessSd</code> is what a point sample of
+the real ocean cannot know about a 1/12-degree six-hourly record. <code>declaredBias</code> is what a
+broken instrument adds (and it is added <em>after</em> noise and <em>before</em> the checks, or quality
+control could never catch it). <code>totalSd</code> is the two random parts in quadrature; a bias is not
+a variance and is not in it.</p>
+<h3>The observation operator</h3>
+<p>A temperature profile in, an interface depth out — the same two-layer relation the model
+draws a profile from, inverted. Levels are combined by inverse-variance weighting with the
+depth error propagated from the temperature error:</p>
+<pre><code>|dh/dT| = 2L / (|T_deep − T_upper| · (1 − f²))
+</code></pre>
+<p>That expression <strong>diverges</strong> as a measurement leaves the thermocline, so a level in the body
+of a layer acquires an enormous depth error and weighs almost nothing. That is the reason the
+operator was chosen (ADR-0005): the down-weighting happens through the arithmetic rather than
+through a rule.</p>
+<h3>Flags</h3>
+<p><code>gross-range</code>, <code>climatology-departure</code> (measured in standard deviations of the climatology at
+that depth — a scale the artefact can answer for), <code>vertical-inversion</code>, <code>argo-flagged</code>,
+<code>unresolved</code>, and <code>outside-record</code> (the probe reached somewhere the truth record does not
+cover). Each carries a <code>detail</code> good enough to draw and a <code>usable</code> boolean, so consumers
+cannot disagree about what a flag means.</p>
+<h2>The analysis</h2>
+<h3><code>AnalysisRecord</code></h3>
+<p>The analysed field, the attribution, which observations were used and which excluded and why,
+and enough of the gain to answer a breakdown or an influence query.</p>
+<h3><code>Attribution</code></h3>
+<p>Three weights per cell — observations, background, climatology — summing to one. It is
+<strong>branded</strong> like <code>Observation</code>: the symbol lives in <code>src/analysis/attribution.ts</code> and is
+exported from nowhere, and gate G-06 fails if its name appears elsewhere, or if anything under
+<code>src/harness/</code> contains a function producing an attribution.</p>
+<p>The weights are not estimated. Because <code>H</code> selects one cell per observation, <code>H·1 = 1</code>, and</p>
+<pre><code>Σ_k (I − K H)_ik + Σ_j K_ij = 1
+</code></pre>
+<p>so the row sum of the gain <em>is</em> the observation weight. A test recomputes it independently and
+asserts equality; the largest difference is zero.</p>
+<p><code>clampedCells</code> counts the cells whose row sum fell outside <code>[0, 1]</code> and was clamped and
+renormalised. That happens: optimal interpolation with a Gaussian covariance and clustered
+observations produces such row sums in the shadows between them. It is published rather than
+hidden.</p>
+<h3><code>CellBreakdown</code> and <code>InfluenceRegion</code></h3>
+<p>A row of the gain and a column of it. The breakdown names each contributing observation and
+its share, summing to the cell&#39;s observation weight. The influence region is one observation&#39;s
+weight in every cell, and its radius <strong>above a declared threshold</strong>.</p>
+<blockquote>
+<p>The radius is a property of the declared correlation length scale, not of the ocean. An
+observation across a front influences the far side exactly as much as its own, which the
+flow would not. The surface says so; beat 012&#39;s ensemble spread is the flow-dependent
+answer.</p>
+</blockquote>
+<h3>What an observation is worth</h3>
+<p>Three numbers, and the third is the one that is easy to forget.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>The instrument&#39;s own noise</td>
+<td>declared per instrument</td>
+</tr>
+<tr>
+<td>Representativeness <em>in the measured quantity</em></td>
+<td>declared per instrument</td>
+</tr>
+<tr>
+<td>Representativeness <em>in the state variable</em></td>
+<td><code>analysis.interfaceRepresentativenessMetres</code></td>
+</tr>
+</tbody></table>
+<p>The operator propagates a formal interface-depth error under a metre. That is what the
+instrument could not know, and it is a <strong>lower bound</strong> on what the observation is worth to a
+4.5 km cell, which differs from a point sounding by tens of metres of mesoscale variability.
+Using the formal error as the whole error tells the analysis to trust a measurement more than
+it deserves — and it did, until this was declared.</p>
+<h2>Scores</h2>
+<h3><code>Figure</code></h3>
+<p>A number that says what kind of number it is: <code>{ value, kind, unit }</code>. Scoring emits most of
+the figures the surface draws, which is why the kind travels on the figure rather than being
+decided where it is rendered — a value that arrived as <code>computed</code> cannot be re-typed on its
+way to the screen. A test round-trips a whole score through JSON and asserts the kinds survive.</p>
+<h3><code>Score</code></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>forecastError</code>, <code>persistenceError</code>, <code>climatologyError</code></td>
+<td>Root-mean-square difference of interface-depth <strong>anomaly</strong></td>
+</tr>
+<tr>
+<td><code>skillAgainstPersistence</code>, <code>skillAgainstClimatology</code></td>
+<td><code>1 − forecast/reference</code>; <code>null</code> where the reference is perfect</td>
+</tr>
+<tr>
+<td><code>statement</code></td>
+<td>In the SRD&#39;s own words. The surface prints it verbatim</td>
+</tr>
+<tr>
+<td><code>meanOffsets</code></td>
+<td>What was removed before comparing, published rather than absorbed</td>
+</tr>
+<tr>
+<td><code>provenance</code></td>
+<td>Below. A score cannot be constructed without one</td>
+</tr>
+</tbody></table>
+<p><strong>Why anomalies.</strong> A reduced-gravity model has no absolute reference for its free surface: only
+departures from a mean carry information, which is why the mean is removed at initialisation.
+Scoring uses the same convention or it measures an offset neither field claims to determine —
+and it did, to the tune of a hundred metres out of the hundred and forty first reported.</p>
+<h3><code>ScoreProvenance</code></h3>
+<p>Reference, region label, margin in cells, cells actually scored, the window&#39;s two instants, the
+metric, the resolution floor <strong>from the truth artefact</strong>, the truth source&#39;s id, and the
+independence caveat naming any external observation the analysis assimilated in the window.</p>
+<p>A score without provenance is an assertion, so the type makes one impossible.</p>
+<h3>What the scorer refuses</h3>
+<ul>
+<li>A region finer than the truth record&#39;s own resolution: <em>scoring inside it would be scoring
+interpolation, not the ocean.</em></li>
+<li>A valid instant outside the record — the refusal beat 009&#39;s validity statement rests on.</li>
+<li>A region with nothing left after the margin is removed.</li>
+<li>Division by a perfect reference: <code>null</code>, and <em>persistence is perfect here</em>.</li>
+</ul>
+<h2>The row</h2>
+<p>The primary surface, and the only place the six horizons appear together. ADR-0003 records
+why it is a row and not a slider or a grid.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Panel.leadHours</code></td>
+<td>The <span class="declared">declared</span> horizon. One panel per horizon and no others; gate G-05 checks that in a running browser.</td>
+</tr>
+<tr>
+<td><code>Panel.validInstant</code>, <code>Panel.initialisedFrom</code></td>
+<td>Absolute instants in the run&#39;s clock, not only a lead time, so that no reader has to do arithmetic to find out whether two panels are comparable.</td>
+</tr>
+<tr>
+<td><code>Panel.field</code></td>
+<td>The forecast interface depth as an <strong>anomaly</strong> about its own regional mean — the same convention the scorer uses, so the picture and the number describe the same thing.</td>
+</tr>
+<tr>
+<td><code>Panel.observationWeight</code></td>
+<td>The analysis&#39;s own weights, read through <code>weightsAt</code> and computed nowhere else.</td>
+</tr>
+<tr>
+<td><code>Panel.observationsDominant</code></td>
+<td>Where observations lead both other sources: the hatch, and the second channel of FR-019.</td>
+</tr>
+<tr>
+<td><code>Panel.score</code></td>
+<td>The <code>Score</code> of the section above, or <code>null</code> before the row has been scored. Scoring is on demand because it costs a second and the interface does not freeze.</td>
+</tr>
+<tr>
+<td><code>Panel.enlarged</code></td>
+<td>A class on an element. Enlargement changes what is shown and never what is computed; the test asserts it by object identity.</td>
+</tr>
+</tbody></table>
+<p><strong>The attribution is one field.</strong> The recorded case runs a single analysis, at the issue
+instant, and the row draws it on every panel. Six identical fields side by side would imply
+six analyses, so the legend states the instant and says that attribution becomes per horizon
+once the forecast cycles.</p>
+<h2>Where a field is painted</h2>
+<p>One module, <code>field-surface.ts</code>, owns every palette and shader. It reports the surface it got
+— <code>webgl2</code> where the browser has it, <code>canvas2d</code> where it does not — on the canvas itself, and
+both paths are exercised by tests: headless Chromium here has WebGL2, so a test refuses it in
+an init script to make the fallback actually run.</p>
+<h2>The counterfactuals</h2>
+<p>An edit is a value, not a mutation: it lives in the manifest, it is applied in order to a fresh
+run, and reverting is removing it. That is why byte-identical revert is structural.</p>
+<table>
+<thead>
+<tr>
+<th>Edit</th>
+<th>What it changes</th>
+<th>Applied</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>withhold</code></td>
+<td>One observation leaves the analysis and stays in the record, drawn struck through.</td>
+<td>after sampling</td>
+</tr>
+<tr>
+<td><code>profile</code></td>
+<td>A measured profile&#39;s values, through the <strong>same</strong> observation operator, with the measurement kept as a ghost.</td>
+<td>after sampling</td>
+</tr>
+<tr>
+<td><code>bias</code></td>
+<td>An instrument&#39;s declared bias, added after noise and before the checks.</td>
+<td>to the configuration</td>
+</tr>
+<tr>
+<td><code>quality-control</code></td>
+<td>Whether the declared checks run at all.</td>
+<td>to the configuration</td>
+</tr>
+<tr>
+<td><code>track</code></td>
+<td>The waypoints. The instruments resample truth where the reader put them, through the same instruments and named streams.</td>
+<td>to the configuration</td>
+</tr>
+</tbody></table>
+<p>A track edit is checked against <code>instruments.track.vesselSpeedKnots</code>, and the declared rule is
+to <strong>stretch</strong> the instants rather than refuse the edit — a reader dragging a waypoint is asking
+what if we had gone there, not whether we could have got there by Tuesday. The stretch is
+stated.</p>
+<p>Two things a reader should know about the checks, both measured in beat 010:</p>
+<ul>
+<li>A profile more than <code>instruments.qualityControl.profileRejectionFraction</code> of whose levels
+failed a check is not trusted at any depth, and the interface derived from it is flagged.
+Before this the flags stopped at the levels and the observation the analysis consumed never
+learned it was suspect.</li>
+<li>A bias large enough to trip the gross-range check is also large enough for the observation
+operator to refuse the profile, so for a warm bias the operator, not the check, is what
+excludes it — identically whether or not quality control is running.</li>
+</ul>
+<h2>The forecast, on two axes</h2>
+<p><code>runForecast</code> produces one entry per declared horizon. The declared horizons are measured from
+the <strong>default</strong> issue instant, so moving the issue time leaves every panel valid at the same
+moment and makes each of them a longer forecast of it.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>HorizonForecast.leadHours</code></td>
+<td>The declared horizon. It names the panel and fixes the valid instant.</td>
+</tr>
+<tr>
+<td><code>HorizonForecast.leadFromIssueHours</code></td>
+<td>What was actually asked of the model: the valid instant less the issue instant. The two differ the moment issue time moves, and conflating them is the confusion the second axis exists to remove.</td>
+</tr>
+<tr>
+<td><code>HorizonForecast.field</code></td>
+<td>Absent where the panel is outside validity or before its issue instant.</td>
+</tr>
+<tr>
+<td><code>HorizonForecast.refusal</code></td>
+<td>Present exactly when the field is absent, and says which of the two it is.</td>
+</tr>
+<tr>
+<td><code>ForecastResult.observationsAvailable</code></td>
+<td>How many observations the analysis was allowed to see: those with instants <strong>at or before</strong> the issue instant.</td>
+</tr>
+<tr>
+<td><code>ForecastResult.observationsWithheld</code></td>
+<td>How many had not happened yet. Until beat 009 this was zero because the analysis was handed all of them, which is the correction that beat records.</td>
+</tr>
+<tr>
+<td><code>DepartureBrief</code></td>
+<td>The analysis at the declared quay-side instant, held constant and never refreshed (FR-026). At the quay side of the recorded case nothing has reported, so it is background blended with climatology — a generous baseline, not a straw man.</td>
+</tr>
+</tbody></table>
+<h2>The observation footprint</h2>
+<p>What the instruments did, as marks. Built from the run&#39;s observations and from nothing else:
+the footprint does not sample truth and does not compute, and a test asserts that by reading
+the module&#39;s own imports.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>TrackMark.value</code></td>
+<td>The surface measurement itself. Its place in the track&#39;s own range drives the mark&#39;s size and fill, so the encoding survives having its colour removed.</td>
+</tr>
+<tr>
+<td><code>FootprintMark.afterInitialisation</code></td>
+<td>Measured after the instant a forecast was initialised from, so it did not inform it. Drawn distinctly, because a mark that did not inform a forecast must not look like one that did.</td>
+</tr>
+<tr>
+<td><code>FootprintMark.insideMargin</code></td>
+<td>Inside the sponge margin. The analysis used it; scoring excludes the region, and the hover says so.</td>
+</tr>
+<tr>
+<td><code>FootprintMark.flagged</code></td>
+<td>Failed a declared check, or carries an Argo flag. Drawn as flagged, never omitted, and distinguishable by luminance rather than hue.</td>
+</tr>
+<tr>
+<td><code>Needle.deepestMetres</code></td>
+<td>The depth <strong>actually reached</strong>, which is not the depth asked for: an XBT infers its depth from a fall-rate equation. The needle&#39;s extent is this and nothing else.</td>
+</tr>
+<tr>
+<td><code>Needle.continuesBelow</code></td>
+<td>The probe went past the floor of the displayed volume. The needle says so rather than stopping as though the profile had.</td>
+</tr>
+<tr>
+<td><code>Needle.measuredNothing</code></td>
+<td>The profile reports no value at any level. Five delayed-mode Argo profiles in the recorded case are like this; they are drawn as a cross at the surface, not as a needle of zero length.</td>
+</tr>
+<tr>
+<td><code>Needle.assimilated</code></td>
+<td>ADR-0007: Argo is drawn either way, and the hover says which.</td>
+</tr>
+</tbody></table>
+<p>The <strong>elevation</strong> is a side elevation, not a scene: it shares the field&#39;s horizontal axis and
+puts depth downward, so latitude is not shown and position is read from the plan view above. A
+perspective volume would imply a viewpoint and a set of distances the harness does not have.</p>
+<p>Every panel also carries a visually hidden <strong>list</strong> of its marks, one entry per observation. A
+canvas says nothing to a reader who cannot see it, and nothing to a test either.</p>
+<h2>The figure kinds</h2>
+<p>Not a type but a discipline, and the surface enforces it typographically.</p>
+<dl class="entries">
+<dt><span class="declared">Declared</span></dt>
+<dd>A value from configuration. Dotted underline, blue.</dd>
+<dt><span class="computed">Computed</span></dt>
+<dd>Produced by the model or the analysis. Bold.</dd>
+<dt><span class="derived">Derived</span></dt>
+<dd>Diagnosed from computed state, such as the depth levels between the model's own. Dashed underline, italic.</dd>
+<dt><span class="host-time">Host time</span></dt>
+<dd>How long the machinery took. Never simulation time, and never enters a run or a manifest.</dd>
+</dl><p>A figure does not change kind between states.</p>
+
+    </main>
+    <footer>
+      <p>
+        j-ocean is a teaching harness. Its numerics are real but reduced, its domain small,
+        and its claims are about relative skill between references it computes itself. This
+        site is a claim about the tree; where the two disagree, the tree wins.
+      </p>
+    </footer>
+  </body>
+</html>
