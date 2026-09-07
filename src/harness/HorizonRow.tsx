@@ -2,8 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'r
 import type { AnalysisRecord } from '../analysis/optimal-interpolation.js';
 import { weightsAt } from '../analysis/attribution.js';
 import type { Configuration, Domain } from '../config/schema.js';
-import { interfaceFieldFromContainer, interfaceFieldFromTruth } from '../instruments/interface-field.js';
-import { domainRegion, score, ScoringRefusal, type Score } from '../scoring/scorer.js';
+import type { Score } from '../scoring/scorer.js';
 import type { TruthSource } from '../ports/truth-source.js';
 import type { FieldContainer } from '../truth/container.js';
 import type { ForecastResult } from '../run/forecast.js';
@@ -11,6 +10,7 @@ import { Panel } from './Panel.js';
 import { profileFromInterfaceDepth } from '../model/profile.js';
 import type { Footprint } from './footprint.js';
 import { markersFrom, marksOf, trackValueRange } from './footprint.js';
+import { scoreEveryHorizon } from './scoring-run.js';
 import { SkillInset, type SkillCurve } from './SkillInset.js';
 import { Counterfactuals } from './Counterfactuals.js';
 import type { Edit } from '../instruments/edits.js';
@@ -156,77 +156,33 @@ export function HorizonRow(props: HorizonRowProps) {
     return flags;
   }, [analysis]);
 
+  /**
+   * Score every panel (FR-005, FR-026).
+   *
+   * The arithmetic is `scoreEveryHorizon` in `scoring-run.ts` and no longer lives here: the
+   * gate that holds this beat digests the row's scores, and until T020 it digested a copy of
+   * this callback rather than the callback (plan 013, "What the record cannot hold"). What is
+   * left here is the state-setting, which is the part that belongs to a component.
+   */
   const scoreAll = useCallback(() => {
-    const region = domainRegion(config, forecast.parameters.grid.nx, forecast.parameters.grid.ny);
-    const climatologyField = interfaceFieldFromContainer(
-      climatology,
-      forecast.parameters.thermalStructure,
-      forecast.box,
-      forecast.parameters.grid,
-    );
-    const next = new Map<number, Score | null>();
-    const briefNext = new Map<number, Score | null>();
-    try {
-      for (const leadHours of horizons) {
-        const panel = forecast.byHorizon.get(leadHours);
-        // FR-005: a panel with no field has nothing to score, and says why instead.
-        if (panel === undefined || panel.field === null) {
-          next.set(leadHours, null);
-          briefNext.set(leadHours, null);
-          continue;
-        }
-        const validInstantMs = panel.validInstantMs;
-        const truthAtValidInstant = interfaceFieldFromTruth(
-          truth,
-          forecast.parameters.thermalStructure,
-          forecast.box,
-          forecast.parameters.grid,
-          validInstantMs,
-        );
-        const common = {
-          config,
-          domain,
-          truth,
-          initial: forecast.initial,
-          climatology: climatologyField,
-          truthAtValidInstant,
-          region,
-          fromInstantMs: forecast.issueInstantMs,
-          validInstantMs,
-          externalObservationIds: forecast.externalObservationIds,
-        };
-        next.set(leadHours, score({ ...common, forecast: panel.field }));
-        // FR-026: the baseline everything else is watched against, scored the same way at the
-        // same instant so the two figures are comparable rather than merely adjacent.
-        briefNext.set(
-          leadHours,
-          score({ ...common, forecast: props.brief.field, initial: props.brief.field }),
-        );
-      }
-      setScores(next);
-      setBriefScores(briefNext);
-      setCurves((current) => {
-        const points = horizons.map((leadHours) => ({
-          leadHours,
-          skill: next.get(leadHours)?.skillAgainstPersistence?.value ?? null,
-        }));
-        // The inset draws the curves that have actually been computed, labelled by issue
-        // instant. It never draws a curve for an issue time nobody has scored.
-        return [
-          ...current.filter((curve) => curve.issueInstantMs !== forecast.issueInstantMs),
-          { issueInstantMs: forecast.issueInstantMs, points },
-        ].sort((a, b) => a.issueInstantMs - b.issueInstantMs);
-      });
-      setScoringFailure(null);
-    } catch (error) {
-      // The spec's second edge case: a horizon whose valid instant is outside the record.
-      // The panel still renders its forecast; the score says there is no truth there.
-      setScores(next);
-      setScoringFailure(
-        error instanceof ScoringRefusal ? error.message : String(error),
-      );
+    const run = scoreEveryHorizon({ config, domain, forecast, truth, climatology, brief: props.brief });
+    if (run.refusal !== null) {
+      setScores(run.scores);
+      setScoringFailure(run.refusal);
+      return;
     }
-  }, [config, domain, forecast, truth, climatology, horizons, props.brief]);
+    setScores(run.scores);
+    setBriefScores(run.briefScores);
+    setCurves((current) =>
+      // The inset draws the curves that have actually been computed, labelled by issue
+      // instant. It never draws a curve for an issue time nobody has scored.
+      [
+        ...current.filter((curve) => curve.issueInstantMs !== run.issueInstantMs),
+        { issueInstantMs: run.issueInstantMs, points: run.points },
+      ].sort((a, b) => a.issueInstantMs - b.issueInstantMs),
+    );
+    setScoringFailure(null);
+  }, [config, domain, forecast, truth, climatology, props.brief]);
 
   useEffect(() => {
     // The scores belong to the forecast that has just been replaced, so they go. The
@@ -240,8 +196,11 @@ export function HorizonRow(props: HorizonRowProps) {
   const runStartMs = Date.parse(config.truth.period.start);
   const earliestMs = runStartMs + config.forecast.issueTimeControl.earliestOffsetHours * 3_600_000;
   const latestMs = runStartMs + config.forecast.issueTimeControl.latestOffsetHours * 3_600_000;
+  // One list of marks for this row (T021). The footprint is now a stable prop, so this holds
+  // between renders instead of being rebuilt beside every reader of it.
+  const marks = useMemo(() => marksOf(props.footprint), [props.footprint]);
   const observationInstants = [
-    ...new Set(marksOf(props.footprint).map((mark) => mark.instantMs)),
+    ...new Set(marks.map((mark) => mark.instantMs)),
   ]
     .filter((instantMs) => instantMs >= earliestMs && instantMs <= latestMs)
     .sort((a, b) => a - b);
@@ -571,7 +530,7 @@ export function HorizonRow(props: HorizonRowProps) {
         </span>{' '}
         Argo profiles, of which{' '}
         <span className="computed" data-testid="footprint-flagged-count">
-          {marksOf(props.footprint).filter((mark) => mark.flagged).length}
+          {marks.filter((mark) => mark.flagged).length}
         </span>{' '}
         carry a flag &mdash; drawn as flagged, never omitted.{' '}
         {props.footprint.qualityControlEnabled

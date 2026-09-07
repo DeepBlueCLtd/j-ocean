@@ -7,6 +7,7 @@ import { checkArtefactDrift } from '../../scripts/gates/check-artefact-drift.js'
 import { checkHostTime } from '../../scripts/gates/check-host-time.js';
 import { checkModelImports } from '../../scripts/gates/check-model-imports.js';
 import { checkAttributionSource } from '../../scripts/gates/check-attribution-source.js';
+import { checkSurfaceInvariance } from '../../scripts/gates/check-surface-invariance.js';
 import { checkTruthBoundary } from '../../scripts/gates/check-truth-boundary.js';
 import { checkVocabulary } from '../../scripts/gates/check-vocabulary.js';
 import { REPO_ROOT } from '../../scripts/gates/gate-lib.js';
@@ -111,6 +112,26 @@ describe('the gates fail on their planted violations', () => {
     expect(output).toContain('Principle VII');
   });
 
+  /**
+   * G-07, and the reason the plan puts it first: beat 013 rearranges a 1,301-line component
+   * and claims it moves no number. The planted violation is one analysis coefficient in a
+   * declared configuration, and what makes the gate worth having is not that it goes red but
+   * that it says *which* quantity moved and what its two digests are.
+   */
+  it('G-07 catches one changed analysis coefficient, naming the quantities that moved', () => {
+    const { code, output } = spawnGate(
+      'check-surface-invariance',
+      'scripts/gates/fixtures/surface-invariance',
+    );
+    expect(code).not.toBe(0);
+    expect(output).toContain('analysis.field');
+    expect(output).toContain('moved');
+    // Both digests, because "something changed" is a report nobody can act on.
+    expect(output).toMatch(/recorded [0-9a-f]{64}, current [0-9a-f]{64}/);
+    // And the producer sentence, so the reader knows where to look (Principle V).
+    expect(output).toContain('src/analysis/optimal-interpolation.ts');
+  });
+
   it('the vocabulary gate catches a word on the hashed list, without quoting it back', () => {
     const { code, output } = spawnGate('check-vocabulary', 'scripts/gates/fixtures/vocabulary-hashed');
     expect(code).not.toBe(0);
@@ -159,10 +180,18 @@ describe('the gates pass what they should pass', () => {
       'check-vocabulary',
       'check-truth-boundary',
       'check-attribution-source',
+      // The clean fixture declares no configuration, so G-07 falls back to the repository's
+      // and passes here for the same reason it passes over the tree.
+      'check-surface-invariance',
     ]) {
       const { code } = spawnGate(gate, CLEAN);
       expect(code, `${gate} must pass the clean fixture`).toBe(0);
     }
+  });
+
+  it('G-07 passes the tree when spawned as the program CI runs', () => {
+    const { code } = spawnGate('check-surface-invariance', '.');
+    expect(code).toBe(0);
   });
 
   it('passes the tree', () => {
@@ -172,6 +201,7 @@ describe('the gates pass what they should pass', () => {
       checkVocabulary(REPO_ROOT),
       checkTruthBoundary(REPO_ROOT),
       checkAttributionSource(REPO_ROOT),
+      checkSurfaceInvariance(REPO_ROOT),
       checkArtefactDrift([]),
     ]) {
       expect(result.violations, `${result.gate} must pass the tree`).toEqual([]);
@@ -185,6 +215,9 @@ describe('the gates pass what they should pass', () => {
     expect(checkVocabulary(REPO_ROOT).scanned).toBeGreaterThan(0);
     expect(checkTruthBoundary(REPO_ROOT).scanned).toBeGreaterThan(0);
     expect(checkAttributionSource(REPO_ROOT).scanned).toBeGreaterThan(0);
+    // For G-07 the number is quantities rather than files, and the reasoning is the same: a
+    // record with nothing in it would compare nothing and pass.
+    expect(checkSurfaceInvariance(REPO_ROOT).scanned).toBeGreaterThan(0);
   });
 
   /**
