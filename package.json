@@ -17,6 +17,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "gates": "tsx scripts/gates/run-all.ts",
+    "record-invariance": "tsx scripts/gates/record-surface-invariance.ts",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm gates && pnpm build && pnpm site",
     "screenshots": "playwright test --project=screenshots",
     "site": "tsx scripts/docs/build-site.ts",

@@ -3,6 +3,7 @@ import { checkAttributionSource } from './check-attribution-source.js';
 import { checkDeclaredHorizons } from './check-declared-horizons.js';
 import { checkHostTime } from './check-host-time.js';
 import { checkModelImports } from './check-model-imports.js';
+import { checkSurfaceInvariance } from './check-surface-invariance.js';
 import { checkTruthBoundary } from './check-truth-boundary.js';
 import { checkVocabulary } from './check-vocabulary.js';
 import { REPO_ROOT, report, type GateResult } from './gate-lib.js';
@@ -36,6 +37,7 @@ const GATES: readonly (Landed | NotYetLanded)[] = [
   { run: () => checkDeclaredHorizons() },
   { run: checkAttributionSource },
   { run: checkVocabulary },
+  { run: checkSurfaceInvariance },
 ];
 
 const isLanded = (gate: Landed | NotYetLanded): gate is Landed => 'run' in gate;

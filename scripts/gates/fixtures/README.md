@@ -15,4 +15,5 @@ watched failing (PR-04) and so that `tests/gates/gates.test.ts` can keep watchin
 | `truth-boundary-import/` | G-02 | the analysis importing the truth-source port |
 | `truth-boundary-model/` | G-02 | the model importing it — which beat 003 actually did, until this gate was written |
 | `truth-boundary-constructor/` | G-02 | a second place that can name the `Observation` brand |
+| `surface-invariance/` | G-07 | `analysis.correlationLengthScaleKilometres` changed from 60 to 45, which moves the analysis field and everything downstream of it |
 | `clean/` | all | no violation, and the navigational use of the word for a vessel's path, which must pass |

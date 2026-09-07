@@ -7,17 +7,17 @@ changes, because FR-001 says so and because the rest of this list is otherwise u
 
 ## The gate, first (US1, FR-001, AT-10)
 
-- [ ] **T010** `scripts/gates/surface-invariance.ts`: the producer. Walks the recorded case
+- [X] **T010** `scripts/gates/surface-invariance.ts`: the producer. Walks the recorded case
       from the declared seed and returns one named digest per computed quantity — the nine
       producers listed in the plan — with the sentence naming what produced each.
-- [ ] **T011** `scripts/gates/records/surface-invariance.json`: the committed record, written
+- [X] **T011** `scripts/gates/records/surface-invariance.json`: the committed record, written
       by `scripts/gates/record-surface-invariance.ts`, never by hand.
-- [ ] **T012** `scripts/gates/check-surface-invariance.ts` (G-07): compares each quantity
+- [X] **T012** `scripts/gates/check-surface-invariance.ts` (G-07): compares each quantity
       against the record and fails naming the quantity, its recorded digest and its current
       one. Registered in `run-all.ts`.
-- [ ] **T013** `scripts/gates/fixtures/surface-invariance/`: a declared configuration with one
+- [X] **T013** `scripts/gates/fixtures/surface-invariance/`: a declared configuration with one
       analysis coefficient changed, and the fixtures README row that says what is planted.
-- [ ] **T014** `tests/gates/gates.test.ts` gains G-07: red on the fixture, green on the tree,
+- [X] **T014** `tests/gates/gates.test.ts` gains G-07: red on the fixture, green on the tree,
       and the failure names the quantity. Watched failing in the commit that introduces it.
 
 ## The regions (US2, US3, FR-002 to FR-006, FR-012)

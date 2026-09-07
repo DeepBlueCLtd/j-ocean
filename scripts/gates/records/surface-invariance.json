@@ -1,0 +1,212 @@
+{
+  "derived": "Derived by scripts/gates/record-surface-invariance.ts (pnpm record-invariance). Never edited by hand: it is the committed record of what the recorded case computes, and a hand-edited record would hold the tree against nothing (constitution Principle IX).",
+  "gate": "G-07 surface invariance",
+  "seed": "6a09e667f3bcc908",
+  "quantities": [
+    {
+      "name": "configuration",
+      "digest": "2c0d997206b62148366896849d41bad24109edaea9844255158d61479cf67db8",
+      "producer": "digestOf in src/config/digest.ts, over the configuration loadConfiguration validated."
+    },
+    {
+      "name": "initialisation.report",
+      "digest": "7d95e79a23c342eb0b53ac7ce8fddeebec23c8f1dee10272673b92c924715427",
+      "producer": "initialiseFromTruth in src/run/initialise-from-truth.ts reports the box it laid the grid over, the mean it removed and what it clamped."
+    },
+    {
+      "name": "state.step0.bytes",
+      "digest": "8cb29ab17d0f39b000b81381d800fd960cf41d3062ddfa0ae8a72e7fcd2c613b",
+      "producer": "stateBytes in src/model/grid.ts, over the state createRun adopted from initialiseFromTruth before any step."
+    },
+    {
+      "name": "instruments.surface",
+      "digest": "4fd887aab9e42b8f4d3e0d2e878ddee2e8868a985d888d06e982c6ddf1283c53",
+      "producer": "sampleSurface in src/instruments/instruments.ts, the ownship thermometer along the declared track."
+    },
+    {
+      "name": "instruments.xbtDrops",
+      "digest": "9d014b27f12f3c7097190e5de2b5fbd97c2698d9780b58c045ec355d599dd546",
+      "producer": "sampleXbtDrops in src/instruments/instruments.ts, each drop as the profile measured and the interface depth it implies."
+    },
+    {
+      "name": "instruments.argo",
+      "digest": "717d5c45f2ef3117b516f0f917593e59d567c288d564629561a5732e8e8933bc",
+      "producer": "argoObservations in src/instruments/instruments.ts, the committed Argo profiles with their flags carried through."
+    },
+    {
+      "name": "analysis.field",
+      "digest": "ea46645c833fac4ef2ee7e3c5b391da77cce94f61005f91836af4ed8b1009cec",
+      "producer": "analyse in src/analysis/optimal-interpolation.ts, the analysed interface depth at the run's initial instant."
+    },
+    {
+      "name": "analysis.attributionWeights",
+      "digest": "6c05822626d117f78e10a972e1499a1d3b719d97fb585cb799e31698e9019c66",
+      "producer": "weightsAt in src/analysis/attribution.ts, over the attribution analyse exported from its own gain."
+    },
+    {
+      "name": "analysis.usedObservations",
+      "digest": "3907e625d98a4dcd325ee65f79da12e23800a385c26b969f28134194ce0618d0",
+      "producer": "analyse in src/analysis/optimal-interpolation.ts records which observations it admitted, where each landed and with what error."
+    },
+    {
+      "name": "analysis.excludedObservations",
+      "digest": "ae0beb6567eb7badba6b8938d2fd2b3de0cbf2bb20d906a34d9726703b807240",
+      "producer": "analyse in src/analysis/optimal-interpolation.ts records every observation it refused and the flag that refused it."
+    },
+    {
+      "name": "results.seaSurfaceHeightMetres",
+      "digest": "f0d7aba4541cb68c6d3e5ee13adf96fda3249a5875101b2090045ff3d649d236",
+      "producer": "publishResults in src/model/results.ts, at step 0, which is what the shell publishes before a reader asks it to integrate."
+    },
+    {
+      "name": "results.thicknessMetres",
+      "digest": "9d2af87fcc11227911c4e7be1d9cf66b2bf9a62ab5ee1346ca89d848b82fa390",
+      "producer": "publishResults in src/model/results.ts, at step 0, which is what the shell publishes before a reader asks it to integrate."
+    },
+    {
+      "name": "results.velocityU",
+      "digest": "56813072ee791e6e1ea120dff00ebaaa656aa9dd1dff19688ff64333fd2e525f",
+      "producer": "publishResults in src/model/results.ts, at step 0, which is what the shell publishes before a reader asks it to integrate."
+    },
+    {
+      "name": "results.velocityV",
+      "digest": "eefe61a0fc8e3e740534ce9c86c9b1453d0c24bc03d91e9d6f0945ef96e1b041",
+      "producer": "publishResults in src/model/results.ts, at step 0, which is what the shell publishes before a reader asks it to integrate."
+    },
+    {
+      "name": "results.spongeWeight",
+      "digest": "7c3fb7cfcfd40ad40ebc211f6c09018a14ce70968421e6827afa8ebaaddabe5b",
+      "producer": "publishResults in src/model/results.ts, at step 0, which is what the shell publishes before a reader asks it to integrate."
+    },
+    {
+      "name": "results.invariants",
+      "digest": "efc64fee4873d6088fb3eab34a6ab2041f37f2c16de096166fbdf7a3c7770825",
+      "producer": "invariantsOf, through publishResults in src/model/results.ts: volume and energy at step 0."
+    },
+    {
+      "name": "results.diagnostics",
+      "digest": "33d01b851dcb3fc5c98619f72a55921552b21317244fb4d793dab38d7f37d259",
+      "producer": "publishResults in src/model/results.ts, at step 0, which is what the shell publishes before a reader asks it to integrate."
+    },
+    {
+      "name": "state.afterDeclaredAdvance.bytes",
+      "digest": "218b7dcedfabd5563e79be2fdcb9a41a5551202f318951329ee9f18773e9cb04",
+      "producer": "stateBytes in src/model/grid.ts, after Run.advance took the 180 steps of the shell's twelve-hour advance."
+    },
+    {
+      "name": "runScore.lead-24h",
+      "digest": "a7c004fa5283d9fded564391c957f8e289823aac6cb503b73957b7bb94e6e233",
+      "producer": "score in src/scoring/scorer.ts, over domainRegion and interfaceFieldFromTruth: the run itself scored where App.tsx scoreRun scores it."
+    },
+    {
+      "name": "forecast.issue",
+      "digest": "139e4b9979c3b0a8cbb1c8e6d3524ce980c106ed9ae79c93ced0c276fa5bdafc",
+      "producer": "runForecast in src/run/forecast.ts: the analysis at the issue instant that every panel in the row starts from, and what it was allowed to see."
+    },
+    {
+      "name": "forecast.lead-0h.field",
+      "digest": "2b523c4b211c2724f38871b6733310010b787a1d53ec3198a5cb845ca1bb029d",
+      "producer": "runForecast in src/run/forecast.ts, integrating the issue analysis forward to this declared horizon."
+    },
+    {
+      "name": "forecast.lead-12h.field",
+      "digest": "5a04139b2dcbb19e4aecf4858334975f89003d4f68732732dee0099ccb6f4071",
+      "producer": "runForecast in src/run/forecast.ts, integrating the issue analysis forward to this declared horizon."
+    },
+    {
+      "name": "forecast.lead-24h.field",
+      "digest": "f2bad1ee3602ad28472e4abfc2e44fca5b6067c93a8caef4b0ddc2f69a78f374",
+      "producer": "runForecast in src/run/forecast.ts, integrating the issue analysis forward to this declared horizon."
+    },
+    {
+      "name": "forecast.lead-48h.field",
+      "digest": "0140b8983c9b3fe39e90c095ade6adc67a717f80ea7d0d3735f49cd324a9b4f7",
+      "producer": "runForecast in src/run/forecast.ts, integrating the issue analysis forward to this declared horizon."
+    },
+    {
+      "name": "forecast.lead-72h.field",
+      "digest": "3f6f46405cbfb475da7adfabda49d953495937d8b424e10d12269d630ee40c31",
+      "producer": "runForecast in src/run/forecast.ts, integrating the issue analysis forward to this declared horizon."
+    },
+    {
+      "name": "forecast.lead-96h.field",
+      "digest": "106ea1f885bb7bbd854d8ebfe41961e7f9243e60c05df489d26b3bd34ce2beed",
+      "producer": "runForecast in src/run/forecast.ts, integrating the issue analysis forward to this declared horizon."
+    },
+    {
+      "name": "brief",
+      "digest": "4bae7af74c59bd0cdb1b0422c25241496c9138be3b5d7cfc65e8bafdd812b4aa",
+      "producer": "departureBrief in src/run/forecast.ts: the frozen quay-side analysis, computed once and never refreshed."
+    },
+    {
+      "name": "score.lead-0h",
+      "digest": "65a7fb3491bc86468ebe63f3b2206262267d53a1f2e686edc26ca6ceaa068ca8",
+      "producer": "score in src/scoring/scorer.ts, over domainRegion and interfaceFieldFromTruth: both skills and all three errors for this declared horizon."
+    },
+    {
+      "name": "briefScore.lead-0h",
+      "digest": "d1540a7f4314b3472ef742da50f7ffa8d8efac3fdb431ddbbc9784cf493e9f7b",
+      "producer": "score in src/scoring/scorer.ts, the departure brief held and scored at the same instant so the two figures are comparable."
+    },
+    {
+      "name": "score.lead-12h",
+      "digest": "cc666c0938adc9bebc0c166a5f2c353662404ddbc79a62a6667573dfbf183247",
+      "producer": "score in src/scoring/scorer.ts, over domainRegion and interfaceFieldFromTruth: both skills and all three errors for this declared horizon."
+    },
+    {
+      "name": "briefScore.lead-12h",
+      "digest": "147ad5f5ccc77a19e6dc13d6c942ef246bb3e66cb3fabcdd38cebb3d743e3026",
+      "producer": "score in src/scoring/scorer.ts, the departure brief held and scored at the same instant so the two figures are comparable."
+    },
+    {
+      "name": "score.lead-24h",
+      "digest": "fe32d58045e89b5977ad75c631fdceaad3b258c002c33e90601084de652caaca",
+      "producer": "score in src/scoring/scorer.ts, over domainRegion and interfaceFieldFromTruth: both skills and all three errors for this declared horizon."
+    },
+    {
+      "name": "briefScore.lead-24h",
+      "digest": "caf3e6b1a3a2e1e59e3398fe354d4627934bd7603b918becdd544a34030964df",
+      "producer": "score in src/scoring/scorer.ts, the departure brief held and scored at the same instant so the two figures are comparable."
+    },
+    {
+      "name": "score.lead-48h",
+      "digest": "bc623c0d695c3bfa7584983ce8db3961767b2d78ebfb65a63e95ae3d280960b0",
+      "producer": "score in src/scoring/scorer.ts, over domainRegion and interfaceFieldFromTruth: both skills and all three errors for this declared horizon."
+    },
+    {
+      "name": "briefScore.lead-48h",
+      "digest": "5c3f2f7533a9de310fd113cebce8c5d15178643f4a8103f5dc937e9d9cad7a74",
+      "producer": "score in src/scoring/scorer.ts, the departure brief held and scored at the same instant so the two figures are comparable."
+    },
+    {
+      "name": "score.lead-72h",
+      "digest": "028d3b3e7f87881d509768e7c9841e434b173c8850b11a85b3075086b9a16e51",
+      "producer": "score in src/scoring/scorer.ts, over domainRegion and interfaceFieldFromTruth: both skills and all three errors for this declared horizon."
+    },
+    {
+      "name": "briefScore.lead-72h",
+      "digest": "bb2d86851d01a2519479824293e84b8a204ab691248b31bef1808966a45f10bb",
+      "producer": "score in src/scoring/scorer.ts, the departure brief held and scored at the same instant so the two figures are comparable."
+    },
+    {
+      "name": "score.lead-96h",
+      "digest": "8ef736cb30ba6cc76016617b449b303e6f43b8c587c9f903938fd85630439b97",
+      "producer": "score in src/scoring/scorer.ts, over domainRegion and interfaceFieldFromTruth: both skills and all three errors for this declared horizon."
+    },
+    {
+      "name": "briefScore.lead-96h",
+      "digest": "711f81d188274d49159d0cce8512112239298e17888e23c63dd0fd6a685bc3b1",
+      "producer": "score in src/scoring/scorer.ts, the departure brief held and scored at the same instant so the two figures are comparable."
+    },
+    {
+      "name": "footprint.run",
+      "digest": "7e6ea270d9e92b1adedbee102616e244b6ca0ccb7127bc9dcc3d23533ab62766",
+      "producer": "footprintOf in src/harness/footprint.ts, as markersFor builds it: the run as it stands, initialised at the declared epoch."
+    },
+    {
+      "name": "footprint.row",
+      "digest": "7db3c023e8f200d4727b495e12a32932f71cd5c9aa9664cac2af6a0f7fa23137",
+      "producer": "footprintOf in src/harness/footprint.ts, as the row reads it: the forecast's own observations, initialised at the issue instant."
+    }
+  ]
+}
