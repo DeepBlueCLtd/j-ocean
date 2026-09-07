@@ -123,6 +123,23 @@ more than it holds.
   scrolling overflow is one of the declared ones. An undeclared scrollbar fails the test by
   name.
 
+## What the regions cost, measured
+
+Two figures came out of building them, and both change a declared value.
+
+- **The reference width no longer holds the row.** Six panels at the declared minimum need
+  1 190 px; the controls and detail columns plus the gutter need 848 more. `1400` was declared in
+  beat 007 for a row that had the whole window, and the measured minimum for four regions is
+  **2 038**. The centre must not answer that by scrolling horizontally — that is beat 007's own
+  finding coming back through a different door, and it is what FR-43 exists to answer instead. So
+  the floor is declared at the measured figure and below it the application says the size it needs.
+- **G-07's first quantity is a digest of the whole validated configuration**, so declaring any
+  presentation figure — a column width, the floor itself — moves a recorded digest although
+  nothing computed moves. That is a real cost of the gate and it is stated rather than worked
+  around: the declared values are declared, `configuration` is re-recorded once, and the commit
+  says which quantity moved and why. A gate that made declaring a number expensive enough to avoid
+  would be shaping the design instead of holding it.
+
 ## Constitution Check
 
 | Principle | Touched | How this beat complies |
