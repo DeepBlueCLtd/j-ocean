@@ -1,11 +1,7 @@
-import { useState } from 'react';
-import type { DiagnosedProfile } from '../model/profile.js';
 import type { Score } from '../scoring/scorer.js';
 import { FieldView, type Marker } from './FieldView.js';
 import type { Footprint } from './footprint.js';
-import { marksOf } from './footprint.js';
 import { NeedleElevation } from './NeedleElevation.js';
-import { ObservationHover } from './ObservationHover.js';
 
 /**
  * One horizon (FR-013, FR-014, FR-015, FR-016, FR-021, FR-022).
@@ -19,6 +15,13 @@ import { ObservationHover } from './ObservationHover.js';
  * because a lead time alone leaves a reader doing arithmetic to find out whether two panels
  * are comparable. What its skill is against **both** references, in the words the scorer
  * chose. And where its answer came from, as a field.
+ *
+ * Beat 013 divides the panel between two regions. The picture and its labels stay in the
+ * centre; the skill figures are `PanelScore`, drawn in the scores region in this panel's own
+ * column (FR-046). They are still one object to a reader, because the column is shared
+ * structurally rather than by arrangement -- see `Regions.tsx`. And what a mark says is no
+ * longer drawn under the panel that drew it: it fills the detail region (FR-047), so that
+ * reading a profile never changes the shape of the surface.
  */
 
 export interface PanelProps {
@@ -36,9 +39,6 @@ export interface PanelProps {
   readonly observationsDominant: Float64Array;
   /** Declared: above this weight a cell is hatched rather than merely tinted (FR-019). */
   readonly hatchThreshold: number;
-  readonly score: Score | null;
-  /** FR-026: the frozen quay-side brief, scored at the same instant, as the baseline. */
-  readonly briefScore: Score | null;
   /** Present exactly when there is no field. FR-027: said, never extrapolated. */
   readonly refusal: string | null;
   /** FR-005 of beat 010: the panel is showing edited minus recorded rather than a forecast. */
@@ -46,14 +46,6 @@ export interface PanelProps {
   /** A difference above this is outlined, so "where the edit went" is a region and not a hue. */
   readonly differenceOutlineMetres: number;
   readonly differenceMagnitude: Float64Array | null;
-  /** Beat 010: how a mark's own counterfactuals are applied, from the panel that drew it. */
-  readonly counterfactualFor: (markId: string) => {
-    readonly withheld: boolean;
-    readonly edited: boolean;
-    readonly ghost: readonly { readonly depthMetres: number; readonly value: number }[] | null;
-    readonly onWithhold: (withheld: boolean) => void;
-    readonly onEditProfile: (levels: readonly { depthMetres: number; value: number }[] | null) => void;
-  } | null;
   /** FR-008: the track's waypoints, draggable in the enlarged panel and nowhere else. */
   readonly waypoints: readonly { readonly x: number; readonly y: number }[] | null;
   readonly onDragWaypoint: (index: number, x: number, y: number) => void;
@@ -67,12 +59,14 @@ export interface PanelProps {
   readonly elevationHeightPx: number;
   readonly needleOffsetPx: number;
   readonly levelTickLimit: number;
-  /** The model's diagnosed profile at a cell, for the measured-beside-derived comparison. */
-  readonly derivedProfileAt: (lonDeg: number, latDeg: number) => DiagnosedProfile | null;
   readonly enlarged: boolean;
   readonly showAttribution: boolean;
   readonly onEnlarge: () => void;
   readonly onSelectCell: (cellIndex: number) => void;
+  /** Which mark the detail region is showing, so this panel can draw it as the current one. */
+  readonly shownMarkId: string | null;
+  readonly onHoverMark: (id: string | null) => void;
+  readonly onSelectMark: (id: string) => void;
 }
 
 /**
@@ -90,27 +84,7 @@ function Instant({ value, testId }: { value: string; testId: string }) {
 }
 
 export function Panel(props: PanelProps) {
-  const {
-    leadHours,
-    validInstant,
-    initialisedFrom,
-    score,
-    enlarged,
-    showAttribution,
-  } = props;
-
-  const skill = (figure: { value: number } | null | undefined): string =>
-    figure === null || figure === undefined ? 'undefined' : figure.value.toFixed(3);
-
-  /*
-   * Hover previews; a click pins. The pinned mark survives the pointer leaving, for the same
-   * reason beat 007's cell breakdown does: a reader who wants to read a profile has to be
-   * able to look away from the thing they are reading it from.
-   */
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [pinnedId, setPinnedId] = useState<string | null>(null);
-  const shownId = pinnedId ?? hoveredId;
-  const hovered = marksOf(props.footprint).find((mark) => mark.id === shownId) ?? null;
+  const { leadHours, validInstant, initialisedFrom, enlarged, showAttribution } = props;
 
   return (
     <article
@@ -179,7 +153,7 @@ export function Panel(props: PanelProps) {
         testId={`panel-field-${String(leadHours)}`}
         markers={props.markers}
         onSelect={props.onSelectCell}
-        onHoverMark={setHoveredId}
+        onHoverMark={props.onHoverMark}
         {...(enlarged && props.waypoints !== null
           ? {
               waypoints: props.waypoints,
@@ -201,27 +175,9 @@ export function Panel(props: PanelProps) {
           heightPx={props.elevationHeightPx}
           offsetPx={props.needleOffsetPx}
           levelTickLimit={props.levelTickLimit}
-          hoveredId={shownId}
-          onHoverMark={setHoveredId}
-          onSelectMark={(id) => { setPinnedId((current) => (current === id ? null : id)); }}
-        />
-      )}
-
-      {hovered !== null && (
-        <ObservationHover
-          mark={hovered}
-          pinned={pinnedId !== null}
-          onUnpin={() => { setPinnedId(null); }}
-          derived={
-            hovered.kind === 'track'
-              ? null
-              : props.derivedProfileAt(hovered.lonDeg, hovered.latDeg)
-          }
-          qualityControlEnabled={props.footprint.qualityControlEnabled}
-          {...(() => {
-            const counterfactual = props.counterfactualFor(hovered.id);
-            return counterfactual === null ? {} : { counterfactual };
-          })()}
+          hoveredId={props.shownMarkId}
+          onHoverMark={props.onHoverMark}
+          onSelectMark={props.onSelectMark}
         />
       )}
 
@@ -248,60 +204,93 @@ export function Panel(props: PanelProps) {
           +{props.leadFromIssueHours.toFixed(0)} h
         </dd>
       </dl>
-
-      <div className="panel-score" data-testid={`panel-score-${String(leadHours)}`}>
-        {props.refusal !== null ? (
-          <span className="unmeasured">no score: this panel has no forecast</span>
-        ) : score === null ? (
-          <span className="unmeasured">not scored yet</span>
-        ) : (
-          <>
-            <p className="statement">{score.statement}</p>
-            <dl className="panel-labels">
-              <dt>vs persistence</dt>
-              <dd className="computed">{skill(score.skillAgainstPersistence)}</dd>
-              <dt>vs climatology</dt>
-              <dd className="computed">{skill(score.skillAgainstClimatology)}</dd>
-              {/* FR-026: the departure brief, the baseline everything else is watched
-                  against. Persistence from the quay side, never refreshed -- correct at
-                  issue and losing to the world on its own. */}
-              <dt>brief error</dt>
-              <dd className="computed" data-testid={`panel-brief-${String(leadHours)}`}>
-                {props.briefScore === null
-                  ? '—'
-                  : `${props.briefScore.forecastError.value.toFixed(1)} m`}
-              </dd>
-              <dt>this forecast</dt>
-              <dd className="computed">{score.forecastError.value.toFixed(1)} m</dd>
-            </dl>
-            <details data-testid={`panel-provenance-${String(leadHours)}`}>
-              <summary>Where this figure came from</summary>
-              <p>
-                {score.provenance.metric}, over {score.provenance.regionLabel} (
-                <span className="computed">{score.provenance.cellsScored.value}</span> cells),
-                from <span className="computed">{score.provenance.fromInstant}</span> to{' '}
-                <span className="computed">{score.provenance.validInstant}</span>, against{' '}
-                {score.provenance.truthSource}, declining to resolve below{' '}
-                <span className="declared">{score.provenance.resolutionFloorDegrees.value}&deg;</span>.
-                Means removed: forecast{' '}
-                <span className="computed">{score.meanOffsets.forecast.value.toFixed(1)} m</span>,
-                truth <span className="computed">{score.meanOffsets.truth.value.toFixed(1)} m</span>.
-              </p>
-              {/* Review R-3. The caveat when there was something external to caveat, and the
-                  statement that there was not when there was not -- a reader cannot tell the
-                  difference between "independent" and "nobody checked" from a blank space. */}
-              {score.provenance.independenceCaveat !== null ? (
-                <p className="caveat">{score.provenance.independenceCaveat}</p>
-              ) : (
-                <p className="unmeasured" data-testid={`panel-independence-${String(leadHours)}`}>
-                  No external observation was assimilated in this window, so this figure carries
-                  no independence caveat.
-                </p>
-              )}
-            </details>
-          </>
-        )}
-      </div>
     </article>
+  );
+}
+
+export interface PanelScoreProps {
+  readonly leadHours: number;
+  readonly score: Score | null;
+  /** FR-026: the frozen quay-side brief, scored at the same instant, as the baseline. */
+  readonly briefScore: Score | null;
+  /** Present exactly when the panel above has no forecast to score. */
+  readonly refusal: string | null;
+}
+
+/**
+ * One panel's skill figures, in that panel's own column (FR-046).
+ *
+ * Not a table: a table asks a reader to match a row label against a panel heading at every
+ * glance, and six figures read left to right draw the decay without a curve being plotted.
+ * The statement is the scorer's own words, printed verbatim -- FR-021 says a model that is
+ * not earning its compute is told so in those words, and the surface does not get to phrase
+ * it more kindly. It wraps in its column and is never truncated: a truncated provenance is a
+ * figure without its provenance (Principle V).
+ */
+export function PanelScore(props: PanelScoreProps) {
+  const { leadHours, score } = props;
+  const skill = (figure: { value: number } | null | undefined): string =>
+    figure === null || figure === undefined ? 'undefined' : figure.value.toFixed(3);
+
+  return (
+    <div className="score-cell panel-score" data-testid={`panel-score-${String(leadHours)}`}>
+      <p className="score-lead">
+        <span className="declared">+{leadHours} h</span>
+      </p>
+      {props.refusal !== null ? (
+        <span className="unmeasured">no score: this panel has no forecast</span>
+      ) : score === null ? (
+        <span className="unmeasured">not scored yet</span>
+      ) : (
+        <>
+          <p className="statement">{score.statement}</p>
+          <dl className="panel-labels">
+            <dt>vs persistence</dt>
+            <dd className="computed">{skill(score.skillAgainstPersistence)}</dd>
+            <dt>vs climatology</dt>
+            <dd className="computed">{skill(score.skillAgainstClimatology)}</dd>
+            {/* FR-026: the departure brief, the baseline everything else is watched
+                against. Persistence from the quay side, never refreshed -- correct at
+                issue and losing to the world on its own. */}
+            <dt>brief error</dt>
+            <dd className="computed" data-testid={`panel-brief-${String(leadHours)}`}>
+              {props.briefScore === null
+                ? '—'
+                : `${props.briefScore.forecastError.value.toFixed(1)} m`}
+            </dd>
+            <dt>this forecast</dt>
+            <dd className="computed">{score.forecastError.value.toFixed(1)} m</dd>
+          </dl>
+          <details data-testid={`panel-provenance-${String(leadHours)}`}>
+            <summary>Where this figure came from</summary>
+            <p>
+              {score.provenance.metric}, over {score.provenance.regionLabel} (
+              <span className="computed">{score.provenance.cellsScored.value}</span> cells),
+              from <span className="computed">{score.provenance.fromInstant}</span> to{' '}
+              <span className="computed">{score.provenance.validInstant}</span>, against{' '}
+              {score.provenance.truthSource}, declining to resolve below{' '}
+              <span className="declared">{score.provenance.resolutionFloorDegrees.value}&deg;</span>.
+              Means removed: forecast{' '}
+              <span className="computed">{score.meanOffsets.forecast.value.toFixed(1)} m</span>,
+              truth <span className="computed">{score.meanOffsets.truth.value.toFixed(1)} m</span>.
+              A reduced-gravity model determines departures from a mean and not the mean
+              itself, so every field is compared as an anomaly about its own. The offsets are
+              published rather than absorbed.
+            </p>
+            {/* Review R-3. The caveat when there was something external to caveat, and the
+                statement that there was not when there was not -- a reader cannot tell the
+                difference between "independent" and "nobody checked" from a blank space. */}
+            {score.provenance.independenceCaveat !== null ? (
+              <p className="caveat">{score.provenance.independenceCaveat}</p>
+            ) : (
+              <p className="unmeasured" data-testid={`panel-independence-${String(leadHours)}`}>
+                No external observation was assimilated in this window, so this figure carries
+                no independence caveat.
+              </p>
+            )}
+          </details>
+        </>
+      )}
+    </div>
   );
 }

@@ -86,7 +86,7 @@ and becomes `NaN`, never a plausible number.
 
 ## What the record actually contains
 
-![The record panel in the shell: source, native resolution, instants and their irregular spacing, depth levels, Argo counts including flagged levels, and the climatology overlap](../images/002-truth-record.png)
+![The record disclosure in the shell: source, native resolution, instants and their irregular spacing, depth levels, Argo counts including flagged levels, and the climatology overlap](../images/002-truth-record.png)
 
 Two figures from the test output are worth writing down, because later beats lean on both.
 

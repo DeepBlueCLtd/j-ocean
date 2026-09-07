@@ -162,6 +162,21 @@ export const configurationSchema = z
       referenceViewportWidthPx: z.number().int().positive(),
       /** Below this a panel stops being legible, so the row stops shrinking panels. */
       minimumPanelWidthPx: z.number().int().positive(),
+      /**
+       * Beat 013. The width of the controls column, which is fixed because FR-047 says
+       * selecting something may not move any other region by a pixel, and a column that
+       * sizes itself to its contents moves whenever its contents change.
+       *
+       * Optional, and undeclared in `config/j-ocean.json`, for a reason that is a finding
+       * rather than a preference: gate G-07 digests the *whole* validated configuration as
+       * one of its quantities, so declaring any presentation figure moves a recorded digest
+       * even though nothing computed moves. Until the author re-records, the column falls
+       * back to `minimumPanelWidthPx` -- a declared figure, not a literal. Declaring it is a
+       * one-line change here and one in the configuration, and needs no code change.
+       */
+      controlsWidthPx: z.number().int().positive().optional(),
+      /** The detail column's width, fixed and optional for the same two reasons. */
+      detailWidthPx: z.number().int().positive().optional(),
       panelGapPx: z.number().int().nonnegative(),
       /** What the page keeps clear of the window edge, on both sides together. */
       pageGutterPx: z.number().int().nonnegative(),

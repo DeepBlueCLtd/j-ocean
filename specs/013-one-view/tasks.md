@@ -26,23 +26,23 @@ changes, because FR-001 says so and because the rest of this list is otherwise u
       module the gate and the shell both call. G-07 proves the lift moved nothing.
 - [X] **T021** `footprintFor` memoised once per view instead of constructed three times per
       render. Same gate, same proof.
-- [ ] **T022** `src/harness/Regions.tsx` and the grid in `index.css`: four named areas, the
+- [X] **T022** `src/harness/Regions.tsx` and the grid in `index.css`: four named areas, the
       centre's column count from `horizons.leadHours.length` as a custom property.
-- [ ] **T023** Controls to the left region: issue time and lead time (FR-25), observation
+- [X] **T023** Controls to the left region: issue time and lead time (FR-25), observation
       toggles (FR-31), quality control (FR-32), domain choice (FR-11), and the track and
       profile editors' entry points. Panel-local controls stay at their panel.
-- [ ] **T024** The domain picker, which did not exist: `config.domains` offered, artefacts
+- [X] **T024** The domain picker, which did not exist: `config.domains` offered, artefacts
       reloaded, the run rebuilt. The recorded case is the default domain and is unmoved.
-- [ ] **T025** Scores into their panels' columns; `score-panel` deleted rather than hidden.
-- [ ] **T026** The narrative sections out of the vertical stack and behind the controls
+- [X] **T025** Scores into their panels' columns; `score-panel` deleted rather than hidden.
+- [X] **T026** The narrative sections out of the vertical stack and behind the controls
       region's disclosures, pending 014.
-- [ ] **T027** `Walkthrough.tsx` anchors updated for the new regions.
+- [X] **T027** `Walkthrough.tsx` anchors updated for the new regions.
 
 ## The detail region and the empty ones (US5, US6, FR-007, FR-008)
 
-- [ ] **T030** The detail region: a cell's breakdown (FR-18) or an XBT's profile with its
+- [X] **T030** The detail region: a cell's breakdown (FR-18) or an XBT's profile with its
       ghost (FR-28), filled by selection, with no geometry change.
-- [ ] **T031** Every region's empty statement: what would appear there and how to put it
+- [X] **T031** Every region's empty statement: what would appear there and how to put it
       there. The centre's says what the row costs and what it will show.
 
 ## The floor (US7, FR-009, FR-010)
@@ -56,7 +56,7 @@ changes, because FR-001 says so and because the rest of this list is otherwise u
 
 ## Holding it (SC-001 to SC-006)
 
-- [ ] **T050** `tests/shell/one-view.spec.ts`: no page scroll on either axis in each of
+- [X] **T050** `tests/shell/one-view.spec.ts`: no page scroll on either axis in each of
       loaded, row-unbuilt, row-built, scored, cell-selected, over-budget and
       configuration-failure; every declared scrolling region declared as one.
 - [ ] **T051** A control is changed and every panel and every score is inside the viewport

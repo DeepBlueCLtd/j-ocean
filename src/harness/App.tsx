@@ -17,10 +17,11 @@ import { loadClimatology, loadObservations, loadTruth } from './artefacts.js';
 import { FieldView, type Marker } from './FieldView.js';
 import { footprintOf, markersFrom, type Footprint } from './footprint.js';
 import type { Edit } from '../instruments/edits.js';
-import { HorizonRow } from './HorizonRow.js';
+import { useHorizonRow } from './HorizonRow.js';
+import { Regions } from './Regions.js';
 import { departureBrief, runForecast, type DepartureBrief, type ForecastResult } from '../run/forecast.js';
 import { climatologyReferenceOver } from '../instruments/climatology-reference.js';
-import { interfaceFieldFromContainer, interfaceFieldFromTruth } from '../instruments/interface-field.js';
+import { interfaceFieldFromContainer } from '../instruments/interface-field.js';
 import {
   argoObservations,
   sampleSurface,
@@ -38,7 +39,6 @@ import { publishResults, type ModelResults } from '../model/results.js';
 import { flaggedLevelCount, levelCount, type ObservationRecord } from '../truth/observations.js';
 import type { ArtefactTruthSource } from '../truth/artefact-truth-source.js';
 import type { FieldContainer } from '../truth/container.js';
-import { domainRegion, score, type Score } from '../scoring/scorer.js';
 import { drawRootSeed } from './seed-provisioning.js';
 import { measure, overBudget } from './timing.js';
 import { Walkthrough } from './Walkthrough.js';
@@ -89,9 +89,6 @@ interface RunView {
   readonly drops: readonly XbtResult[];
   readonly argo: readonly XbtResult[];
   readonly analysis: AnalysisRecord;
-  /** Computed on demand: scoring the row costs a second, and NFR-04 says not to freeze. */
-  readonly score: Score | null;
-  readonly scoringLeadHours: number;
   /** The row's forecasts. Computed on demand: it costs a couple of seconds (NFR-04). */
   readonly forecast: ForecastResult | null;
   /** FR-026: the frozen quay-side analysis. Computed once and never refreshed. */
@@ -170,6 +167,36 @@ export function App() {
   const [view, setView] = useState<RunView | null>(null);
   const [record, setRecord] = useState<Record002 | null>(null);
   const [overBudgetNotice, setOverBudgetNotice] = useState<{ projectedMs: number } | null>(null);
+  /**
+   * SRD-v1 FR-11, built here because it had never been built: the shell read
+   * `domains.defaultId` and nothing offered the bland domain the requirement calls a
+   * requirement rather than a bonus. Null until the configuration has validated, because
+   * which domains exist is a declared value like any other; the recorded case is the default
+   * domain and choosing it changes nothing about it.
+   */
+  const [chosenDomainId, setChosenDomainId] = useState<string | null>(null);
+  /**
+   * Principle VI: the harness can lose, and it says so where the reader asked.
+   *
+   * Building the domain choice found that the second domain of FR-11 cannot be run at all --
+   * `instruments.track.waypoints` are declared once, in the eventful domain's longitudes, and
+   * the bland domain's artefact does not cover them, so the ownship thermometer refuses to
+   * sample. That is a finding under FR-40 and not a thing this beat fixes: making the track a
+   * per-domain declaration is a configuration change, and this beat changes no declared value.
+   * What it must not do is leave a blank page, so the refusal is caught, said in the
+   * instrument's own words, and the run the reader had is left standing.
+   */
+  const [domainFailure, setDomainFailure] = useState<string | null>(null);
+  /**
+   * FR-047: what the detail region is showing. Held here rather than in the panel that drew
+   * the mark, because the region belongs to the surface and a selection made on one panel
+   * must survive a reader looking at another.
+   */
+  const [mark, setMark] = useState<{
+    readonly id: string;
+    readonly leadHours: number;
+    readonly pinned: boolean;
+  } | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -198,7 +225,7 @@ export function App() {
   useEffect(() => {
     if (loaded === null) return () => undefined;
     let live = true;
-    const domainId = loaded.config.domains.defaultId;
+    const domainId = chosenDomainId ?? loaded.config.domains.defaultId;
     Promise.all([loadTruth(domainId), loadClimatology(domainId), loadObservations(domainId)])
       .then(([truth, climatology, observations]) => {
         if (live) setRecord({ domainId, truth, climatology, observations });
@@ -209,7 +236,7 @@ export function App() {
     return () => {
       live = false;
     };
-  }, [loaded]);
+  }, [loaded, chosenDomainId]);
 
   const buildRun = useCallback(
     (
@@ -312,8 +339,6 @@ export function App() {
         drops,
         argo,
         analysis,
-        score: null,
-        scoringLeadHours: 24,
         forecast: null,
         brief: null,
         pendingIssueInstantMs: null,
@@ -327,9 +352,18 @@ export function App() {
   );
 
   useEffect(() => {
-    const built = buildRun(undefined, true);
-    if (built !== null) setView(built);
-  }, [buildRun]);
+    try {
+      const built = buildRun(undefined, true);
+      if (built !== null) setView(built);
+    } catch (error) {
+      // The chosen domain could not be run. Say which and why, put the choice back to the
+      // default, and leave the run on screen alone: a refused choice provisions nothing.
+      setDomainFailure(
+        `${record?.domainId ?? 'that domain'}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      setChosenDomainId(null);
+    }
+  }, [buildRun, record?.domainId]);
 
   const stepsPerAdvance =
     loaded === null ? 0 : Math.round((ADVANCE_HOURS * 3600) / loaded.config.clock.timestepSeconds);
@@ -392,43 +426,6 @@ export function App() {
     },
     [loaded, view, stepsPerAdvance, overBudget],
   );
-
-  /**
-   * Score this run at one horizon (FR-020 to FR-022).
-   *
-   * It integrates the analysis forward, samples the truth record at the valid instant through
-   * the port, and scores against both references. It happens on demand rather than on load,
-   * because it costs about a second and NFR-04 says the interface does not freeze.
-   */
-  const scoreRun = useCallback(() => {
-    if (loaded === null || record === null || view === null) return;
-    const leadHours = view.scoringLeadHours;
-    const parameters = view.results.grid;
-    const region = domainRegion(loaded.config, parameters.nx, parameters.ny);
-    const validInstantMs = Date.parse(loaded.config.truth.period.start) + leadHours * 3_600_000;
-
-    const forecastField = view.run.state.fields[THICKNESS] as Float64Array;
-    const structure = loaded.config.model.thermalStructure;
-    const truthField = interfaceFieldFromTruth(record.truth, structure, view.box, parameters, validInstantMs);
-
-    const computedScore = score({
-      config: loaded.config,
-      domain: loaded.config.domains.list.find((d) => d.id === record.domainId) as never,
-      truth: record.truth,
-      forecast: forecastField.slice(),
-      initial: view.analysis.field.slice(),
-      climatology: interfaceFieldFromContainer(record.climatology, structure, view.box, parameters),
-      truthAtValidInstant: truthField,
-      region,
-      fromInstantMs: Date.parse(loaded.config.truth.period.start),
-      validInstantMs,
-      externalObservationIds: view.argo
-        .map((r) => r.interface)
-        .filter((o) => o.flags.every((flag) => flag.usable))
-        .map((o) => o.id),
-    });
-    setView({ ...view, score: computedScore });
-  }, [loaded, record, view]);
 
   /**
    * The row's forecasts. Integrating six horizons costs a couple of seconds, so it happens
@@ -588,749 +585,791 @@ export function App() {
     [runMarkers],
   );
 
-  return (
-    <main>
-      {/* The walkthrough sits outside every panel because it is about all of them, and
-          before them in the document so that a reader tabbing in reaches the explanation
-          of the page before the page itself. */}
-      <Walkthrough />
 
-      {/* FR-02, and it is the first thing in the document rather than a footnote. It has
-          no dismiss control because there is nothing about it that stops being true. */}
-      <section className="not-operational" data-testid="not-operational" role="note">
-        <h1>j-ocean</h1>
-        <p>
-          <strong>j-ocean is not an operational forecast system.</strong> Its numerics are
-          real but reduced, its domain small, and its claims are about <em>relative</em>{' '}
-          skill between references it computes itself, scored against a truth record it did
-          not author.
-        </p>
-      </section>
+  /**
+   * FR-047. Selecting a cell fills the detail region, and takes it from whatever mark was
+   * there: the region carries *the last selection*, not two of them.
+   */
+  const selectCell = useCallback((cellIndex: number) => {
+    setMark(null);
+    setView((current) => (current === null ? current : { ...current, selectedCell: cellIndex }));
+  }, []);
 
-      {failure !== null && (
-        <section className="failure" data-testid="configuration-failure">
-          <h2>The configuration did not validate, so no run was provisioned.</h2>
-          <pre>{failure}</pre>
-        </section>
-      )}
+  /** A hover previews; a pinned mark survives the pointer leaving, as it did under the panel. */
+  const showMark = useCallback(
+    (next: { readonly id: string; readonly leadHours: number } | null) => {
+      setMark((current) =>
+        current?.pinned === true ? current : next === null ? null : { ...next, pinned: false },
+      );
+    },
+    [],
+  );
 
-      {loaded !== null && view !== null && (
-        <>
-          <section data-testid="run-panel">
-            <h2>The run</h2>
-            <dl>
-              <dt>Root seed</dt>
-              <dd>
-                <Declared>
-                  <span data-testid="root-seed">{view.run.rng.rootSeed}</span>
-                </Declared>
-              </dd>
+  /** Clicking the same mark again releases it, which is what the Release control also does. */
+  const pinMark = useCallback((next: { readonly id: string; readonly leadHours: number }) => {
+    setMark((current) =>
+      current !== null && current.pinned && current.id === next.id ? null : { ...next, pinned: true },
+    );
+  }, []);
 
-              <dt>Which run this is</dt>
-              <dd data-testid="recorded-case">
-                {view.recordedCase
-                  ? `This is ${loaded.config.run.recordedCaseLabel}: the declared seed, unchanged.`
-                  : 'This is not the recorded case. A seed was drawn for this visit and nothing about it persists.'}
-              </dd>
+  const defaultIssueInstantMs =
+    loaded === null
+      ? 0
+      : Date.parse(loaded.config.truth.period.start) +
+        loaded.config.forecast.spinUpHours * 3_600_000;
 
-              <dt>Domain</dt>
-              <dd>
-                <Declared>{view.run.domainId}</Declared>, cells laid over{' '}
-                <Computed>
-                  {view.results.grid.cellSizeXMetres.toFixed(0)} &times;{' '}
-                  {view.results.grid.cellSizeYMetres.toFixed(0)} m
-                </Computed>{' '}
-                &mdash; a five-degree box is not square in kilometres.
-              </dd>
+  /**
+   * The row, as three regions and a detail (see `HorizonRow.tsx`). It is a hook rather than a
+   * component because its parts belong to different regions and a component returns one tree.
+   */
+  const row = useHorizonRow({
+    config: loaded?.config ?? null,
+    domain: loaded?.config.domains.list.find((d) => d.id === view?.run.domainId) ?? null,
+    forecast: view?.forecast ?? null,
+    analysis: view?.forecast?.analysis ?? null,
+    truth: record?.truth ?? null,
+    climatology: record?.climatology ?? null,
+    footprint: rowFootprint,
+    brief: view?.brief ?? null,
+    issueInstantMs: view?.forecast?.issueInstantMs ?? 0,
+    defaultIssueInstantMs,
+    pendingIssueInstantMs: view?.pendingIssueInstantMs ?? view?.forecast?.issueInstantMs ?? 0,
+    onPendingIssueInstantChange: (instantMs) => {
+      setView((current) =>
+        current === null ? current : { ...current, pendingIssueInstantMs: instantMs },
+      );
+    },
+    onReissue: () => {
+      buildRow(view?.pendingIssueInstantMs ?? view?.forecast?.issueInstantMs);
+    },
+    reissuing: false,
+    edits: view?.edits ?? [],
+    baseline: view?.baseline ?? view?.forecast ?? null,
+    onApplyEdits: (edits) => {
+      buildRow(view?.forecast?.issueInstantMs, edits);
+    },
+    onSelectCell: selectCell,
+    shownMark: mark,
+    onShowMark: showMark,
+    onPinMark: pinMark,
+    markPinned: mark?.pinned ?? false,
+  });
 
-              <dt>Timestep</dt>
-              <dd data-testid="stability">
-                <Declared>{view.run.stability.declaredTimestepSeconds} s</Declared>, inside the{' '}
-                <Computed>{view.run.stability.largestStableTimestepSeconds.toFixed(1)} s</Computed>{' '}
-                the declared criterion admits (the scheme&rsquo;s linear boundary is{' '}
-                <Computed>{view.run.stability.linearStabilityBoundarySeconds.toFixed(1)} s</Computed>
-                ). Gravity-wave speed{' '}
-                <Computed>
-                  {view.run.stability.gravityWaveSpeedMetresPerSecond.toFixed(3)} m/s
-                </Computed>
-                .
-              </dd>
+  /*
+   * FR-02, and it is the first thing in the document rather than a footnote. It has no
+   * dismiss control because there is nothing about it that stops being true, and it sits
+   * above the controls column's own scroller, so no amount of scrolling takes it off screen.
+   */
+  const statement = (
+    <section className="not-operational" data-testid="not-operational" role="note">
+      <h1>j-ocean</h1>
+      <p>
+        <strong>j-ocean is not an operational forecast system.</strong> Its numerics are real
+        but reduced, its domain small, and its claims are about <em>relative</em> skill between
+        references it computes itself, scored against a truth record it did not author.
+      </p>
+    </section>
+  );
 
-              <dt>Steps taken</dt>
-              <dd>
-                <Computed>
-                  <span data-testid="steps">{view.steps}</span>
-                </Computed>{' '}
-                {view.integrating && <span className="unmeasured">integrating&hellip;</span>}
-              </dd>
-
-              <dt>Valid at</dt>
-              <dd>
-                <Computed>
-                  <span data-testid="instant">{view.instant}</span>
-                </Computed>
-              </dd>
-
-              <dt>Step time</dt>
-              <dd data-testid="step-time">
-                {view.lastStepMs === null ? (
-                  <span className="unmeasured">not yet measured</span>
-                ) : (
-                  <>
-                    <HostTime>{view.lastStepMs.toFixed(3)} ms/step</HostTime>{' '}
-                    {overBudget(view.lastStepMs, loaded.config.budget.frameBudgetMs) ? (
-                      <em>
-                        over the declared budget of{' '}
-                        <Declared>{loaded.config.budget.frameBudgetMs} ms</Declared>, and said
-                        so rather than freezing the page
-                      </em>
-                    ) : (
-                      <span className="within-budget">
-                        within the declared budget of{' '}
-                        <Declared>{loaded.config.budget.frameBudgetMs} ms</Declared>
-                      </span>
-                    )}
-                  </>
-                )}
-              </dd>
-            </dl>
-
-              <dt>Outcrop clamps</dt>
-              <dd data-testid="outcrops">
-                <Computed>{view.results.outcrops}</Computed>. The layer is clamped at a
-                declared minimum of{' '}
-                <Declared>{loaded.config.model.minimumLayerThicknessMetres} m</Declared> where
-                it would otherwise outcrop, and every clamp is counted rather than swallowed.
-              </dd>
-            {overBudgetNotice !== null && (
-              <div className="banner warn" data-testid="over-budget">
-                <p>
-                  The projected time to integrate the longest declared horizon (
-                  <Declared>{Math.max(...loaded.config.horizons.leadHours)} h</Declared>) is{' '}
-                  <HostTime>{overBudgetNotice.projectedMs.toFixed(0)} ms</HostTime>, which
-                  exceeds the declared frame budget of{' '}
-                  <Declared>{loaded.config.budget.frameBudgetMs} ms</Declared>. Nothing has
-                  been integrated beyond the first chunk. The page is saying so rather than
-                  freezing.
-                </p>
-                <button type="button" onClick={() => integrate(true)} data-testid="proceed-anyway">
-                  Integrate anyway
-                </button>
-              </div>
-            )}
-
-            <div className="controls">
-              <button
-                type="button"
-                onClick={() => integrate(false)}
-                data-testid="advance"
-                disabled={view.integrating}
-              >
-                Integrate {ADVANCE_HOURS} hours
-              </button>
-              <button type="button" onClick={newRun} data-testid="new-run">
-                New run
-              </button>
-            </div>
-          </section>
-
-          <section data-testid="declared-panel">
-            <h2>What has been declared</h2>
-            <p className="aside">
-              Every figure here is a value in configuration, validated before anything was
-              computed. No component in the tree holds a literal for any of them.
-            </p>
-            <dl>
-              <dt>Grid</dt>
-              <dd>
-                <Declared>
-                  {loaded.config.grid.nx} &times; {loaded.config.grid.ny}
-                </Declared>{' '}
-                cells
-              </dd>
-              <dt>Timestep</dt>
-              <dd>
-                <Declared>{loaded.config.clock.timestepSeconds} s</Declared>, from{' '}
-                <Declared>{loaded.config.clock.epoch}</Declared>
-              </dd>
-              <dt>Horizons</dt>
-              <dd data-testid="horizons">
-                <Declared>{loaded.config.horizons.leadHours.join(', ')} h</Declared>
-              </dd>
-              <dt>Domains</dt>
-              <dd>
-                {loaded.config.domains.list.map((domain) => (
-                  <span key={domain.id} className="domain">
-                    <Declared>{domain.label}</Declared> ({domain.character})
-                  </span>
-                ))}
-              </dd>
-            </dl>
-          </section>
-
-          <section data-testid="field-panel">
-            <h2>The ocean, as the model has it</h2>
-            <p className="aside">
-              Sea-surface height, computed from the layer thickness by the reduced-gravity
-              relation. Initialised from the truth record at{' '}
-              <Declared>{loaded.config.truth.period.start}</Declared> and integrated from
-              there. There is no fixture behind this: it is the field the model holds.
-            </p>
-            <FieldView
-              values={view.results.seaSurfaceHeightMetres()}
-              nx={view.results.grid.nx}
-              ny={view.results.grid.ny}
-              limit={0.8}
-              label={`Sea-surface height anomaly over ${view.run.domainId}, valid at ${view.instant}`}
-              testId="field-view"
-              markers={runMarkers}
-            />
-            <p className="legend">
-              <span>
-                <span className="dot drop" />
-                XBT drop
-              </span>
-              <span>
-                <span className="dot external" />
-                Argo profile (external)
-              </span>
-              <span>
-                <span className="dot flagged" />
-                flagged &mdash; drawn, never omitted
-              </span>
-            </p>
-            <dl>
-              <dt>Valid at</dt>
-              <dd>
-                <Computed>{view.instant}</Computed>
-              </dd>
-              <dt>Initialised from</dt>
-              <dd data-testid="initialisation">
-                the truth record at{' '}
-                <Computed>{new Date(view.initialisation.instantMs).toISOString()}</Computed>;
-                layer thickness{' '}
-                <Computed>
-                  {view.initialisation.thicknessRangeMetres[0].toFixed(0)}&ndash;
-                  {view.initialisation.thicknessRangeMetres[1].toFixed(0)} m
-                </Computed>{' '}
-                about a declared mean of{' '}
-                <Declared>{loaded.config.model.meanUpperLayerThicknessMetres} m</Declared>.
-                Velocity is put in geostrophic balance with that thickness rather than taken
-                from the truth, which carries motions this model has no layer for.
-              </dd>
-              <dt>Excluded margin</dt>
-              <dd>
-                <Declared>{view.results.spongeWidthCells} cells</Declared> of sponge at each
-                edge, relaxed toward the initial state. Scoring will exclude it.
-              </dd>
-            </dl>
-          </section>
-
-          {view.forecast === null ? (
-            <section data-testid="row-invitation">
-              <h2>The row</h2>
-              <p className="aside">
-                Six panels at the declared horizons, each stating what it is valid for, what it
-                was initialised from, and what it was worth against two references. Building
-                them means integrating the analysis forward four days, which takes a couple of
-                seconds &mdash; so it happens when you ask.
-              </p>
-              <button type="button" onClick={() => { buildRow(); }} data-testid="build-row">
-                Build the horizon row
-              </button>
+  /*
+   * Before a run exists there is nothing to divide into regions, so the surface is the
+   * statement and, where the configuration refused to validate, the refusal. The refusal is
+   * bounded and scrolls within itself: a stack trace that lengthens the page would break the
+   * one property this beat exists to establish.
+   */
+  if (loaded === null || view === null) {
+    return (
+      <>
+        <Walkthrough />
+        <div className="boot-view">
+          {statement}
+          {failure !== null && (
+            <section className="failure" data-testid="configuration-failure" data-scrolls="true">
+              <h2>The configuration did not validate, so no run was provisioned.</h2>
+              <pre>{failure}</pre>
             </section>
-          ) : (
-            <HorizonRow
-              config={loaded.config}
-              domain={
-                loaded.config.domains.list.find((d) => d.id === view.run.domainId) as never
-              }
-              forecast={view.forecast}
-              analysis={view.forecast.analysis}
-              truth={record?.truth as never}
-              climatology={record?.climatology as never}
-              footprint={rowFootprint as Footprint}
-              brief={view.brief as DepartureBrief}
-              issueInstantMs={view.forecast.issueInstantMs}
-              defaultIssueInstantMs={
-                Date.parse(loaded.config.truth.period.start) +
-                loaded.config.forecast.spinUpHours * 3_600_000
-              }
-              pendingIssueInstantMs={view.pendingIssueInstantMs ?? view.forecast.issueInstantMs}
-              onPendingIssueInstantChange={(instantMs) => {
-                setView((current) =>
-                  current === null ? current : { ...current, pendingIssueInstantMs: instantMs },
-                );
-              }}
-              onReissue={() => {
-                buildRow(view.pendingIssueInstantMs ?? view.forecast?.issueInstantMs);
-              }}
-              reissuing={false}
-              edits={view.edits}
-              baseline={view.baseline ?? view.forecast}
-              onApplyEdits={(edits) => {
-                buildRow(view.forecast?.issueInstantMs, edits);
-              }}
-              onSelectCell={(cellIndex) => {
-                setView((current) => (current === null ? current : { ...current, selectedCell: cellIndex }));
+          )}
+        </div>
+      </>
+    );
+  }
+
+  const config = loaded.config;
+
+  const controls = (
+    <>
+      {/*
+        SRD-v1 FR-11. The contrast between the eventful domain and the bland one is called a
+        requirement rather than a bonus, and until this beat nothing on the surface offered
+        it. Choosing a domain loads that domain's three committed artefacts and rebuilds the
+        run from the declared seed; the recorded case is the default domain, unmoved.
+      */}
+      <div className="control-group" data-testid="domain-control">
+        <h3>Domain</h3>
+        {config.domains.list.map((domain) => (
+          <label key={domain.id} className="choice">
+            <input
+              type="radio"
+              name="domain"
+              data-testid={`domain-${domain.id}`}
+              checked={(chosenDomainId ?? config.domains.defaultId) === domain.id}
+              disabled={view.integrating}
+              onChange={() => {
+                setDomainFailure(null);
+                setChosenDomainId(domain.id);
+                setOverBudgetNotice(null);
+                setMark(null);
               }}
             />
-          )}
+            <Declared>{domain.label}</Declared> ({domain.character})
+          </label>
+        ))}
+        <p className="aside">
+          The same machinery over a deliberately bland ocean buys much less, and being able to
+          watch it buy less is the point of the second domain.
+        </p>
+        {domainFailure !== null && (
+          <p className="banner warn" data-testid="domain-failure">
+            That domain could not be run, so nothing was provisioned and the run you had is
+            still on screen. In the instrument&rsquo;s own words: {domainFailure}
+          </p>
+        )}
+      </div>
 
-          <section data-testid="score-panel">
-            <h2>What the forecast was worth</h2>
-            <p className="aside">
-              A raw error figure means nothing on its own, so there is never one here without
-              two references the harness computes itself. Zero means <em>no better than the
-              reference</em> and negative means <em>worse</em>.
-            </p>
-            {view.score === null ? (
-              <p>
-                <button type="button" onClick={scoreRun} data-testid="score-run">
-                  Score this run against truth
-                </button>{' '}
-                <span className="unmeasured">
-                  Not scored yet. It takes about a second, so it happens when you ask.
+      {row.controls}
+
+      <div className="control-group" data-testid="run-controls">
+        <h3>The run</h3>
+        <p data-testid="recorded-case">
+          {view.recordedCase
+            ? `This is ${config.run.recordedCaseLabel}: the declared seed, unchanged.`
+            : 'This is not the recorded case. A seed was drawn for this visit and nothing about it persists.'}
+        </p>
+        <div className="row-controls">
+          <button
+            type="button"
+            onClick={() => { integrate(false); }}
+            data-testid="advance"
+            disabled={view.integrating}
+          >
+            Integrate {ADVANCE_HOURS} hours
+          </button>
+          <button type="button" onClick={newRun} data-testid="new-run">
+            New run
+          </button>
+          {view.forecast === null && (
+            <button type="button" onClick={() => { buildRow(); }} data-testid="build-row">
+              Build the horizon row
+            </button>
+          )}
+        </div>
+
+        <p data-testid="step-time">
+          {view.lastStepMs === null ? (
+            <span className="unmeasured">not yet measured</span>
+          ) : (
+            <>
+              <HostTime>{view.lastStepMs.toFixed(3)} ms/step</HostTime>{' '}
+              {overBudget(view.lastStepMs, config.budget.frameBudgetMs) ? (
+                <em>
+                  over the declared budget of{' '}
+                  <Declared>{config.budget.frameBudgetMs} ms</Declared>, and said so rather
+                  than freezing the page
+                </em>
+              ) : (
+                <span className="within-budget">
+                  within the declared budget of{' '}
+                  <Declared>{config.budget.frameBudgetMs} ms</Declared>
                 </span>
-              </p>
-            ) : (
+              )}
+            </>
+          )}
+        </p>
+
+        {overBudgetNotice !== null && (
+          <div className="banner warn" data-testid="over-budget">
+            <p>
+              The projected time to integrate the longest declared horizon (
+              <Declared>{Math.max(...config.horizons.leadHours)} h</Declared>) is{' '}
+              <HostTime>{overBudgetNotice.projectedMs.toFixed(0)} ms</HostTime>, which exceeds
+              the declared frame budget of{' '}
+              <Declared>{config.budget.frameBudgetMs} ms</Declared>. Nothing has been
+              integrated beyond the first chunk. The page is saying so rather than freezing.
+            </p>
+            <button type="button" onClick={() => { integrate(true); }} data-testid="proceed-anyway">
+              Integrate anyway
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/*
+        Beat 014 takes the narrative off the application entirely (SRD-v2 FR-42). Until it
+        lands, everything that was a vertical section is a disclosure here: reachable, closed
+        by default, and no longer holding a claim on the reader's vertical space.
+      */}
+      <div className="disclosures">
+        <details data-testid="run-panel">
+          <summary>The run</summary>
+          <dl>
+            <dt>Root seed</dt>
+            <dd>
+              <Declared>
+                <span data-testid="root-seed">{view.run.rng.rootSeed}</span>
+              </Declared>
+            </dd>
+
+            <dt>Domain</dt>
+            <dd>
+              <Declared>{view.run.domainId}</Declared>, cells laid over{' '}
+              <Computed>
+                {view.results.grid.cellSizeXMetres.toFixed(0)} &times;{' '}
+                {view.results.grid.cellSizeYMetres.toFixed(0)} m
+              </Computed>{' '}
+              &mdash; a five-degree box is not square in kilometres.
+            </dd>
+
+            <dt>Timestep</dt>
+            <dd data-testid="stability">
+              <Declared>{view.run.stability.declaredTimestepSeconds} s</Declared>, inside the{' '}
+              <Computed>{view.run.stability.largestStableTimestepSeconds.toFixed(1)} s</Computed>{' '}
+              the declared criterion admits (the scheme&rsquo;s linear boundary is{' '}
+              <Computed>{view.run.stability.linearStabilityBoundarySeconds.toFixed(1)} s</Computed>
+              ). Gravity-wave speed{' '}
+              <Computed>
+                {view.run.stability.gravityWaveSpeedMetresPerSecond.toFixed(3)} m/s
+              </Computed>
+              .
+            </dd>
+
+            <dt>Steps taken</dt>
+            <dd>
+              <Computed>
+                <span data-testid="steps">{view.steps}</span>
+              </Computed>{' '}
+              {view.integrating && <span className="unmeasured">integrating&hellip;</span>}
+            </dd>
+
+            <dt>Valid at</dt>
+            <dd>
+              <Computed>
+                <span data-testid="instant">{view.instant}</span>
+              </Computed>
+            </dd>
+
+            {/* Beat 013: the field panel is gone -- its field is the row's panels and the
+                centre's analysed field -- and these are the figures that were beneath it. */}
+            <dt>Initialised from</dt>
+            <dd data-testid="initialisation">
+              the truth record at{' '}
+              <Computed>{new Date(view.initialisation.instantMs).toISOString()}</Computed>;
+              layer thickness{' '}
+              <Computed>
+                {view.initialisation.thicknessRangeMetres[0].toFixed(0)}&ndash;
+                {view.initialisation.thicknessRangeMetres[1].toFixed(0)} m
+              </Computed>{' '}
+              about a declared mean of{' '}
+              <Declared>{config.model.meanUpperLayerThicknessMetres} m</Declared>. Velocity is
+              put in geostrophic balance with that thickness rather than taken from the truth,
+              which carries motions this model has no layer for.
+            </dd>
+
+            <dt>Excluded margin</dt>
+            <dd>
+              <Declared>{view.results.spongeWidthCells} cells</Declared> of sponge at each
+              edge, relaxed toward the initial state. Scoring will exclude it.
+            </dd>
+
+            <dt>Outcrop clamps</dt>
+            <dd data-testid="outcrops">
+              <Computed>{view.results.outcrops}</Computed>. The layer is clamped at a declared
+              minimum of{' '}
+              <Declared>{config.model.minimumLayerThicknessMetres} m</Declared> where it would
+              otherwise outcrop, and every clamp is counted rather than swallowed.
+            </dd>
+          </dl>
+        </details>
+
+        <details data-testid="declared-panel">
+          <summary>What has been declared</summary>
+          <p className="aside">
+            Every figure here is a value in configuration, validated before anything was
+            computed. No component in the tree holds a literal for any of them.
+          </p>
+          <dl>
+            <dt>Grid</dt>
+            <dd>
+              <Declared>
+                {config.grid.nx} &times; {config.grid.ny}
+              </Declared>{' '}
+              cells
+            </dd>
+            <dt>Timestep</dt>
+            <dd>
+              <Declared>{config.clock.timestepSeconds} s</Declared>, from{' '}
+              <Declared>{config.clock.epoch}</Declared>
+            </dd>
+            <dt>Horizons</dt>
+            <dd data-testid="horizons">
+              <Declared>{config.horizons.leadHours.join(', ')} h</Declared>
+            </dd>
+            <dt>Domains</dt>
+            <dd>
+              {config.domains.list.map((domain) => (
+                <span key={domain.id} className="domain">
+                  <Declared>{domain.label}</Declared> ({domain.character})
+                </span>
+              ))}
+            </dd>
+          </dl>
+        </details>
+
+        <details data-testid="instruments-panel">
+          <summary>What the instruments measured</summary>
+          <p className="aside">
+            Truth becomes an observation in exactly one module, and this is everything that
+            module produced. Every figure below is what a measurement was priced at, not what
+            it turned out to be worth &mdash; that is the analysis&rsquo;s question.
+          </p>
+          <dl>
+            <dt>Ownship surface</dt>
+            <dd data-testid="surface-count">
+              <Computed>{view.surface.length}</Computed> measurements along the declared track,
+              at <Declared>{config.instruments.track.sampleIntervalHours} h</Declared>{' '}
+              intervals. Declared error{' '}
+              <Declared>{config.instruments.surface.noiseStandardDeviationDegC} degC</Declared>{' '}
+              instrument and{' '}
+              <Declared>
+                {config.instruments.surface.representativenessStandardDeviationDegC} degC
+              </Declared>{' '}
+              representativeness.
+            </dd>
+
+            <dt>XBT drops</dt>
+            <dd data-testid="drop-count">
+              <Computed>{view.drops.length}</Computed> drops of{' '}
+              <Declared>{config.instruments.xbt.depthsMetres.length}</Declared> levels each. An
+              XBT infers its depth from a fall rate, so each level records the depth it{' '}
+              <em>reached</em>, not the depth it was asked for.
+            </dd>
+
+            <dt>What a drop told us</dt>
+            <dd data-testid="interface-estimates">
+              {view.drops.map(({ interface: inferred }) => (
+                <span key={inferred.id} className="estimate">
+                  {isUsable(inferred) ? (
+                    <>
+                      <Computed>{inferred.value.toFixed(0)} m</Computed>
+                      <span className="host-time"> &plusmn;{inferred.error.totalSd.toFixed(0)} m</span>
+                    </>
+                  ) : (
+                    <em>unresolved</em>
+                  )}
+                </span>
+              ))}
+              <br />
+              The observed quantity is the interface depth, inverted from the same two-layer
+              relation the profile above is drawn from. A level far from the thermocline
+              acquires an enormous depth error and weighs almost nothing, through the
+              arithmetic rather than through a rule.
+            </dd>
+
+            <dt>Argo</dt>
+            <dd data-testid="argo-state">
+              {config.instruments.argo.assimilate ? (
+                <>
+                  <Computed>{view.argo.length}</Computed> profiles admitted, marked{' '}
+                  <em>external</em>. The truth record assimilated these profiles, so skill
+                  measured against it while assimilating them is not independent evidence, and
+                  every score will say so.
+                </>
+              ) : (
+                <>Drawn, not assimilated. The toggle is off.</>
+              )}
+            </dd>
+
+            <dt>Flags</dt>
+            <dd data-testid="flag-summary">
+              {flagSummary(view).length === 0 ? (
+                <>
+                  No check fired. Quality control is{' '}
+                  <Declared>{config.instruments.qualityControl.enabled ? 'on' : 'off'}</Declared>
+                  .
+                </>
+              ) : (
+                flagSummary(view).map(([code, count]) => (
+                  <span key={code} className="estimate">
+                    <Computed>{count}</Computed> {code}
+                  </span>
+                ))
+              )}
+              <br />
+              A flagged observation keeps its value and is drawn as flagged. Nothing is
+              dropped, because what the analysis chose to ignore is as interesting as what it
+              used.
+            </dd>
+          </dl>
+        </details>
+
+        {record !== null && (
+          <details data-testid="truth-panel">
+            <summary>The record this run is scored against</summary>
+            <p className="aside">
+              Two derived artefacts, regenerated from a digest-verified raw subset by gate
+              G-01. Nothing here was edited by hand; a file that had been would fail the build.
+            </p>
+            <dl>
+              <dt>Domain</dt>
+              <dd data-testid="truth-domain">
+                <Declared>{record.domainId}</Declared>
+              </dd>
+
+              <dt>Truth source</dt>
+              <dd data-testid="truth-source">
+                {String((record.truth.provenance()['sourceLabel'] as string | undefined) ?? '')}
+              </dd>
+
+              <dt>Native resolution</dt>
+              <dd>
+                <Declared>{record.truth.nativeResolutionDegrees}&deg;</Declared>, which is{' '}
+                <Declared>
+                  {config.domains.list.find((d) => d.id === record.domainId)
+                    ?.truthToModelResolutionRatio}
+                  &times;
+                </Declared>{' '}
+                coarser than the model grid. Scoring will decline to resolve below it.
+              </dd>
+
+              <dt>Instants</dt>
+              <dd data-testid="truth-instants">
+                <Computed>{record.truth.instantsMs().length}</Computed>, spaced{' '}
+                <Computed>
+                  {(record.truth.provenance()['instantSpacingHours'] as number[] | undefined)?.join(
+                    ' and ',
+                  )}
+                </Computed>{' '}
+                hours apart. The source is missing occasional snapshots; the record carries its
+                instants as they are and interpolates nothing at build time.
+              </dd>
+
+              <dt>Depth levels</dt>
+              <dd>
+                <Declared>{record.truth.depthLevelsMetres().join(', ')} m</Declared> &mdash;
+                exact levels of the source, so no build-time vertical interpolation.
+              </dd>
+
+              <dt>Argo profiles</dt>
+              <dd data-testid="observation-count">
+                <Computed>{record.observations.profiles.length}</Computed> profiles,{' '}
+                <Computed>{levelCount(record.observations)}</Computed> levels, of which{' '}
+                <Computed>{flaggedLevelCount(record.observations)}</Computed> carry a flag the
+                analysis will not treat as usable. Flagged levels are kept and will be drawn as
+                flagged, never omitted.
+              </dd>
+
+              <dt>Climatology</dt>
+              <dd data-testid="climatology-overlap">
+                Averaged over{' '}
+                <Declared>
+                  {String(
+                    (record.climatology.header.provenance['window'] as { start: string })?.start,
+                  )}
+                </Declared>{' '}
+                to{' '}
+                <Declared>
+                  {String((record.climatology.header.provenance['window'] as { end: string })?.end)}
+                </Declared>
+                , which overlaps this run&rsquo;s period by{' '}
+                <Computed>
+                  {String(record.climatology.header.provenance['overlapWithRunPeriodDays'])}
+                </Computed>{' '}
+                days. Skill against this reference is therefore not a fully independent
+                measure, and the surface will say so beside every such score.
+              </dd>
+            </dl>
+          </details>
+        )}
+
+        <details data-testid="manifest-panel">
+          <summary>The manifest this run replays from</summary>
+          <p className="aside">
+            Everything needed to rebuild this run, and none of its state: replay is
+            re-computation, not the restoration of a snapshot. Nothing persists between visits
+            &mdash; no storage, no cookie, no run in the URL &mdash; so this file is the only
+            thing that leaves and the only thing that comes back.
+          </p>
+
+          <dl>
+            <dt>This build</dt>
+            <dd className="computed" data-testid="code-version">{CODE_VERSION}</dd>
+            <dt>Fields and analysis</dt>
+            {/* AT-04, as something a reader can check: two visits showing this digest have
+                the same fields. */}
+            <dd className="computed" data-testid="results-digest">{resultsDigest}</dd>
+          </dl>
+
+          <div className="row-controls">
+            <button
+              type="button"
+              data-testid="download-manifest"
+              onClick={() => {
+                const url = URL.createObjectURL(
+                  new Blob([manifest ?? ''], { type: 'application/json' }),
+                );
+                const anchor = document.createElement('a');
+                anchor.href = url;
+                anchor.download = `j-ocean-${view.run.rng.rootSeed}.json`;
+                anchor.click();
+                URL.revokeObjectURL(url);
+              }}
+            >
+              Download this manifest
+            </button>
+          </div>
+
+          <pre data-testid="manifest">{manifest}</pre>
+
+          <h3>Import a manifest</h3>
+          <p className="aside">
+            Paste one and this visit becomes that run &mdash; rebuilt from its seed and its
+            edits, not restored. The schema, the format version, the configuration digest and
+            the domain are all checked before anything is provisioned, so a refused import
+            leaves the run you have alone.
+          </p>
+          <textarea
+            data-testid="manifest-input"
+            rows={4}
+            value={pasted}
+            onChange={(event) => { setPasted(event.target.value); }}
+            placeholder="Paste a manifest"
+          />
+          <div className="row-controls">
+            <button
+              type="button"
+              data-testid="import-manifest"
+              onClick={() => { importManifest(pasted); }}
+              disabled={pasted.trim() === ''}
+            >
+              Import this manifest
+            </button>
+            <input
+              type="file"
+              accept="application/json,.json"
+              data-testid="manifest-file"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file === undefined) return;
+                void file.text().then((text) => {
+                  setPasted(text);
+                  importManifest(text);
+                });
+              }}
+            />
+          </div>
+
+          {importFailure !== null && (
+            <p className="banner warn" data-testid="import-failure">
+              {importFailure}
+            </p>
+          )}
+          {importWarning !== null && (
+            <p className="banner warn" data-testid="import-warning">
+              {importWarning}
+            </p>
+          )}
+        </details>
+
+        {/*
+          What this harness does not do, and what would have to be true before it did.
+          §10's deferrals are assessed, not vague: each has a trigger somebody wrote down,
+          and one of them is measured on every test run. Leaving them off the surface would
+          make the harness look more capable than it is, which is the failure mode this
+          project spends most of its effort avoiding.
+        */}
+        <details data-testid="deferrals-panel">
+          <summary>What this does not do, and what would change that</summary>
+          <p className="aside">
+            Four capabilities are assessed, deferred and cheap to adopt. Each has a trigger,
+            and the triggers are written down rather than remembered.
+          </p>
+          <dl>
+            <dt>Adaptive sampling</dt>
+            <dd data-testid="deferral-adaptive">
+              An ensemble, its spread, and a vessel steered by it against a lawnmower track.
+              Deferred until scoring is trusted &mdash; which means AT-02, AT-03 and AT-06 have
+              passed. <strong>AT-03 has; AT-02 and AT-06 have not</strong>, and both fail
+              because two declared numbers disagree about amplitude. A test measures the
+              trigger on every run, so this statement is never out of date.
+            </dd>
+            <dt>Dynamic depth levels</dt>
+            <dd data-testid="deferral-depth">
+              Vertical structure that is advected rather than diagnosed. The trigger is a
+              question about vertical structure evolving in time. The disagreement a reader can
+              see between an XBT and the model&rsquo;s derived profile is{' '}
+              <em>not that trigger</em>: it is a static offset, and advected structure would
+              not move it.
+            </dd>
+            <dt>A GPU kernel</dt>
+            <dd data-testid="deferral-gpu">
+              The trigger is the declared frame budget binding at a grid somebody wants. At
+              100 &times; 100 it does not.
+            </dd>
+            <dt>Observation latency</dt>
+            <dd data-testid="deferral-latency">
+              Observations arriving late rather than not at all. Withholding is its special
+              case, and beat 010 built that.
+            </dd>
+          </dl>
+        </details>
+      </div>
+    </>
+  );
+
+  /*
+   * FR-045: the row, and nothing else competing with it for this region's space. Before it is
+   * built the row is not there, so FR-048 applies instead: the region says what the row will
+   * show and what building it costs, and carries the run's analysed field at full size --
+   * which is where a cell is selected while there are no panels to select one on.
+   */
+  const centre =
+    view.forecast === null ? (
+      <div className="full" data-testid="row-invitation">
+        <h2>The row</h2>
+        <p className="aside">
+          Six panels at the declared horizons &mdash;{' '}
+          <Declared>{config.horizons.leadHours.join(', ')} h</Declared> &mdash; each stating
+          what it is valid for, what it was initialised from, and what it was worth against two
+          references. Building them means integrating the analysis forward four days, which
+          takes a couple of seconds, so it happens when you ask: <em>Build the horizon row</em>
+          {' '}is in the controls.
+        </p>
+        <figure className="analysed-field" data-testid="analysed-field">
+          <FieldView
+            values={view.analysis.attribution.observationWeight}
+            nx={view.results.grid.nx}
+            ny={view.results.grid.ny}
+            limit={1}
+            palette="sequential"
+            unit=""
+            label="Weight carried by observations in each cell"
+            testId="attribution-view"
+            markers={attributionMarkers}
+            onSelect={selectCell}
+          />
+          <figcaption>
+            The weight observations carried in each cell &mdash; the analysis&rsquo;s own gain,
+            drawn as a field. This is not a picture computed to illustrate the answer; it is
+            the same arithmetic that produced it, exported beside it, which is why it cannot
+            disagree with it. There is no fixture behind this: it is the field the analysis
+            produced on this visit. Click a cell and its breakdown fills the detail region.
+          </figcaption>
+        </figure>
+        <dl>
+          <dt>Influence radius</dt>
+          <dd data-testid="influence-radius">
+            A property of the{' '}
+            <Declared>{config.analysis.correlationLengthScaleKilometres} km</Declared> declared
+            correlation length scale, not of the ocean. An observation across a front influences
+            the far side exactly as much as its own, which the flow would not.
+          </dd>
+          <dt>Observations used</dt>
+          <dd data-testid="analysis-counts">
+            <Computed>{view.analysis.used.length}</Computed> entered the analysis;{' '}
+            <Computed>{view.analysis.excluded.length}</Computed> were excluded and are still
+            drawn. <Computed>{view.analysis.attribution.clampedCells}</Computed> cells had a
+            weight clamped and renormalised.
+          </dd>
+        </dl>
+      </div>
+    ) : (
+      row.centre
+    );
+
+  /* FR-046, and FR-048 where there is nothing to report yet. */
+  const scores =
+    view.forecast === null ? (
+      <p className="region-empty full" data-testid="scores-empty">
+        Each panel&rsquo;s skill against persistence and against climatology appears here, in
+        that panel&rsquo;s own column, once the row has been built and scored. There is no
+        scores table anywhere else: a table would ask you to match a row label against a panel
+        heading at every glance.
+      </p>
+    ) : (
+      row.scores
+    );
+
+  /*
+   * FR-047 and FR-048. Whatever was last selected, and -- when nothing has been -- the two
+   * things that can appear here and how to put one of them there.
+   */
+  const detail = (
+    <>
+      <h2>What is selected</h2>
+      {row.detail !== null ? (
+        row.detail
+      ) : view.selectedCell !== null ? (
+        <div data-testid="cell-breakdown">
+          {(() => {
+            const breakdown = view.analysis.breakdownAt(view.selectedCell);
+            return (
               <>
-                <p className="statement" data-testid="score-statement">
-                  {view.score.statement}
+                <p>
+                  Cell <Computed>{view.selectedCell}</Computed>, as the analysis weighted it.
+                  A breakdown is an instrument of a selected cell, never a per-panel summary
+                  &mdash; that was specified first and was wrong.
                 </p>
                 <dl>
-                  <dt>Errors</dt>
-                  <dd data-testid="score-errors">
-                    forecast <Computed>{view.score.forecastError.value.toFixed(1)} m</Computed>,
-                    persistence <Computed>{view.score.persistenceError.value.toFixed(1)} m</Computed>,
-                    climatology <Computed>{view.score.climatologyError.value.toFixed(1)} m</Computed>
+                  <dt>observations</dt>
+                  <dd>
+                    <Computed>{(breakdown.observations * 100).toFixed(1)}%</Computed>
                   </dd>
-                  <dt>Skill</dt>
-                  <dd data-testid="score-skill">
-                    against persistence{' '}
-                    <Computed>
-                      {(view.score.skillAgainstPersistence?.value ?? Number.NaN).toFixed(3)}
-                    </Computed>
-                    , against climatology{' '}
-                    <Computed>
-                      {(view.score.skillAgainstClimatology?.value ?? Number.NaN).toFixed(3)}
-                    </Computed>
+                  <dt>background</dt>
+                  <dd>
+                    <Computed>{(breakdown.background * 100).toFixed(1)}%</Computed>
                   </dd>
-                  <dt>Computed against</dt>
-                  <dd data-testid="score-provenance">
-                    {view.score.provenance.metric}, over {view.score.provenance.regionLabel} (
-                    <Computed>{view.score.provenance.cellsScored.value}</Computed> cells), from{' '}
-                    <Computed>{view.score.provenance.fromInstant}</Computed> to{' '}
-                    <Computed>{view.score.provenance.validInstant}</Computed>, against{' '}
-                    {view.score.provenance.truthSource}. It declines to resolve below the truth
-                    record&rsquo;s own{' '}
-                    <Declared>{view.score.provenance.resolutionFloorDegrees.value}&deg;</Declared>.
+                  <dt>climatology</dt>
+                  <dd>
+                    <Computed>{(breakdown.climatology * 100).toFixed(1)}%</Computed>
                   </dd>
-                  <dt>Means removed</dt>
-                  <dd data-testid="score-offsets">
-                    forecast <Computed>{view.score.meanOffsets.forecast.value.toFixed(1)} m</Computed>,
-                    truth <Computed>{view.score.meanOffsets.truth.value.toFixed(1)} m</Computed>,
-                    climatology{' '}
-                    <Computed>{view.score.meanOffsets.climatology.value.toFixed(1)} m</Computed>.
-                    A reduced-gravity model determines departures from a mean and not the mean
-                    itself, so every field is compared as an anomaly about its own. The offsets
-                    are published rather than absorbed.
-                  </dd>
-                  {view.score.provenance.independenceCaveat !== null && (
-                    <>
-                      <dt>Caveat</dt>
-                      <dd data-testid="score-caveat">
-                        {view.score.provenance.independenceCaveat}
-                      </dd>
-                    </>
-                  )}
                 </dl>
+                {breakdown.shares.length > 0 && (
+                  <p data-testid="cell-shares">
+                    of which{' '}
+                    {breakdown.shares
+                      .slice(0, 3)
+                      .map((share) => `${share.id} ${(share.share * 100).toFixed(1)}%`)
+                      .join(', ')}
+                  </p>
+                )}
               </>
-            )}
-          </section>
-
-          <section data-testid="attribution-panel">
-            <h2>Where the answer came from</h2>
-            <p className="aside">
-              The weight observations carried in each cell &mdash; the analysis&rsquo;s own
-              gain, drawn as a field. This is not a picture computed to illustrate the
-              answer; it is the same arithmetic that produced it, exported beside it, which
-              is why it cannot disagree with it.
-            </p>
-            <FieldView
-              values={view.analysis.attribution.observationWeight}
-              nx={view.results.grid.nx}
-              ny={view.results.grid.ny}
-              limit={1}
-              palette="sequential"
-              unit=""
-              label="Weight carried by observations in each cell"
-              testId="attribution-view"
-              markers={attributionMarkers}
-              onSelect={(cellIndex) => {
-                setView((current) => (current === null ? current : { ...current, selectedCell: cellIndex }));
-              }}
-            />
-            <dl>
-              <dt>Influence radius</dt>
-              <dd data-testid="influence-radius">
-                A property of the <Declared>
-                  {loaded.config.analysis.correlationLengthScaleKilometres} km
-                </Declared>{' '}
-                declared correlation length scale, not of the ocean. An observation across a
-                front influences the far side exactly as much as its own, which the flow
-                would not. Beat 012&rsquo;s ensemble spread is the flow-dependent answer.
-              </dd>
-
-              <dt>Observations used</dt>
-              <dd data-testid="analysis-counts">
-                <Computed>{view.analysis.used.length}</Computed> entered the analysis;{' '}
-                <Computed>{view.analysis.excluded.length}</Computed> were excluded and are
-                still drawn. <Computed>{view.analysis.attribution.clampedCells}</Computed>{' '}
-                cells had a weight clamped and renormalised.
-              </dd>
-
-              <dt>A cell&rsquo;s breakdown</dt>
-              <dd data-testid="cell-breakdown">
-                {view.selectedCell === null ? (
-                  <span className="unmeasured">
-                    Click the field above. A breakdown is an instrument of a selected cell,
-                    never a per-panel summary &mdash; that was specified first and was wrong.
-                  </span>
-                ) : (
-                  (() => {
-                    const breakdown = view.analysis.breakdownAt(view.selectedCell);
-                    return (
-                      <>
-                        observations <Computed>{(breakdown.observations * 100).toFixed(1)}%</Computed>,
-                        background <Computed>{(breakdown.background * 100).toFixed(1)}%</Computed>,
-                        climatology <Computed>{(breakdown.climatology * 100).toFixed(1)}%</Computed>
-                        {breakdown.shares.length > 0 && (
-                          <>
-                            {' '}&mdash; of which{' '}
-                            {breakdown.shares
-                              .slice(0, 3)
-                              .map((share) => `${share.id} ${(share.share * 100).toFixed(1)}%`)
-                              .join(', ')}
-                          </>
-                        )}
-                      </>
-                    );
-                  })()
-                )}
-              </dd>
-            </dl>
-          </section>
-
-          <section data-testid="instruments-panel">
-            <h2>What the instruments measured</h2>
-            <p className="aside">
-              Truth becomes an observation in exactly one module, and this is everything that
-              module produced. Every figure below is what a measurement was priced at, not
-              what it turned out to be worth &mdash; that is the analysis&rsquo;s question.
-            </p>
-            <dl>
-              <dt>Ownship surface</dt>
-              <dd data-testid="surface-count">
-                <Computed>{view.surface.length}</Computed> measurements along the declared
-                track, at <Declared>{loaded.config.instruments.track.sampleIntervalHours} h</Declared>{' '}
-                intervals. Declared error{' '}
-                <Declared>
-                  {loaded.config.instruments.surface.noiseStandardDeviationDegC} degC
-                </Declared>{' '}
-                instrument and{' '}
-                <Declared>
-                  {loaded.config.instruments.surface.representativenessStandardDeviationDegC} degC
-                </Declared>{' '}
-                representativeness.
-              </dd>
-
-              <dt>XBT drops</dt>
-              <dd data-testid="drop-count">
-                <Computed>{view.drops.length}</Computed> drops of{' '}
-                <Declared>{loaded.config.instruments.xbt.depthsMetres.length}</Declared> levels
-                each. An XBT infers its depth from a fall rate, so each level records the depth
-                it <em>reached</em>, not the depth it was asked for.
-              </dd>
-
-              <dt>What a drop told us</dt>
-              <dd data-testid="interface-estimates">
-                {view.drops.map(({ interface: inferred }) => (
-                  <span key={inferred.id} className="estimate">
-                    {isUsable(inferred) ? (
-                      <>
-                        <Computed>{inferred.value.toFixed(0)} m</Computed>
-                        <span className="host-time"> &plusmn;{inferred.error.totalSd.toFixed(0)} m</span>
-                      </>
-                    ) : (
-                      <em>unresolved</em>
-                    )}
-                  </span>
-                ))}
-                <br />
-                The observed quantity is the interface depth, inverted from the same two-layer
-                relation the profile above is drawn from. A level far from the thermocline
-                acquires an enormous depth error and weighs almost nothing, through the
-                arithmetic rather than through a rule.
-              </dd>
-
-              <dt>Argo</dt>
-              <dd data-testid="argo-state">
-                {loaded.config.instruments.argo.assimilate ? (
-                  <>
-                    <Computed>{view.argo.length}</Computed> profiles admitted, marked{' '}
-                    <em>external</em>. The truth record assimilated these profiles, so skill
-                    measured against it while assimilating them is not independent evidence,
-                    and every score will say so.
-                  </>
-                ) : (
-                  <>Drawn, not assimilated. The toggle is off.</>
-                )}
-              </dd>
-
-              <dt>Flags</dt>
-              <dd data-testid="flag-summary">
-                {flagSummary(view).length === 0 ? (
-                  <>No check fired. Quality control is{' '}
-                    <Declared>
-                      {loaded.config.instruments.qualityControl.enabled ? 'on' : 'off'}
-                    </Declared>
-                    .
-                  </>
-                ) : (
-                  flagSummary(view).map(([code, count]) => (
-                    <span key={code} className="estimate">
-                      <Computed>{count}</Computed> {code}
-                    </span>
-                  ))
-                )}
-                <br />
-                A flagged observation keeps its value and is drawn as flagged. Nothing is
-                dropped, because what the analysis chose to ignore is as interesting as what
-                it used.
-              </dd>
-            </dl>
-          </section>
-
-          {record !== null && (
-            <section data-testid="truth-panel">
-              <h2>The record this run is scored against</h2>
-              <p className="aside">
-                Two derived artefacts, regenerated from a digest-verified raw subset by
-                gate G-01. Nothing here was edited by hand; a file that had been would fail
-                the build.
-              </p>
-              <dl>
-                <dt>Domain</dt>
-                <dd data-testid="truth-domain">
-                  <Declared>{record.domainId}</Declared>
-                </dd>
-
-                <dt>Truth source</dt>
-                <dd data-testid="truth-source">
-                  {String((record.truth.provenance()['sourceLabel'] as string | undefined) ?? '')}
-                </dd>
-
-                <dt>Native resolution</dt>
-                <dd>
-                  <Declared>{record.truth.nativeResolutionDegrees}&deg;</Declared>, which is{' '}
-                  <Declared>
-                    {loaded.config.domains.list.find((d) => d.id === record.domainId)
-                      ?.truthToModelResolutionRatio}
-                    &times;
-                  </Declared>{' '}
-                  coarser than the model grid. Scoring will decline to resolve below it.
-                </dd>
-
-                <dt>Instants</dt>
-                <dd data-testid="truth-instants">
-                  <Computed>{record.truth.instantsMs().length}</Computed>, spaced{' '}
-                  <Computed>
-                    {(record.truth.provenance()['instantSpacingHours'] as number[] | undefined)?.join(
-                      ' and ',
-                    )}
-                  </Computed>{' '}
-                  hours apart. The source is missing occasional snapshots; the record carries
-                  its instants as they are and interpolates nothing at build time.
-                </dd>
-
-                <dt>Depth levels</dt>
-                <dd>
-                  <Declared>{record.truth.depthLevelsMetres().join(', ')} m</Declared> &mdash;
-                  exact levels of the source, so no build-time vertical interpolation.
-                </dd>
-
-                <dt>Argo profiles</dt>
-                <dd data-testid="observation-count">
-                  <Computed>{record.observations.profiles.length}</Computed> profiles,{' '}
-                  <Computed>{levelCount(record.observations)}</Computed> levels, of which{' '}
-                  <Computed>{flaggedLevelCount(record.observations)}</Computed> carry a flag
-                  the analysis will not treat as usable. Flagged levels are kept and will be
-                  drawn as flagged, never omitted.
-                </dd>
-
-                <dt>Climatology</dt>
-                <dd data-testid="climatology-overlap">
-                  Averaged over{' '}
-                  <Declared>
-                    {String(
-                      (record.climatology.header.provenance['window'] as { start: string })?.start,
-                    )}
-                  </Declared>{' '}
-                  to{' '}
-                  <Declared>
-                    {String((record.climatology.header.provenance['window'] as { end: string })?.end)}
-                  </Declared>
-                  , which overlaps this run's period by{' '}
-                  <Computed>
-                    {String(record.climatology.header.provenance['overlapWithRunPeriodDays'])}
-                  </Computed>{' '}
-                  days. Skill against this reference is therefore not a fully independent
-                  measure, and the surface will say so beside every such score.
-                </dd>
-              </dl>
-            </section>
-          )}
-
-          <section data-testid="manifest-panel">
-            <h2>The manifest this run replays from</h2>
-            <p className="aside">
-              Everything needed to rebuild this run, and none of its state: replay is
-              re-computation, not the restoration of a snapshot. Nothing persists between
-              visits &mdash; no storage, no cookie, no run in the URL &mdash; so this file is
-              the only thing that leaves and the only thing that comes back.
-            </p>
-
-            <dl>
-              <dt>This build</dt>
-              <dd className="computed" data-testid="code-version">{CODE_VERSION}</dd>
-              <dt>Fields and analysis</dt>
-              {/* AT-04, as something a reader can check: two visits showing this digest have
-                  the same fields. */}
-              <dd className="computed" data-testid="results-digest">{resultsDigest}</dd>
-            </dl>
-
-            <div className="row-controls">
-              <button
-                type="button"
-                data-testid="download-manifest"
-                onClick={() => {
-                  const url = URL.createObjectURL(
-                    new Blob([manifest ?? ''], { type: 'application/json' }),
-                  );
-                  const anchor = document.createElement('a');
-                  anchor.href = url;
-                  anchor.download = `j-ocean-${view.run.rng.rootSeed}.json`;
-                  anchor.click();
-                  URL.revokeObjectURL(url);
-                }}
-              >
-                Download this manifest
-              </button>
-            </div>
-
-            <pre data-testid="manifest">{manifest}</pre>
-
-            <h3>Import a manifest</h3>
-            <p className="aside">
-              Paste one and this visit becomes that run &mdash; rebuilt from its seed and its
-              edits, not restored. The schema, the format version, the configuration digest and
-              the domain are all checked before anything is provisioned, so a refused import
-              leaves the run you have alone.
-            </p>
-            <textarea
-              data-testid="manifest-input"
-              rows={4}
-              value={pasted}
-              onChange={(event) => { setPasted(event.target.value); }}
-              placeholder="Paste a manifest"
-            />
-            <div className="row-controls">
-              <button
-                type="button"
-                data-testid="import-manifest"
-                onClick={() => { importManifest(pasted); }}
-                disabled={pasted.trim() === ''}
-              >
-                Import this manifest
-              </button>
-              <input
-                type="file"
-                accept="application/json,.json"
-                data-testid="manifest-file"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file === undefined) return;
-                  void file.text().then((text) => {
-                    setPasted(text);
-                    importManifest(text);
-                  });
-                }}
-              />
-            </div>
-
-            {importFailure !== null && (
-              <p className="banner warn" data-testid="import-failure">
-                {importFailure}
-              </p>
-            )}
-            {importWarning !== null && (
-              <p className="banner warn" data-testid="import-warning">
-                {importWarning}
-              </p>
-            )}
-          </section>
-
-          {/*
-            What this harness does not do, and what would have to be true before it did.
-            §10's deferrals are assessed, not vague: each has a trigger somebody wrote down,
-            and one of them is measured on every test run. Leaving them off the surface would
-            make the harness look more capable than it is, which is the failure mode this
-            project spends most of its effort avoiding.
-          */}
-          <section data-testid="deferrals-panel">
-            <h2>What this does not do, and what would change that</h2>
-            <p className="aside">
-              Four capabilities are assessed, deferred and cheap to adopt. Each has a trigger,
-              and the triggers are written down rather than remembered.
-            </p>
-            <dl>
-              <dt>Adaptive sampling</dt>
-              <dd data-testid="deferral-adaptive">
-                An ensemble, its spread, and a vessel steered by it against a lawnmower track.
-                Deferred until scoring is trusted &mdash; which means AT-02, AT-03 and AT-06
-                have passed. <strong>AT-03 has; AT-02 and AT-06 have not</strong>, and both
-                fail because two declared numbers disagree about amplitude. A test measures the
-                trigger on every run, so this statement is never out of date.
-              </dd>
-              <dt>Dynamic depth levels</dt>
-              <dd data-testid="deferral-depth">
-                Vertical structure that is advected rather than diagnosed. The trigger is a
-                question about vertical structure evolving in time. The disagreement a reader
-                can see between an XBT and the model&rsquo;s derived profile is <em>not that trigger</em>: it is a static offset, and advected structure would not move it.
-              </dd>
-              <dt>A GPU kernel</dt>
-              <dd data-testid="deferral-gpu">
-                The trigger is the declared frame budget binding at a grid somebody wants. At
-                100 &times; 100 it does not.
-              </dd>
-              <dt>Observation latency</dt>
-              <dd data-testid="deferral-latency">
-                Observations arriving late rather than not at all. Withholding is its special
-                case, and beat 010 built that.
-              </dd>
-            </dl>
-          </section>
-
-          <footer>
-            <p className="aside">
-              j-ocean is a teaching harness: a real but reduced ocean model, its measurements,
-              and what each of them was worth. It is not an operational forecast system, and
-              every figure on this page says where it came from.
-            </p>
-          </footer>
-        </>
+            );
+          })()}
+        </div>
+      ) : (
+        <p className="region-empty" data-testid="detail-empty">
+          Nothing is selected. Two things can appear here: a cell&rsquo;s attribution
+          breakdown, from clicking a cell on any field; and a measurement&rsquo;s own profile
+          beside the model&rsquo;s derived one, with the measured levels kept as a ghost, from
+          hovering or clicking its mark.
+        </p>
       )}
-    </main>
+    </>
+  );
+
+  return (
+    <>
+      {/* The walkthrough sits outside every region because it is about all of them, and
+          before them in the document so that a reader tabbing in reaches the explanation of
+          the surface before the surface itself. */}
+      <Walkthrough />
+      <Regions
+        config={config}
+        statement={statement}
+        controls={controls}
+        centre={centre}
+        scores={scores}
+        detail={detail}
+      />
+    </>
   );
 }

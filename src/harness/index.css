@@ -15,6 +15,8 @@
 
 * { box-sizing: border-box; }
 
+html, body, #root { height: 100%; }
+
 body {
   margin: 0;
   background: var(--paper);
@@ -22,11 +24,156 @@ body {
   font: 16px/1.5 ui-serif, Georgia, "Times New Roman", serif;
 }
 
-main {
-  max-width: 46rem;
-  margin: 0 auto;
-  padding: 1.5rem 1.25rem 4rem;
+/* Beat 013, ADR-0012. One viewport of four regions, divided by what changes when.
+
+   Every width here comes from `presentation` in configuration through a custom property that
+   `Regions.tsx` sets; the fallbacks exist only so this file reads on its own. The page itself
+   never scrolls -- a region that can outgrow its box scrolls within itself and says so with
+   `data-scrolls`, and the one-view test fails by name on any element that scrolls without
+   declaring it. */
+.one-view {
+  display: grid;
+  grid-template-columns: var(--controls-width, 390px) minmax(0, 1fr) var(--detail-width, 390px);
+  grid-template-rows: minmax(0, 1fr);
+  gap: var(--panel-gap, 10px);
+  height: 100dvh;
+  padding: calc(var(--page-gutter, 48px) / 2);
+  overflow: hidden;
 }
+
+.region {
+  min-width: 0;
+  min-height: 0;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* FR-02 stays out of the scroller: a statement a reader has to scroll to is not one that is
+   always visible, and nothing about this one stops being true while the page is open. */
+.controls > .not-operational {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.controls > .not-operational h1 { font-size: 1.1rem; margin: 0 0 0.2rem; }
+
+.controls-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 0.35rem;
+}
+
+/* FR-045 and FR-046 in one grid. The centre and the scores are `subgrid` of these tracks, so a
+   score is in its panel's column because the browser placed it there and not because somebody
+   arranged two lists to match. The track count is the declared horizon count. */
+.centre-stack {
+  display: grid;
+  grid-template-columns: repeat(var(--horizon-count, 6), minmax(var(--panel-minimum-width, 190px), 1fr));
+  grid-template-rows: auto auto;
+  align-content: start;
+  gap: var(--panel-gap, 10px);
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.centre,
+.scores,
+.horizon-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  gap: var(--panel-gap, 10px);
+  align-content: start;
+}
+
+.centre > .full,
+.scores > .full { grid-column: 1 / -1; }
+
+.detail {
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-left: 1px solid var(--rule);
+  padding-left: 0.6rem;
+}
+
+/* The help button is fixed in this corner, so the heading keeps clear of it rather than
+   running underneath it. */
+.detail > h2 { padding-right: 3.2rem; }
+
+.region-empty {
+  color: var(--host);
+  font-size: 0.82rem;
+  margin: 0 0 0.6rem;
+}
+
+.region h2 {
+  margin: 0 0 0.4rem;
+  font-size: 0.82rem;
+}
+
+.controls .disclosures { margin-top: 0.75rem; }
+
+.controls details {
+  border-top: 1px solid var(--rule);
+  padding: 0.3rem 0;
+  font-size: 0.82rem;
+}
+
+.controls details > summary {
+  cursor: pointer;
+  color: var(--host);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.72rem;
+}
+
+.controls details dl { grid-template-columns: 1fr; gap: 0.1rem; }
+.controls details dt { font-size: 0.68rem; }
+.controls details dd { font-size: 0.78rem; margin-bottom: 0.35rem; }
+
+.control-group {
+  border-top: 1px solid var(--rule);
+  padding-top: 0.4rem;
+  margin-top: 0.4rem;
+}
+
+.control-group > h3 {
+  margin: 0 0 0.3rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--host);
+}
+
+.control-group button { font-size: 0.78rem; padding: 0.25rem 0.5rem; }
+.control-group label { font-size: 0.78rem; }
+
+.score-cell {
+  border-top: 1px solid var(--rule);
+  padding-top: 0.3rem;
+  min-width: 0;
+}
+
+/* Which panel this column belongs to, said in the column itself: a reader looking along the
+   scores alone should not have to count across to the row to find out. */
+.score-cell .score-lead { margin: 0 0 0.2rem; font-size: 0.78rem; }
+
+/* The analysed field, before the row exists. Bounded by the height it has rather than by the
+   width, because the centre is wide and a square field given all of it would be taller than
+   the viewport -- which is the one thing this beat does not allow. */
+.analysed-field { margin: 0.5rem 0; }
+.analysed-field canvas { max-width: min(100%, 46vh); }
+.analysed-field figcaption { color: var(--host); font-size: 0.8rem; margin-top: 0.4rem; max-width: 44rem; }
 
 /* FR-02. First in the document, first in the viewport, and with no control that removes
    it: nothing about it stops being true while the page is open. */
@@ -78,7 +225,6 @@ dd { margin: 0; }
 
 .domain + .domain::before { content: " / "; color: var(--rule); }
 
-.controls { margin-top: 1.25rem; display: flex; gap: 0.75rem; flex-wrap: wrap; }
 
 button {
   font: inherit;
@@ -91,11 +237,27 @@ button {
 
 button:hover { background: var(--ink); color: var(--paper); }
 
+/* Before a run exists there is nothing to divide into regions: the statement, and the refusal
+   if the configuration was refused. It is still one viewport, and the refusal is bounded and
+   scrolls within itself rather than lengthening the page with a stack trace. */
+.boot-view {
+  height: 100dvh;
+  padding: calc(var(--page-gutter, 48px) / 2);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow: hidden;
+}
+
+.boot-view > .not-operational { flex: 0 0 auto; max-width: 46rem; margin: 0; }
+
 .failure {
   border: 2px solid var(--alarm);
   background: #fff;
   padding: 1rem 1.25rem;
-  margin-bottom: 1.5rem;
+  margin: 0;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .failure h2 { border: none; color: var(--alarm); margin-top: 0; }
@@ -113,13 +275,15 @@ pre {
 
 .aside { color: var(--host); font-size: 0.9rem; }
 
-footer { margin-top: 2.5rem; border-top: 1px solid var(--rule); padding-top: 0.75rem; }
-
 /* The field panel (beat 003). The canvas is 100 x 100 device pixels scaled up, and
    `image-rendering: pixelated` keeps a cell a cell: a smoothed 100 x 100 field would show
    structure the model does not have, which is the sort of picture Principle V exists to
    forbid. */
-.field { margin: 1rem 0 1.5rem; }
+/* Positioned so that the mark list inside it is contained by the figure. Absolutely
+   positioned with no positioned ancestor, its containing block was the viewport, which meant
+   it escaped the clipping of every scrolling region it sat in and lengthened the page --
+   exactly the undeclared overflow beat 013 exists to forbid. */
+.field { margin: 1rem 0 1.5rem; position: relative; }
 
 .field canvas {
   width: 100%;
@@ -211,36 +375,22 @@ button[disabled]:hover { background: #fff; color: var(--ink); }
    number here comes from `presentation` in configuration through a custom property; the
    fallbacks exist only so the stylesheet is readable on its own, and the schema refuses a
    configuration whose reference width cannot hold every declared horizon. */
-.row-section {
-  --row-width: min(
-    calc(var(--row-reference-width, 1400px) - var(--row-page-gutter, 48px)),
-    calc(100vw - var(--row-page-gutter, 48px))
-  );
-  width: var(--row-width);
-  margin-left: calc(50% - var(--row-width) / 2);
-}
-
-.horizon-row {
-  display: flex;
-  gap: var(--panel-gap, 10px);
-  align-items: flex-start;
-  overflow-x: auto;
-  padding-bottom: 0.5rem;
-  margin: 1rem 0;
-}
-
 .panel {
-  flex: 1 1 0;
-  min-width: var(--panel-minimum-width, 190px);
   border: 1px solid var(--rule);
   background: #fff;
-  padding: 0.5rem 0.6rem 0.7rem;
+  padding: 0.4rem 0.45rem 0.5rem;
+  min-width: 0;
 }
 
 /* FR-014: enlargement is a class on an element. Nothing is recomputed, and the other panels
-   stay visible -- "in place" means in place. */
+   stay visible -- "in place" means in place.
+
+   What it no longer does is take a neighbour's width. The scores beneath share the centre's
+   column tracks by `subgrid` (FR-046), so a panel that took two tracks would take its
+   neighbour's score column with it and a score would sit under the wrong picture. Enlargement
+   therefore buys the depth elevation and the mark's own detail rather than width, which is
+   what a reader opens it for. */
 .panel.enlarged {
-  flex: 3 1 0;
   border-color: var(--ink);
   border-width: 2px;
 }
@@ -396,28 +546,33 @@ button[disabled]:hover { background: #fff; color: var(--ink); }
   font-size: 0.85rem;
 }
 
-.issue-control input[type='range'] { flex: 1 1 16rem; min-width: 12rem; }
+.issue-control input[type='range'] { flex: 1 1 100%; min-width: 0; }
 .issue-control label { color: var(--host); }
 
-.skill-inset { margin: 0.75rem 0 0; }
+.skill-inset { margin: 0.5rem 0 0; }
+
+.skill-disclosure { font-size: 0.8rem; padding-top: 0.3rem; }
+.skill-disclosure > summary { cursor: pointer; color: var(--host); }
 .skill-inset svg { background: #fff; border: 1px solid var(--rule); display: block; }
 .skill-inset figcaption { font-size: 0.72rem; color: var(--host); margin-top: 0.25rem; }
 
 /* Beat 010: the counterfactuals. The status is not decoration -- a reader who cannot tell an
    edit from the record has been misled by the harness, so it is always on the surface. */
-.counterfactuals { margin: 0.75rem 0; }
+.counterfactuals { margin: 0.4rem 0; }
+.counterfactuals .row-controls { display: block; }
+.counterfactuals label { display: flex; margin-bottom: 0.25rem; }
 
+/* Block, not flex: in a column this narrow the words of the sentence would each have become
+   a flex item and the sentence would have come apart. */
 .run-status {
-  margin: 0 0 0.5rem;
-  padding: 0.4rem 0.6rem;
+  margin: 0 0 0.4rem;
+  padding: 0.35rem 0.5rem;
   border: 1px solid var(--rule);
   background: #fff;
-  font-size: 0.85rem;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+  font-size: 0.78rem;
 }
+
+.run-status button { display: block; margin-top: 0.35rem; font-size: 0.75rem; padding: 0.2rem 0.45rem; }
 
 .counterfactuals label { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; }
 .counterfactuals input[type='number'] { width: 4.5rem; }

@@ -26,7 +26,7 @@ The row keeps the axis and pays for it in panel size. Enlarge in place is the an
 and it is deliberately not a modal — an enlargement that hid the row would be a slider with
 extra steps.
 
-![One panel enlarged; the other five stay visible and shrink to their declared minimum](../images/007-enlarged.png)
+![One panel enlarged, gaining its depth elevation; the other five stay visible and keep their columns, because the scores beneath share those columns](../images/007-enlarged.png)
 
 ## The row passed its tests and did not fit
 
