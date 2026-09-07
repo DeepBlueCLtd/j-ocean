@@ -113,7 +113,7 @@ approximation the spec described.
 
 ## Where the answer came from
 
-![The attribution field: observation weight in each cell, drawn ink-on-paper, with the XBT drops and Argo profiles marked and a selected cell's breakdown below](../images/005-attribution.png)
+![The attribution field: observation weight in each cell, drawn ink-on-paper, with the XBT drops and Argo profiles marked and a selected cell's breakdown filling the detail region on the right](../images/005-attribution.png)
 
 Two presentation decisions in that picture are load-bearing.
 

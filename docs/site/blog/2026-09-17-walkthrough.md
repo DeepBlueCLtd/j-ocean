@@ -97,7 +97,7 @@ Below the anchor, else above it, else along the bottom of the window — the las
 anchor taller than the screen, where the card must overlap something and the bottom is the
 cheapest place to do it.
 
-![Step four, ringing the field panel, with the card pinned clear of the figure](images/013-walkthrough-field-step.png)
+![Step three, ringing the centre region, with the card pinned clear of the row](images/013-walkthrough-field-step.png)
 
 ## It is not modal
 

@@ -57,8 +57,19 @@ single-panel presentation, rather than shrinking six panels past legibility.
 ## Consequences
 
 - **The minimum viewport becomes a declared figure**, measured from the built layout rather
-  than chosen, and refused by the schema if it cannot hold the declared horizons. This is
-  the cost of the decision stated honestly: the instrument wants width, and now it says so.
+  than chosen, and refused by the schema if it cannot hold the declared horizons. It is
+  **2 038 x 682 CSS pixels**: 848 px for the gutter and the two columns, 1 190 px for six panels
+  at their declared minimum with five gaps between them, and a row 634 px tall once its labels
+  and six score statements have wrapped in their own columns. The width is a sum of declared
+  boxes; the height could not have been predicted, because a score statement is a sentence and a
+  wider panel is a shorter score.
+
+  This is the cost of the decision stated honestly, and it is not small: a 13-inch laptop is
+  below the floor, so most readers meet the single-panel answer rather than the row. The
+  alternative was six panels too narrow to read, or a row that scrolls -- which is the fault
+  beat 007 caught, arriving through a different door. Whether 190 px is still the right minimum
+  panel width now that six of them plus two columns is the binding constraint on the window is
+  question 5 for the author.
 - **The narrative has nowhere to live on the application**, which is why beat 014 exists.
   Until it lands, the introductory matter and the run's provenance sit behind disclosures in
   the controls region, and the open question of SRD-v2 §9 — whether that column stays fixed

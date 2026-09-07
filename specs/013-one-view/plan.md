@@ -123,6 +123,37 @@ more than it holds.
   scrolling overflow is one of the declared ones. An undeclared scrollbar fails the test by
   name.
 
+## What the regions cost, measured
+
+Two figures came out of building them, and both change a declared value.
+
+- **The reference width no longer holds the row.** Six panels at the declared minimum need
+  1 190 px; the controls and detail columns plus the gutter need 848 more. `1400` was declared in
+  beat 007 for a row that had the whole window, and the measured minimum for four regions is
+  **2 038**. The centre must not answer that by scrolling horizontally — that is beat 007's own
+  finding coming back through a different door, and it is what FR-43 exists to answer instead. So
+  the floor is declared at the measured figure and below it the application says the size it needs.
+- **T040 measured both figures from the built layout: 2 038 × 682 CSS px.** The width is the
+  arithmetic above and agrees with it to the pixel, because it is a sum of declared boxes. The
+  height was not predictable and was not predicted: the row with its labels and its six score
+  statements is 634 px tall at that width, and the page gutter is the other 48. The height is
+  measured at the *floor's own width* rather than at a roomy one, because a score statement is a
+  sentence that wraps in its column and a wider panel is a shorter score.
+- **`referenceViewportWidthPx` is raised from 1400 to 2038.** It is the width the documentation
+  photographs the application at, and photographing it at a width where the centre scrolled would
+  be publishing the fault. The schema now refuses a reference below the floor.
+- **The two column widths are declared rather than derived.** `controlsWidthPx` and
+  `detailWidthPx` were left optional and absent so that G-07's `configuration` digest would not
+  move; that is the gate shaping the design instead of holding it. They are required, they are
+  390 each — two panels and the gap between them, which is what the detail region needs to draw a
+  profile editor whole — and `schemaVersion` goes to 7 with them.
+- **G-07's first quantity is a digest of the whole validated configuration**, so declaring any
+  presentation figure — a column width, the floor itself — moves a recorded digest although
+  nothing computed moves. That is a real cost of the gate and it is stated rather than worked
+  around: the declared values are declared, `configuration` is re-recorded once, and the commit
+  says which quantity moved and why. A gate that made declaring a number expensive enough to avoid
+  would be shaping the design instead of holding it.
+
 ## Constitution Check
 
 | Principle | Touched | How this beat complies |
@@ -150,4 +181,36 @@ more than it holds.
 
 ## Measured
 
-_Filled in when the beat lands._
+- **5 757 px to 900 px.** At the width declared when the beat began, the application was 6.4
+  vertical screens of ten stacked sections in a 46-rem prose column. It is now one viewport in
+  every state it can reach: loaded, row-unbuilt, row-built, scored, cell-selected, over-budget
+  and configuration-failure, on both axes (SC-001).
+- **The floor is 2 038 x 682 CSS pixels**, measured from the built layout rather than chosen, and
+  tight: a panel is *at* its declared 190 px and the centre has no spare height, so one pixel
+  less is one pixel too few. `referenceViewportWidthPx` rose from 1 400 to meet it.
+- **Four declared internal scrollers**, and the test found a fifth that nobody declared: every
+  field's accessible mark list was absolutely positioned inside an unpositioned `figure`, so its
+  containing block was the viewport. It escaped every scroll container and lengthened the page by
+  33 px.
+- **G-07 held the whole beat.** Forty-one quantities, forty of them byte-identical from the first
+  commit to the last across a rewrite of `App.tsx`, `HorizonRow.tsx` and `Panel.tsx`. One moved:
+  `configuration`, because presentation figures that compute nothing are inside the digest of the
+  validated configuration, and this beat declared four of them. Re-recorded once, with both
+  digests in the commit message.
+- **256 headless tests, 54 shell tests, 17 screenshots, eight gates.**
+
+## What the plan said, and what landed instead
+
+- **The narrative did not move behind the controls' disclosures as prose.** The run, the declared
+  values, the instruments, the truth record, the manifest and the deferrals did; the introductory
+  matter and the blog are still the site's, waiting for beat 014, which is where FR-42 puts them.
+- **The skill curve became a disclosure rather than a band across the scores' tracks.** Stretched
+  over six columns it was some 600 px tall, and the requirement is that the figures show the decay
+  without a curve being plotted. The curve is an aid to reading them, so it is offered rather than
+  spent on.
+- **A control was built that the plan expected to move.** SRD-v1 FR-11 declares two domains and
+  nothing on the surface had ever offered the second, so building the picker was the first time
+  anyone ran it -- and found it cannot be run. That is question 4.
+- **The floor was worse than the plan guessed and is stated rather than softened.** A 13-inch
+  laptop is below it. The honest answer was already in SRD-v2 FR-43: this instrument wants width,
+  and a no-scroll requirement without a smallest-case answer is an unfinished requirement.

@@ -1,6 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { expect, test, type Request } from '@playwright/test';
+import { expect, test, type Page, type Request } from '@playwright/test';
+import { declared } from './declared-geometry.js';
 
 /**
  * SC-003 and User Story 3 of spec 001.
@@ -12,10 +11,12 @@ import { expect, test, type Request } from '@playwright/test';
 
 const CONFIG_REQUEST = /j-ocean.*\.json$/;
 
-/** The declared presentation geometry, read from the file the shell is served. */
-const declared = JSON.parse(
-  readFileSync(fileURLToPath(new URL('../../config/j-ocean.json', import.meta.url)), 'utf8'),
-) as { presentation: { referenceViewportWidthPx: number; minimumPanelWidthPx: number } };
+/** A disclosure has to be opened before what is inside it can be seen. */
+async function openDisclosure(page: Page, testId: string): Promise<void> {
+  await page.getByTestId(testId).evaluate((node) => {
+    (node as HTMLDetailsElement).open = true;
+  });
+}
 
 test.describe('the shell', () => {
   test('loads from a static server making no external request', async ({ page, baseURL }) => {
@@ -75,12 +76,19 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('instant')).not.toHaveText(startInstant ?? '');
   });
 
+  /**
+   * Beat 013 deleted the field panel: its field is the row's six panels and, before the row
+   * is built, the centre's analysed field at full size. The claims it carried are unchanged
+   * and are asserted here against where each of them now lives -- the picture in the centre,
+   * the initialisation figures in the run disclosure.
+   */
   test('draws the field the model holds, and says what it is', async ({ page }) => {
     await page.goto('/');
-    const panel = page.getByTestId('field-panel');
+    const panel = page.getByTestId('analysed-field');
     await expect(panel).toBeVisible();
     await expect(panel.getByRole('img')).toBeVisible();
     await expect(panel).toContainText('no fixture behind this');
+    await openDisclosure(page, 'run-panel');
     await expect(page.getByTestId('initialisation')).toContainText('geostrophic balance');
     // FR-003: the criterion is on the surface, not only in a test.
     await expect(page.getByTestId('stability')).toContainText('the declared criterion admits');
@@ -197,21 +205,21 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('not-operational')).toBeVisible();
   });
 
-  test('fits every declared horizon at the declared reference width, and never scrolls the page', async ({
+  test('fits every declared horizon at the width the four regions need, and never scrolls the page', async ({
     page,
   }) => {
     // FR-013's "all visible at once" is a claim about geometry at a declared width, so it is
-    // measured. The row's container may scroll below that width; the page may not, ever.
+    // measured. The centre's container may scroll below that width; the page may not, ever.
     await page.setViewportSize({
-      width: declared.presentation.referenceViewportWidthPx,
-      height: 1000,
+      width: declared.presentation.minimumViewportWidthPx,
+      height: declared.presentation.minimumViewportHeightPx,
     });
     await page.goto('/');
     await page.getByTestId('build-row').click();
     await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
 
     const row = await page
-      .getByTestId('horizon-row')
+      .getByTestId('centre-stack')
       .evaluate((node) => ({ scrollWidth: node.scrollWidth, clientWidth: node.clientWidth }));
     expect(
       row.scrollWidth,
@@ -220,7 +228,7 @@ test.describe('the shell', () => {
 
     // Every panel is inside the container it is drawn in, and no narrower than the declared
     // minimum -- "visible" is not the same as "present and one pixel wide".
-    const container = await page.getByTestId('horizon-row').boundingBox();
+    const container = await page.getByTestId('centre-stack').boundingBox();
     for (const lead of [0, 12, 24, 48, 72, 96]) {
       const box = await page.getByTestId(`panel-${String(lead)}`).boundingBox();
       expect(box, `panel ${String(lead)} has no box`).not.toBeNull();
@@ -632,6 +640,7 @@ test.describe('the shell', () => {
     expect(await page.getByTestId('panel-brief-24').textContent()).toBe(brief);
 
     // FR-008: two curves once two issue times have been scored, labelled by issue instant.
+    await openDisclosure(page, 'skill-disclosure');
     const curves = page.getByTestId('skill-inset').locator('[data-issue-instant]');
     expect(await curves.count()).toBe(2);
     // Exactly one of them is the row's current issue time; the other is the one it was.
@@ -807,6 +816,7 @@ test.describe('the shell', () => {
   test('replays a run in a fresh context from its manifest alone', async ({ page, browser }) => {
     test.setTimeout(240_000);
     await page.goto('/');
+    await openDisclosure(page, 'manifest-panel');
     await expect(page.getByTestId('manifest')).toContainText('rootSeed');
 
     // Make it a run worth replaying: a drawn seed, some integration and an edit.
@@ -832,6 +842,7 @@ test.describe('the shell', () => {
     const fresh = await browser.newContext();
     const other = await fresh.newPage();
     await other.goto(page.url());
+    await openDisclosure(other, 'manifest-panel');
     await expect(other.getByTestId('manifest')).toContainText('rootSeed');
     await other.getByTestId('manifest-input').fill(manifest);
     await other.getByTestId('import-manifest').click();
@@ -849,6 +860,7 @@ test.describe('the shell', () => {
     page,
   }) => {
     await page.goto('/');
+    await openDisclosure(page, 'manifest-panel');
     const manifest = (await page.getByTestId('manifest').textContent()) ?? '';
     const parsed = JSON.parse(manifest) as Record<string, unknown>;
 
@@ -880,6 +892,7 @@ test.describe('the shell', () => {
 
   test('warns about a different build rather than refusing it', async ({ page }) => {
     await page.goto('/');
+    await openDisclosure(page, 'manifest-panel');
     const parsed = JSON.parse((await page.getByTestId('manifest').textContent()) ?? '{}') as Record<
       string,
       unknown
@@ -951,51 +964,78 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('deferral-latency')).toContainText('special case');
   });
 
+  /**
+   * Beat 013 deleted the score panel: FR-046 says each panel's figures are drawn beneath that
+   * panel and that no scores table exists anywhere else. Every claim the panel carried is
+   * asserted here against the scores region, which is where those figures now are.
+   *
+   * One claim lost its subject and is recorded rather than quietly dropped. The score panel
+   * scored the *run* from its start, where an Argo profile had been assimilated, so its
+   * independence caveat fired; the row's panels score from the issue instant, by which no
+   * Argo profile has arrived (beat 009), so there is nothing to caveat. What the panel must
+   * therefore say -- and what is asserted here -- is which of the two it is, because a reader
+   * cannot tell "independent" from "nobody checked" out of a blank space (review R-3).
+   */
   test('never shows an error figure without two references and their provenance', async ({
     page,
   }) => {
     await page.goto('/');
-    const panel = page.getByTestId('score-panel');
-    await expect(panel).toBeVisible();
-    await expect(panel).toContainText('never one here without');
-    await expect(page.getByTestId('score-run')).toBeVisible();
+    await expect(page.getByTestId('scores-empty')).toContainText('no scores table anywhere else');
+    await page.getByTestId('build-row').click();
+    await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('panel-score-24')).toContainText('not scored yet');
 
-    await page.getByTestId('score-run').click();
-    await expect(page.getByTestId('score-statement')).toBeVisible({ timeout: 30_000 });
+    await page.getByTestId('score-row').click();
+    const score = page.getByTestId('panel-score-24');
+    await expect(score).toContainText('persistence', { timeout: 60_000 });
 
     // FR-021: the convention, and the words. Whichever way this run falls, the statement
     // says it in the SRD's terms rather than in kinder ones.
-    await expect(page.getByTestId('score-statement')).toContainText(/than (persistence|climatology)/);
-    await expect(page.getByTestId('score-errors')).toContainText('persistence');
-    await expect(page.getByTestId('score-errors')).toContainText('climatology');
+    await expect(score.locator('.statement')).toContainText(/than (persistence|climatology)/);
+    await expect(score).toContainText('vs persistence');
+    await expect(score).toContainText('vs climatology');
 
     // FR-022: a score without provenance is an assertion.
-    await expect(page.getByTestId('score-provenance')).toContainText('root-mean-square');
-    await expect(page.getByTestId('score-provenance')).toContainText('sponge margin');
-    await expect(page.getByTestId('score-provenance')).toContainText('declines to resolve below');
-    await expect(page.getByTestId('score-offsets')).toContainText('published rather than absorbed');
+    await openDisclosure(page, 'panel-provenance-24');
+    const provenance = page.getByTestId('panel-provenance-24');
+    await expect(provenance).toContainText('root-mean-square');
+    await expect(provenance).toContainText('sponge margin');
+    await expect(provenance).toContainText('declining to resolve below');
+    await expect(provenance).toContainText('published rather than absorbed');
 
-    // ADR-0007: the caveat travels with the figure.
-    await expect(page.getByTestId('score-caveat')).toContainText('not independent evidence');
+    // ADR-0007 and review R-3: the caveat travels with the figure, and where there is none
+    // the panel says so rather than leaving a space a reader has to interpret.
+    await expect(provenance).toContainText(/not independent evidence|no independence caveat/);
   });
 
+  /**
+   * Beat 013 moved the attribution panel: its field is the centre's analysed field, drawn at
+   * full size while there are no panels to select a cell on, and the breakdown it produced is
+   * the detail region's (FR-047). The claims are the same ones.
+   */
   test('draws the attribution as the analysis own weights, and a cell breakdown on demand', async ({
     page,
   }) => {
     await page.goto('/');
-    const panel = page.getByTestId('attribution-panel');
-    await expect(panel).toBeVisible();
-    await expect(panel).toContainText('cannot disagree with it');
+    const field = page.getByTestId('analysed-field');
+    await expect(field).toBeVisible();
+    await expect(field).toContainText('cannot disagree with it');
 
     // Review R-7: the radius is a property of the declared length scale, and the surface
     // says so rather than letting a reader take it for a property of the ocean.
     await expect(page.getByTestId('influence-radius')).toContainText('not of the ocean');
 
+    // FR-048: with nothing selected the region says what could be there and how to put it
+    // there, rather than rendering blank.
+    await expect(page.getByTestId('detail-empty')).toContainText('attribution breakdown');
+    await expect(page.getByTestId('cell-breakdown')).toHaveCount(0);
+
     // FR-18: a breakdown is an instrument of a selected cell, never a per-panel summary.
-    await expect(page.getByTestId('cell-breakdown')).toContainText('never a per-panel summary');
     await page.getByTestId('attribution-view-overlay').click({ position: { x: 200, y: 200 } });
-    await expect(page.getByTestId('cell-breakdown')).toContainText('observations');
-    await expect(page.getByTestId('cell-breakdown')).toContainText('climatology');
+    const breakdown = page.getByTestId('cell-breakdown');
+    await expect(breakdown).toContainText('never a per-panel summary');
+    await expect(breakdown).toContainText('observations');
+    await expect(breakdown).toContainText('climatology');
   });
 
   test('says what the instruments measured and what each measurement was priced at', async ({
@@ -1019,10 +1059,49 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('interface-estimates')).toContainText('interface depth');
   });
 
+  /**
+   * SRD-v1 FR-11, built by beat 013 because it had never been built: the shell read
+   * `domains.defaultId` and nothing on the surface offered the second domain. The contrast is
+   * a requirement rather than a bonus -- a reader has to be able to watch the same machinery
+   * buy much less over a deliberately bland ocean.
+   *
+   * And building it found that the bland domain cannot be run at all.
+   * `instruments.track.waypoints` are declared once, in the eventful domain's longitudes, and
+   * the bland domain's artefact does not cover them, so the ownship thermometer refuses to
+   * sample there. Under FR-40 that is recorded rather than fixed: a per-domain track is a
+   * configuration change and this beat changes no declared value. What is asserted here is
+   * Principle VI -- the harness loses in a way a reader can read, in the instrument's own
+   * words, and the run they had is still on screen afterwards.
+   */
+  test('offers the second domain, and says why it cannot be run', async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.goto('/');
+    await openDisclosure(page, 'truth-panel');
+    await expect(page.getByTestId('truth-domain')).toContainText('gulf-stream-front');
+    await expect(page.getByTestId('domain-gulf-stream-front')).toBeChecked();
+    await expect(page.getByTestId('domain-open-gyre')).toHaveCount(1);
+
+    await page.getByTestId('domain-open-gyre').check();
+
+    const failure = page.getByTestId('domain-failure');
+    await expect(failure).toBeVisible({ timeout: 60_000 });
+    await expect(failure).toContainText('open-gyre');
+    await expect(failure).toContainText('outside this artefact');
+
+    // Nothing was provisioned by that: the run on screen is the one that was there, over the
+    // domain it was over, and the choice is back where it was.
+    await expect(page.getByTestId('recorded-case')).toContainText('the recorded case');
+    await expect(page.getByTestId('domain-gulf-stream-front')).toBeChecked();
+    await expect(page.getByTestId('truth-domain')).toContainText('gulf-stream-front');
+    await openDisclosure(page, 'run-panel');
+    await expect(page.getByTestId('run-panel')).toContainText('gulf-stream-front');
+  });
+
   test('states the declared values, so that no figure on the page is unattributed', async ({
     page,
   }) => {
     await page.goto('/');
+    await openDisclosure(page, 'declared-panel');
     await expect(page.getByTestId('horizons')).toContainText('0, 12, 24, 48, 72, 96 h');
     await expect(page.getByTestId('declared-panel')).toContainText('100 × 100');
     await expect(page.getByTestId('declared-panel').locator('.figure.declared').first()).toBeVisible();
@@ -1123,10 +1202,10 @@ test.describe('the walkthrough', () => {
     await expect(page.getByTestId('run-panel')).toBeVisible();
     await page.getByTestId('help-button').click();
     await page.getByTestId('walkthrough-next').click();
-    await expect(page.getByTestId('walkthrough-title')).toContainText('Which run this is');
+    await expect(page.getByTestId('walkthrough-title')).toContainText('Everything you can change');
 
-    // Geometry again: the spotlight's rectangle is the run panel's rectangle. Beat 007 was
-    // a lesson in what a test that counts elements does not notice.
+    // Geometry again: the spotlight's rectangle is the controls region's rectangle. Beat 007
+    // was a lesson in what a test that counts elements does not notice.
     //
     // Polled rather than read once, because the step scrolls its anchor into view and the
     // ring is still catching up for a few frames. Polling waits for the mechanism to
@@ -1135,7 +1214,7 @@ test.describe('the walkthrough', () => {
     await expect
       .poll(async () => {
         const ring = await page.getByTestId('walkthrough-spotlight').boundingBox();
-        const panel = await page.getByTestId('run-panel').boundingBox();
+        const panel = await page.getByTestId('region-controls').boundingBox();
         if (ring === null || panel === null) return null;
         return [
           Math.round(Math.abs(ring.x - panel.x)),

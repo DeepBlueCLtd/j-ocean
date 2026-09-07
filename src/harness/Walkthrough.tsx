@@ -28,8 +28,10 @@ interface Step {
 }
 
 /**
- * In page order, so that walking the tour scrolls one way. A reader who follows it top to
- * bottom has read the page top to bottom, which is the order the page was written in.
+ * In region order, and then in the order of the disclosures beneath the controls. Beat 013
+ * left the page nothing to scroll, so a tour is no longer a walk down it: it is the four
+ * regions in the order a reader meets them -- what this is, what you change, what it answers,
+ * what that was worth, and what you are inspecting -- followed by the run's provenance.
  */
 const STEPS: readonly Step[] = [
   {
@@ -68,6 +70,71 @@ const STEPS: readonly Step[] = [
     ),
   },
   {
+    testIds: ['region-controls'],
+    title: 'Everything you can change',
+    body: (
+      <>
+        <p>
+          One column for every cause: which ocean, when the forecast was issued, which
+          instruments the analysis was allowed to see, and whether quality control was
+          running. Change any of them and every panel and every score answers where they are,
+          without you moving.
+        </p>
+        <p className="walkthrough-note">
+          A control that acts on one panel alone is not here; it is at that panel.
+        </p>
+      </>
+    ),
+  },
+  {
+    testIds: ['region-centre'],
+    title: 'The forecast, at every horizon at once',
+    body: (
+      <>
+        <p>
+          One panel per declared horizon, all visible together rather than behind a slider
+          &mdash; a forecast is a shape over lead time, and you cannot see a shape one frame
+          at a time.
+        </p>
+        <p>
+          Two axes, not one: <em>lead time</em> runs across the row, and <em>issue time</em>
+          {' '}is a control on the left. Moving the issue time earlier gives the analysis fewer
+          observations and is the clearest way to watch skill change.
+        </p>
+        <p className="walkthrough-note">
+          Building the row integrates four days forward, so it happens when you ask.
+        </p>
+      </>
+    ),
+  },
+  {
+    testIds: ['region-scores'],
+    title: 'What each forecast was worth',
+    body: (
+      <p>
+        Each panel&rsquo;s skill sits directly beneath that panel, in its own column, rather
+        than in a table you would have to match against a heading. A raw error is meaningless
+        alone, so there is never one here without two references the harness computes itself.
+        Zero means <em>no better than the reference</em>; negative means <em>worse</em>, and
+        it is reported rather than tuned. Read the six columns left to right and the decay is
+        there without a curve being plotted.
+      </p>
+    ),
+  },
+  {
+    testIds: ['region-detail'],
+    title: 'Whatever you last selected',
+    body: (
+      <p>
+        Click a cell and this region fills with that cell&rsquo;s own breakdown: how much of
+        the answer there came from observations, from the advected background, and from
+        climatology. Click a measurement&rsquo;s mark and it fills with that profile beside
+        the model&rsquo;s derived one. Filling it moves nothing else on the surface, which is
+        the point of it having a region of its own.
+      </p>
+    ),
+  },
+  {
     testIds: ['run-panel'],
     title: 'Which run this is',
     body: (
@@ -93,68 +160,6 @@ const STEPS: readonly Step[] = [
         in the tree holds a literal for any of them, so changing the ocean means editing
         configuration, not code &mdash; and a configuration that does not validate stops the
         page rather than quietly substituting a default.
-      </p>
-    ),
-  },
-  {
-    testIds: ['field-panel'],
-    title: 'The ocean the model holds',
-    body: (
-      <>
-        <p>
-          Sea-surface height over the domain, initialised from the truth record and
-          integrated forward. Warm colours are high, cool low; each square is one cell, drawn
-          unsmoothed so the picture cannot suggest structure the model does not have.
-        </p>
-        <p>
-          The line across it is the vessel&rsquo;s declared track, and the marks on it are
-          where it measured.
-        </p>
-      </>
-    ),
-  },
-  {
-    testIds: ['horizon-row-panel', 'row-invitation'],
-    title: 'The forecast, at every horizon at once',
-    body: (
-      <>
-        <p>
-          Six panels, one per declared horizon, all visible together rather than behind a
-          slider &mdash; a forecast is a shape over lead time, and you cannot see a shape one
-          frame at a time.
-        </p>
-        <p>
-          Two axes, not one: <em>lead time</em> runs across the row, and <em>issue time</em>
-          {' '}is its own control. Moving the issue time earlier gives the analysis fewer
-          observations and is the clearest way to watch skill change.
-        </p>
-        <p className="walkthrough-note">
-          Building the row integrates four days forward, so it happens when you ask.
-        </p>
-      </>
-    ),
-  },
-  {
-    testIds: ['score-panel'],
-    title: 'What the forecast was worth',
-    body: (
-      <p>
-        A raw error is meaningless alone, so there is never one here without two references
-        the harness computes itself: persistence and climatology. Zero means{' '}
-        <em>no better than the reference</em>; negative means <em>worse</em>. On this run the
-        figure is close to zero, and that is reported rather than tuned.
-      </p>
-    ),
-  },
-  {
-    testIds: ['attribution-panel'],
-    title: 'Where the answer came from',
-    body: (
-      <p>
-        The weight observations carried in each cell, drawn as a field. It is not a picture
-        made to illustrate the analysis &mdash; it is the analysis&rsquo;s own gain, exported
-        beside the answer, which is why it cannot disagree with it. Click a cell to see which
-        observations reached it.
       </p>
     ),
   },
@@ -217,12 +222,6 @@ const CARD_WIDTH_PX = 360;
 const CARD_MARGIN_PX = 12;
 /** Below this, a gap is not worth putting the card in: it would be mostly scrollbar. */
 const MIN_CARD_SPACE_PX = 260;
-/**
- * How far below the top of the viewport a step's anchor is brought. Enough to clear the
- * help button and to leave the panel looking like part of a page rather than pinned to its
- * edge.
- */
-const SCROLL_MARGIN_PX = 72;
 
 function anchorFor(step: Step): HTMLElement | null {
   for (const testId of step.testIds) {
@@ -304,21 +303,25 @@ export function Walkthrough() {
   }, [step]);
 
   /**
-   * Brings the step's anchor to a fixed distance below the top of the viewport, rather than
-   * `scrollIntoView({ block: 'center' })`. Centring a panel taller than the screen -- the
-   * instruments panel, on a laptop -- puts its heading above the fold, so the reader is
-   * shown the middle of the thing the card has just named.
+   * Brings the step's anchor into view -- inside whichever region owns it.
+   *
+   * Beat 013 left the page nothing to scroll, so scrolling the window would do nothing at
+   * all: a disclosure part-way down the controls column is reached by scrolling *that
+   * column*, and `block: 'nearest'` is what asks the nearest scrollable ancestor rather than
+   * the document. `nearest` on both axes also means an anchor already on screen is not
+   * moved, which is the common case now that everything is in one viewport.
    *
    * The scroll is where the ring's position comes from, so the measurement is left to the
-   * scroll listener: a rect read here describes where the panel was before the scroll.
+   * scroll listener: a rect read here describes where the region was before the scroll.
    */
   useEffect(() => {
     if (step === undefined) return;
     const anchor = anchorFor(step);
     if (anchor === null) return;
     const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    window.scrollTo({
-      top: Math.max(0, anchor.getBoundingClientRect().top + window.scrollY - SCROLL_MARGIN_PX),
+    anchor.scrollIntoView({
+      block: 'nearest',
+      inline: 'nearest',
       behavior: smooth ? 'smooth' : 'auto',
     });
   }, [step]);
@@ -327,10 +330,13 @@ export function Walkthrough() {
     if (!open) return;
     measure();
     const onChange = () => { measure(); };
-    window.addEventListener('scroll', onChange, { passive: true });
+    // Captured, not bubbled: a scroll event fired on a region does not reach the window, and
+    // since beat 013 every scroll is a region's rather than the page's.
+    const options = { capture: true, passive: true } as const;
+    window.addEventListener('scroll', onChange, options);
     window.addEventListener('resize', onChange);
     return () => {
-      window.removeEventListener('scroll', onChange);
+      window.removeEventListener('scroll', onChange, options);
       window.removeEventListener('resize', onChange);
     };
   }, [open, measure]);

@@ -95,7 +95,7 @@ FAIL  forbidden vocabulary  (1 file scanned)
 
 ## What the shell says
 
-![The j-ocean shell on arrival, showing the not-operational statement, the run's root seed and the manifest it replays from](../images/001-shell-on-arrival.png)
+![The j-ocean shell on arrival: the not-operational statement and the controls on the left, what the row will show in the centre, and the run's provenance behind the disclosures beneath the controls](../images/001-shell-on-arrival.png)
 
 The page states its seed, whether this is the recorded case, and the manifest it would
 replay from. The statement of what j-ocean is not is the first thing in the document and

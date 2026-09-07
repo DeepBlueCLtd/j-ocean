@@ -41,7 +41,7 @@ that scoring be trusted, meaning AT-02, AT-03 and AT-06 have passed -- and
 AT-06 do not, both for the same reason. The test asserts the current state, so it fails when
 the figures improve, which is the signal to plan the beat.
 
-**Nine questions are open for the author**, in
+**Eleven questions are open for the author**, in
 [`docs/questions-for-the-author.md`](docs/questions-for-the-author.md); the first of them,
 settled, would change most of the rest.
 

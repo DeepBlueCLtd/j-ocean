@@ -137,7 +137,76 @@ discretion? Everything else in this list is a naming exercise.
 
 ---
 
-## 4. Should Argo be assimilated at all? (review R-3)
+## 4. The bland domain cannot be run, and only the domain picker found it
+
+**The evidence.** SRD-v1 FR-11 declares two domains: the eventful Gulf Stream front and a
+deliberately bland open gyre, offered alongside it so a reader can see what the harness says when
+there is nothing to see. Until beat 013 nothing on the surface offered the second one — `App.tsx`
+read `domains.defaultId` and stopped there — so in twelve beats it had never been run from the
+application.
+
+It cannot be. `instruments.track.waypoints` is declared **once**, in the eventful domain's
+longitudes; the open-gyre artefact covers −45.04° to −40°, and the thermometer refuses at −74.5°
+because the track leaves the domain it is sampling. Building the picker turned the page blank
+before the refusal was caught.
+
+**What it costs.** One of two declared domains is unreachable, and the acceptance the second domain
+exists to support — that the harness says something honest about a quiet ocean — has never been
+watched. The surface now prints the instrument's refusal in its own words beside the choice and
+leaves the standing run alone, so the failure is legible rather than fatal; but a legible refusal
+is not a domain a reader can look at.
+
+**The question.** Should the track be declared **per domain**, so each domain carries a passage
+through its own water? That is a configuration change and not a code one, and it is the smallest
+thing that would make FR-11's second domain real. The alternative — deriving a track from each
+domain's own box — would be the harness inventing a survey, which is a different decision and a
+larger one.
+
+---
+
+## 5. The reference viewport was declared for a row that had the whole window
+
+**The evidence.** `presentation.referenceViewportWidthPx` is 1400, declared in beat 007 when the
+horizon row had the page to itself. Four regions changed the arithmetic underneath it: six panels
+at the declared `minimumPanelWidthPx` need 1190 px, and the controls and detail columns plus the
+page gutter need 848 more. The width at which all six panels are a promise is therefore **2038**,
+and 1400 is 638 px short of the layout it is supposed to be the reference for.
+
+**What it costs.** Beat 007's finding was that "all visible at once" is a claim about geometry and
+that a test asserting membership and order measures nothing; the row was scrolling and four and a
+half panels were on screen. A reference width that no longer holds six panels is the same fault
+returning by a different door — the number is declared, the tests use it, and it has quietly
+stopped describing a layout a reader can use.
+
+**What was measured.** `tests/shell/viewport-floor.spec.ts` took both figures from the built
+layout with the row built and scored: **2038 × 682 CSS px**. The width agrees with the arithmetic
+above to the pixel, because it is a sum of declared boxes. The height was not predicted and could
+not have been: the row with its labels and its six score statements is 634 px tall at that width,
+and the page gutter is the other 48. It is measured at the floor's own width rather than at a
+roomy one, because a score statement is a sentence that wraps in its column, so a wider panel is a
+shorter score and a height measured beside wide panels is a height the floor has not got.
+
+**The question.** This one the beat answers rather than asks, and it is recorded here because the
+answer changes a declared figure the author chose: `referenceViewportWidthPx` is raised from 1400
+to the measured 2038, and below the floor the application gives the FR-43 answer — it states the
+size it needs and offers the single-panel presentation — rather than scrolling the row. The
+centre's horizontal scroll is gone.
+
+What is left for the author is whether 190 px is still the right `minimumPanelWidthPx` now that
+six of them plus two columns is the binding constraint on the window, or whether the panels should
+be allowed to be narrower than beat 007 declared. The arithmetic is now printed by the schema
+itself: a configuration whose floor cannot hold its horizons is refused with the sum in the
+message, so the cost of any answer to that question is visible before it is committed.
+
+**And what the answer cost.** 2038 × 682 is a large window. A 13-inch laptop at its default
+scaling has about 1440 × 800 CSS pixels and is below the floor on both axes, so the reader on one
+gets the single-panel fallback rather than the row — the instrument this project is about. That is
+the honest consequence of six legible panels beside two columns, and it is the second half of the
+`minimumPanelWidthPx` question rather than a separate one.
+
+---
+
+## 6. Should Argo be assimilated at all? (review R-3)
 
 **Where it stands.** Admitted behind a toggle defaulting to true (ADR-0007), with an
 independence caveat on every score whose window contains an assimilated Argo profile — because
@@ -153,7 +222,7 @@ set it false and simplify the story?
 
 ---
 
-## 5. AT-06: negligible where?
+## 7. AT-06: negligible where?
 
 **The evidence.** An edited profile moves the near horizon by 33 m and the far horizon by 30 m
 inside the influence region, and by 32 m somewhere in the domain. The edit is advected, not
@@ -166,7 +235,7 @@ not do it and question 1 is where to look?
 
 ---
 
-## 6. The recorded case's dates (review R-6)
+## 8. The recorded case's dates (review R-6)
 
 **Where it stands.** The truth period is 2013-09-01 to 2013-09-12, from HYCOM GLBv0.08
 expt_53.X, chosen because it is reanalysis rather than forecast and because Argo coverage over
@@ -178,7 +247,7 @@ declared maximum, so an arbitrary window may not be admissible.
 
 ---
 
-## 7. SRD §4's summary bar
+## 9. SRD §4's summary bar
 
 **Where it stands.** The SRD specified a per-panel attribution *summary bar*; review found that
 attribution has to be a per-cell field derived from the analysis's own gain (FR-16, FR-17), and
@@ -190,7 +259,7 @@ Does the author agree, and should the SRD be amended?
 
 ---
 
-## 8. Quality control's role, given what beat 010 found
+## 10. Quality control's role, given what beat 010 found
 
 **The evidence.** For a warm bias, any bias large enough to trip the gross-range check is also
 large enough that the observation operator cannot invert the profile — so the operator excludes
@@ -205,7 +274,7 @@ of five hundred.
 
 ---
 
-## 9. Is the attribution that is *drawn* the analysis's own weights?
+## 11. Is the attribution that is *drawn* the analysis's own weights?
 
 SRD-v2 §9 asked this and beat 013 answered it before changing anything, because FR-40 says a
 finding is recorded before it is fixed. **The verdict is: derived** — with one display transform
