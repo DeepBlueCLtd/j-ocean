@@ -55,6 +55,12 @@ export function regionGeometry(config: Configuration): CSSProperties {
     '--panel-minimum-width': `${String(presentation.minimumPanelWidthPx)}px`,
     '--panel-gap': `${String(presentation.panelGapPx)}px`,
     '--page-gutter': `${String(presentation.pageGutterPx)}px`,
+    /* Beat 015. The strip's geometry, and what the centre costs beyond a panel's field: the
+       stylesheet works the centre's height out from these and from the track count, so that
+       enlarging cannot change the box the scores sit under (FR-049, AT-13). */
+    '--strip-height': `${String(presentation.strip.heightPx)}px`,
+    '--strip-thumbnail-width': `${String(presentation.strip.thumbnailWidthPx)}px`,
+    '--centre-chrome-height': `${String(presentation.centreChromeHeightPx)}px`,
   } as CSSProperties;
 }
 
@@ -138,9 +144,12 @@ export interface BelowFloorProps {
    * does not phrase it.
    */
   readonly notice: ReactNode;
-  /** FR-049's strip and the one panel enlarged beneath it, or the row's invitation. */
+  /**
+   * The same centre the four regions get, and that is beat 015's point: below the floor the
+   * union is forced to an enlargement rather than laid out again here.
+   */
   readonly centre: ReactNode;
-  /** The shown panel's skill figures, and no others: there is one panel to be beneath. */
+  /** Every declared horizon's skill figures, as above the floor: one implementation. */
   readonly scores: ReactNode;
   readonly detail: ReactNode;
   readonly controls: ReactNode;

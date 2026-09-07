@@ -83,3 +83,20 @@ single-panel presentation, rather than shrinking six panels past legibility.
 - **This decision moves no number.** That claim is not made by the author of the change; it
   is held by gate G-07, which digests every computed quantity of the recorded case and was
   landed and watched failing before the first element moved.
+
+## Amended by beat 015
+
+The floor is now **2 038 x 728 CSS pixels**. The width is unchanged and is the same sum of
+declared boxes. The height grew by 46 px, which is the declared height of FR-049's strip.
+
+Beat 015 made enlargement a selection: it replaces the contents of the centre region and
+moves nothing else, to the pixel. That is only true of the geometry if the centre's height
+does not depend on what is in it -- a centre sized by its contents is one height with six
+small panels and another with one large one, and the scores region beneath it moves on a
+click. So the centre's height is declared (`presentation.centreChromeHeightPx` plus
+`presentation.strip.heightPx` plus one track width) and reserves the strip's height in both
+states. The row therefore sits in a centre slightly taller than it needs, and the floor
+carries that difference.
+
+The consequence stated above is unchanged in kind and slightly larger in degree: a 13-inch
+laptop was already below the floor and still is.

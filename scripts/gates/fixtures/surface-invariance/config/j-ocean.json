@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 7,
+  "schemaVersion": 8,
   "run": {
     "defaultSeed": "6a09e667f3bcc908",
     "recordedCaseLabel": "the recorded case"
@@ -30,11 +30,16 @@
     "referenceViewportWidthPx": 2038,
     "minimumPanelWidthPx": 190,
     "minimumViewportWidthPx": 2038,
-    "minimumViewportHeightPx": 682,
+    "minimumViewportHeightPx": 728,
     "controlsWidthPx": 390,
     "detailWidthPx": 390,
     "panelGapPx": 10,
     "pageGutterPx": 48,
+    "strip": {
+      "heightPx": 46,
+      "thumbnailWidthPx": 40
+    },
+    "centreChromeHeightPx": 196,
     "anomalyLimitMetres": 220,
     "attributionHatchThreshold": 0.5,
     "footprint": {

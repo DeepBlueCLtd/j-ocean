@@ -45,6 +45,14 @@ cost is answered by **enlarge in place** (FR-14): one panel grows, the other fiv
 visible and shrink to a declared minimum. It is deliberately not a modal or a new page,
 because an enlargement that hides the row would be a slider with extra steps.
 
+*Amended by beat 015.* "The other five stay visible" is still the requirement and it is met
+differently: the five become a **strip** along the top of the centre region, each carrying a
+thumbnail of its own field and its own skill figures, with the enlarged one marked. The
+reason is this decision's own -- comparison across horizons is the lesson -- and the strip
+keeps it quantitative rather than reducing it to five smaller pictures. Enlargement replaces
+the contents of the centre region and nothing else, so the strip is what the row becomes
+rather than something drawn beside it.
+
 **"All visible at once" is a declared width, not an aspiration.** `presentation` in
 configuration declares the reference viewport width, the minimum panel width, the gap and
 the page gutter; the schema refuses a configuration whose reference width cannot hold

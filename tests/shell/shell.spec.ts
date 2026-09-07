@@ -272,8 +272,14 @@ test.describe('the shell', () => {
   });
 
   /**
-   * FR-014 and SC-003. Enlarging a panel changes what is shown and never what is computed,
-   * and the assertion is by identity: the same array object is in the panel afterwards.
+   * FR-014 and SC-003, as beat 015 rebuilt them (SRD-v2 FR-049, FR-050).
+   *
+   * Enlarging changes what is shown and never what is computed, and it hides nothing: the row
+   * survives as the strip above the enlarged panel, so the other five horizons and what each
+   * was worth are still on screen. "In place" is now a claim about the *regions* -- nothing
+   * outside the centre moves -- and `tests/shell/enlargement.spec.ts` measures that, and the
+   * field identity, in one place. What is checked here is beat 007's own pair: the panel is
+   * enlarged, the other five are still there, and the drawing did not change surface.
    */
   test('enlarges a panel in place, recomputing nothing and hiding nothing', async ({ page }) => {
     await page.goto('/');
@@ -287,10 +293,12 @@ test.describe('the shell', () => {
 
     await page.getByTestId('enlarge-24').click();
     await expect(page.getByTestId('panel-24')).toHaveClass(/enlarged/);
+    await expect(page.getByTestId('horizon-row')).toHaveCount(0);
 
-    // Every other panel is still on screen: "in place" means in place.
+    // Every other horizon is still on screen, in the strip: "in place" means in place, and
+    // FR-050 says the comparison is the lesson, so it survives the enlargement.
     for (const lead of [0, 12, 48, 72, 96]) {
-      await expect(page.getByTestId(`panel-${String(lead)}`)).toBeVisible();
+      await expect(page.getByTestId(`strip-${String(lead)}`)).toBeVisible();
     }
     const after = await page.getByTestId('panel-field-24').locator('canvas').first().evaluate((canvas) => {
       const context = (canvas as HTMLCanvasElement).getContext('webgl2');
@@ -299,6 +307,7 @@ test.describe('the shell', () => {
     expect(after).toBe(before);
 
     await page.getByTestId('enlarge-24').click();
+    await expect(page.getByTestId('horizon-row')).toBeVisible();
     await expect(page.getByTestId('panel-24')).not.toHaveClass(/enlarged/);
   });
 
@@ -535,7 +544,9 @@ test.describe('the shell', () => {
     // A click pins it: what a mark says has to survive the reader looking away from it, which
     // is the same rule beat 007 applied to a cell's breakdown.
     await needle.click();
-    await page.getByTestId('panel-0').hover();
+    // Looking away -- at another horizon in the strip, which is where the other five are once
+    // one of them is enlarged (FR-049).
+    await page.getByTestId('strip-0').hover();
     await expect(page.getByTestId('observation-hover')).toBeVisible();
 
     // FR-005 and FR-07: the comparison SRD section 10 makes the trigger for dynamic depth. A

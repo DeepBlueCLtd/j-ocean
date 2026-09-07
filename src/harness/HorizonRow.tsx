@@ -7,6 +7,8 @@ import type { TruthSource } from '../ports/truth-source.js';
 import type { FieldContainer } from '../truth/container.js';
 import type { ForecastResult } from '../run/forecast.js';
 import { Panel, PanelScore } from './Panel.js';
+import { HorizonStrip, type StripSlot } from './HorizonStrip.js';
+import { CentreLedger, resolveCentreContent, THE_ROW, type CentreContent } from './CentreContent.js';
 import { profileFromInterfaceDepth } from '../model/profile.js';
 import type { Footprint } from './footprint.js';
 import { markersFrom, marksOf, trackValueRange } from './footprint.js';
@@ -26,15 +28,19 @@ import type { DepartureBrief } from '../run/forecast.js';
  * declared horizon without a panel.
  *
  * **Enlarging recomputes nothing.** The fields, the analysis and the scores are computed once
- * and held; enlargement is a class on an element. FR-014 says an act of display changes what
- * is shown and never what is computed, and the test asserts it by identity: the same
- * `Float64Array` object is in the panel before and after.
+ * and held; enlarging chooses which of them the centre draws. FR-014 says an act of display
+ * changes what is shown and never what is computed, and the assertion is by identity: the same
+ * `Float64Array` object backs the panel before and after, and across a swap in the strip. The
+ * array is left on the canvas that drew it so a browser test can compare `===` rather than
+ * deep equality -- see `field-identity.ts`.
  *
- * **Two presentations, one set of panels.** `presentation` chooses between the row and the
- * single-panel fallback FR-043 gives below the declared viewport floor: the strip of FR-049
- * and one panel enlarged beneath it. Both draw panels through one `panelFor`, from the same
- * fields and the same scores, so the fallback cannot quietly become a different picture.
- * Which panels are drawn is display; nothing about it recomputes anything.
+ * **What the centre holds is a discriminated union.** `CentreContent` is the row, or exactly
+ * one enlarged horizon, and it is the only thing that decides -- so the spec's *never both,
+ * never neither* is a property of the type rather than a rule somebody has to remember. The
+ * answer below the declared viewport floor (FR-043) is not a second arrangement: it is this
+ * union forced to `enlarged`, so the strip, the marking, the keyboard behaviour and the
+ * figures have one implementation at any viewport. Which panels are drawn is display; nothing
+ * about it recomputes anything.
  *
  * **Why this is a hook and not a component.** Beat 013 divides the surface by what changes
  * when, and the row's parts belong to three different regions: the controls that drive it are
@@ -76,13 +82,12 @@ export interface HorizonRowInputs {
   readonly onPinMark: (mark: { readonly id: string; readonly leadHours: number }) => void;
   readonly markPinned: boolean;
   /**
-   * FR-043 and FR-049. `'row'` is every declared horizon side by side, which is the design
-   * (ADR-0003). `'single-panel'` is the answer below the declared viewport floor: the strip
-   * of FR-049 and one panel enlarged beneath it, because six panels shrunk to fit a small
-   * window are six panels nobody can read. Nothing is recomputed either way -- the fields,
-   * the analysis and the scores are the same objects, and which of them is drawn is display.
+   * FR-043. Above the declared floor the centre may hold the row; below it there is no room
+   * for six legible panels, so the centre is forced to an enlargement -- the same enlargement
+   * a reader chooses above the floor, not a presentation of its own. Nothing is recomputed
+   * either way: the fields, the analysis and the scores are the same objects.
    */
-  readonly presentation?: 'row' | 'single-panel';
+  readonly aboveFloor: boolean;
 }
 
 /** What the row puts in each region. Null where the row has not been built. */
@@ -109,10 +114,12 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
     [config],
   );
 
-  const [enlarged, setEnlarged] = useState<number | null>(null);
-  /** FR-043's fallback: one panel where six will not fit, and which one that is. */
-  const singlePanel = props.presentation === 'single-panel';
-  const shownHorizon = singlePanel ? (enlarged ?? horizons[0] ?? null) : null;
+  /**
+   * What the centre holds (FR-049). One piece of state, one union, and the only decider: an
+   * enlargement is a selection like any other and changes nothing else on the surface.
+   */
+  const [requested, setRequested] = useState<CentreContent>(THE_ROW);
+  const { content, undeclared } = resolveCentreContent(requested, horizons, !props.aboveFloor);
   const [showAttribution, setShowAttribution] = useState(false);
   const [showDifference, setShowDifference] = useState(false);
   const [scores, setScores] = useState<ReadonlyMap<number, Score | null> | null>(null);
@@ -600,9 +607,10 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
    * row and the single-panel fallback have to draw the *same* panel from the same fields --
    * two lists of properties would be two panels that could quietly disagree.
    */
-  const panelFor = (leadHours: number, isEnlarged: boolean): ReactNode => (
+  const panelFor = (leadHours: number, isEnlarged: boolean, legend?: ReactNode): ReactNode => (
     <Panel
       key={leadHours}
+      {...(legend === undefined ? {} : { legend })}
       leadHours={leadHours}
       validInstant={new Date(
         forecast.byHorizon.get(leadHours)?.validInstantMs ??
@@ -641,7 +649,11 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
       enlarged={isEnlarged}
       showAttribution={showAttribution}
       onEnlarge={() => {
-        setEnlarged((current) => (current === leadHours ? null : leadHours));
+        setRequested((current) =>
+          current.kind === 'enlarged' && current.leadHours === leadHours
+            ? THE_ROW
+            : { kind: 'enlarged', leadHours },
+        );
       }}
       onSelectCell={props.onSelectCell}
       shownMarkId={props.shownMark?.id ?? null}
@@ -653,122 +665,148 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
   );
 
   /**
-   * FR-049's strip, and FR-050's reason for it: comparison across horizons is the lesson, so
-   * a presentation that shows one panel still shows the other five and what each was worth.
-   * It scrolls within itself where the window is too narrow for six buttons, and says so.
+   * FR-049's strip, built once and used at every viewport (spec 015 T020, T022).
+   *
+   * The slots carry the panels' own field objects, so a thumbnail is the same array drawn
+   * small and never a reduction computed for the strip, and each carries the horizon's own
+   * score. Below the declared floor this is the same component and the same slots: the
+   * fallback selects an enlargement rather than laying out a presentation of its own.
    */
-  const strip = (
-    <div className="horizon-strip" data-testid="horizon-strip" data-scrolls="true">
-      {horizons.map((leadHours) => {
-        const score = scores?.get(leadHours) ?? null;
-        return (
-          <button
-            key={leadHours}
-            type="button"
-            className={`strip-panel${leadHours === shownHorizon ? ' current' : ''}`}
-            data-testid={`strip-${String(leadHours)}`}
-            aria-pressed={leadHours === shownHorizon}
-            onClick={() => { setEnlarged(leadHours); }}
-          >
-            <span className="figure declared" title="declared in configuration">
-              +{leadHours} h
-            </span>
-            <span className="strip-score">
-              {score === null ? (
-                <span className="unmeasured">not scored</span>
-              ) : score.skillAgainstPersistence === null ? (
-                <span className="unmeasured">undefined</span>
-              ) : (
-                <>
-                  <span className="figure computed" title="computed by the model">
-                    {score.skillAgainstPersistence.value.toFixed(3)}
-                  </span>{' '}
-                  vs persistence
-                </>
-              )}
-            </span>
-          </button>
-        );
-      })}
-    </div>
+  const stripSlots: readonly StripSlot[] = horizons.map((leadHours) => ({
+    leadHours,
+    field: showDifference
+      ? (differences.get(leadHours) ?? null)
+      : (anomalies.get(leadHours) ?? null),
+    refusal: forecast.byHorizon.get(leadHours)?.refusal ?? null,
+    score: scores?.get(leadHours) ?? null,
+  }));
+
+  /*
+   * What the drawing means. In the row it is one legend for six panels and it says what the
+   * row is *not* showing: FR-051 puts the attribution layer and the marks at their own depths
+   * in the enlarged panel, and a row that drew a depth-coded glyph without saying so would be
+   * claiming the fidelity it has not got. Enlarged, the same legend belongs to the one panel.
+   */
+  const legendContent = showAttribution ? (
+    <>
+      <span>
+        <span className="dot ink" /> weight carried by <strong>observations</strong>, dark
+        for more
+      </span>
+      <span>
+        <span className="dot hatched" /> hatched where observations lead the{' '}
+        <strong>background</strong> and the <strong>climatology</strong> &mdash; a second
+        channel, so the field reads without colour
+      </span>
+      {/* The spec's third acceptance scenario for the breakdown expects attribution to
+          differ between horizons. It cannot yet, and the surface says so rather than
+          letting six identical fields imply six analyses. The recorded case runs one
+          analysis, at the issue instant; beat 009 cycles at each issue time and this
+          becomes one field per panel. */}
+      <span data-testid="attribution-scope">
+        the same field on every panel: this run analyses once, at{' '}
+        <span className="computed">{issued}</span>. Attribution becomes per horizon when
+        the forecast cycles.
+      </span>
+    </>
+  ) : (
+    <>
+      <span>
+        <span className="dot cool" /> shallower interface
+      </span>
+      <span>
+        <span className="dot warm" /> deeper interface
+      </span>
+      <span>
+        <span className="dot drop" /> XBT drop &mdash; the glyph&rsquo;s length is the
+        depth it reached
+      </span>
+      <span>
+        <span className="dot external" /> Argo (external)
+      </span>
+      <span data-testid="track-legend">
+        <span className="dot track" /> surface measurement, dark for warm, over{' '}
+        <span className="computed">{trackRange.low.toFixed(1)}</span> to{' '}
+        <span className="computed">{trackRange.high.toFixed(1)} &deg;C</span> &mdash; the
+        track&rsquo;s own range
+      </span>
+      <span data-testid="after-initialisation-legend">
+        <span className="dot dashed" /> dashed: measured after the forecast was
+        initialised, so it did not inform it
+      </span>
+    </>
   );
 
   const centre = (
     <>
-      {singlePanel ? (
-        <div className="single-panel" data-testid="single-panel">
-          {strip}
-          {shownHorizon === null ? null : panelFor(shownHorizon, true)}
-        </div>
-      ) : (
-        <div className="horizon-row" data-testid="horizon-row">
-          {horizons.map((leadHours) => panelFor(leadHours, enlarged === leadHours))}
-        </div>
+      <CentreLedger content={content} />
+
+      {/* G-05 and the spec's third edge case: a configuration that no longer declares the
+          enlarged horizon gets the row back and is told which horizon went, rather than a
+          panel drawn for a horizon nothing declares. */}
+      {undeclared !== null && (
+        <p className="banner warn full" data-testid="undeclared-horizon">
+          The enlarged panel was <span className="declared">+{undeclared} h</span>, which this
+          configuration no longer declares. The row is back; nothing was drawn for it.
+        </p>
       )}
 
-      <p className="legend full" data-testid="row-legend">
-        {showAttribution ? (
-          <>
-            <span>
-              <span className="dot ink" /> weight carried by <strong>observations</strong>, dark
-              for more
+      {content.kind === 'enlarged' ? (
+        <div className="enlarged-centre" data-testid="enlarged-centre">
+          <HorizonStrip
+            slots={stripSlots}
+            enlargedLeadHours={content.leadHours}
+            onSelect={(leadHours) => { setRequested({ kind: 'enlarged', leadHours }); }}
+            nx={forecast.parameters.grid.nx}
+            ny={forecast.parameters.grid.ny}
+            limit={
+              showDifference
+                ? config.counterfactual.differenceLimitMetres
+                : config.presentation.anomalyLimitMetres
+            }
+            scoringRefusal={scoringFailure}
+          />
+          {panelFor(
+            content.leadHours,
+            true,
+            <p className="legend" data-testid="panel-legend">
+              {legendContent}
+            </p>,
+          )}
+        </div>
+      ) : (
+        <>
+          <div className="horizon-row" data-testid="horizon-row">
+            {horizons.map((leadHours) => panelFor(leadHours, false))}
+          </div>
+
+          <p className="legend full" data-testid="row-legend">
+            {legendContent}
+            {/* FR-051. The row draws the field and where each measurement was; it says so,
+                because the attribution layer and each probe at the depth it actually reached
+                are drawn in the enlarged panel and nowhere else. */}
+            <span data-testid="row-fidelity">
+              the row shows the field alone at this size: the attribution layer and each
+              measurement at the depth it reached are drawn in the enlarged panel
             </span>
-            <span>
-              <span className="dot hatched" /> hatched where observations lead the{' '}
-              <strong>background</strong> and the <strong>climatology</strong> &mdash; a second
-              channel, so the field reads without colour
-            </span>
-            {/* The spec's third acceptance scenario for the breakdown expects attribution to
-                differ between horizons. It cannot yet, and the surface says so rather than
-                letting six identical fields imply six analyses. The recorded case runs one
-                analysis, at the issue instant; beat 009 cycles at each issue time and this
-                becomes one field per panel. */}
-            <span data-testid="attribution-scope">
-              the same field on every panel: this run analyses once, at{' '}
-              <span className="computed">{issued}</span>. Attribution becomes per horizon when
-              the forecast cycles.
-            </span>
-          </>
-        ) : (
-          <>
-            <span>
-              <span className="dot cool" /> shallower interface
-            </span>
-            <span>
-              <span className="dot warm" /> deeper interface
-            </span>
-            <span>
-              <span className="dot drop" /> XBT drop &mdash; the glyph&rsquo;s length is the
-              depth it reached
-            </span>
-            <span>
-              <span className="dot external" /> Argo (external)
-            </span>
-            <span data-testid="track-legend">
-              <span className="dot track" /> surface measurement, dark for warm, over{' '}
-              <span className="computed">{trackRange.low.toFixed(1)}</span> to{' '}
-              <span className="computed">{trackRange.high.toFixed(1)} &deg;C</span> &mdash; the
-              track&rsquo;s own range
-            </span>
-            <span data-testid="after-initialisation-legend">
-              <span className="dot dashed" /> dashed: measured after the forecast was
-              initialised, so it did not inform it
-            </span>
-          </>
-        )}
-      </p>
+          </p>
+        </>
+      )}
     </>
   );
 
-  const scoredHorizons = singlePanel
-    ? shownHorizon === null
-      ? []
-      : [shownHorizon]
-    : horizons;
-
+  /*
+   * Every declared horizon's figures, in every state (FR-046, spec 015 FR-001).
+   *
+   * Not only the enlarged one. The scores region may not move when the centre's contents are
+   * replaced -- that is the whole of AT-13 -- and a region carrying six cells beside the row
+   * and one beside an enlargement would change height on a click, which is the reshaping
+   * FR-047 forbids for the same reason. The strip carries the same figures compactly, above
+   * the panel; these are the full statements, in their own columns.
+   */
   const scoresSlot = (
     <>
-      {scoredHorizons.map((leadHours) => (
+      {horizons.map((leadHours) => (
         <PanelScore
           key={leadHours}
           leadHours={leadHours}

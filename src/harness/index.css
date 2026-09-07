@@ -39,6 +39,28 @@ body {
   height: 100dvh;
   padding: calc(var(--page-gutter, 48px) / 2);
   overflow: hidden;
+
+  /* Beat 015, FR-049 and AT-13. The centre's height is worked out from the declared figures
+     rather than fitted to whatever is in it, and that is what makes "enlargement replaces the
+     contents of the centre region only" a property of the geometry: a centre sized by its
+     contents is one height with the row in it and another with an enlarged panel, and the
+     scores region beneath it would move on a click.
+
+     The arithmetic is the row's own. A panel's field is a square at the track width, so the
+     centre is one track wide plus what it costs beyond the field -- the panel's header and
+     labels, the legend, and the strip an enlargement puts above the panel. Nothing here is a
+     literal; the fallbacks exist only so this file reads on its own. */
+  --centre-width: calc(
+    100dvw - var(--page-gutter, 48px) - var(--controls-width, 390px) - var(--detail-width, 390px) -
+      2 * var(--panel-gap, 10px)
+  );
+  --track-width: calc(
+    (var(--centre-width) - (var(--horizon-count, 6) - 1) * var(--panel-gap, 10px)) /
+      var(--horizon-count, 6)
+  );
+  --centre-height: calc(
+    var(--track-width) + var(--centre-chrome-height, 196px) + var(--strip-height, 46px)
+  );
 }
 
 .region {
@@ -116,6 +138,24 @@ body {
   grid-template-columns: subgrid;
   gap: var(--panel-gap, 10px);
   align-content: start;
+}
+
+/* The declared height, and the whole of AT-13: with the row in it and with an enlarged panel
+   in it the centre is the same box, so the scores beneath it and the two flanking columns do
+   not move by a pixel when a reader enlarges or swaps. Below the floor the regions are a
+   scrolling column of natural heights and there is nothing to hold still. */
+.one-view:not(.below-floor) .centre { height: var(--centre-height); }
+
+/* Enlarged, the centre's one child takes the whole box: the strip along the top at its
+   declared height, the panel filling what is left. */
+.centre:has(> .enlarged-centre) { grid-template-rows: minmax(0, 1fr); }
+
+.enlarged-centre {
+  grid-column: 1 / -1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: var(--strip-height, 46px) minmax(0, 1fr);
+  gap: var(--panel-gap, 10px);
 }
 
 .centre > .full,
@@ -202,48 +242,156 @@ body {
 
 .below-floor .controls { border-top: 1px solid var(--rule); padding-top: 0.5rem; }
 
-.single-panel { display: flex; flex-direction: column; gap: 0.6rem; }
+/* Below the floor the same strip and the same enlarged panel, in a column that scrolls. There
+   is no box to keep here -- the regions are stacked and the body is a declared scroller -- so
+   the centre takes the height its contents need and the field is bounded by the window rather
+   than by a track width six panels would have shared. */
+.below-floor .enlarged-centre { display: flex; flex-direction: column; }
+.below-floor .horizon-strip { flex: 0 0 auto; }
+/* Above the floor the slots take the row's own tracks, one to a column, so a thumbnail is
+   above the score it belongs to. Below it there are no tracks and there is not the width for
+   six of them, so each slot takes what it needs and the strip scrolls sideways -- which it is
+   allowed to do, being a list of controls rather than the thing being read. */
+.below-floor .strip-slot { flex: 0 0 auto; }
+/* Still two columns, but sized by the field rather than by a box it has to fill: below the
+   floor the column scrolls, so the panel takes the height its contents need. */
+.below-floor .enlarged-body { align-items: flex-start; }
+.below-floor .enlarged-field { flex: 0 0 min(100%, 52dvh); min-width: 0; }
+.below-floor .panel.enlarged .field { height: auto; }
+.below-floor .panel.enlarged .field-stack { height: auto; max-width: 100%; aspect-ratio: auto; }
+.below-floor .panel.enlarged .field-stack canvas { width: 100%; height: auto; }
+.below-floor .enlarged-aside { overflow: visible; }
 
-/* FR-049's strip, and FR-050's reason for keeping it: the enlargement is a selection, and
-   the other five horizons stay on screen with what each was worth. It is the one element on
-   this surface allowed to scroll sideways, because it is a list of six buttons and not the
-   thing being read. */
+/* FR-049's strip, and FR-050's reason for keeping it: the enlargement is a selection, and the
+   other five horizons stay on screen with what each was worth. There is one of these at every
+   viewport -- below the floor it is the same component in a column that scrolls.
+
+   It is the one element on this surface allowed to scroll sideways, because it is a list of
+   six controls and not the thing being read. Its height is declared, so a horizon going from
+   unscored to scored cannot move the panel beneath it. */
 .horizon-strip {
   display: flex;
-  gap: 0.3rem;
+  align-items: stretch;
+  gap: var(--panel-gap, 10px);
   overflow-x: auto;
   overflow-y: hidden;
-  padding-bottom: 0.2rem;
+  min-height: 0;
 }
 
-.strip-panel {
-  flex: 0 0 auto;
+.strip-slot {
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.15rem;
-  padding: 0.3rem 0.5rem;
-  font-size: 0.72rem;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0.35rem;
+  font-size: 0.7rem;
   text-align: left;
+  border: 2px solid var(--rule);
 }
 
-/* The colour is stated as well as the border, because the button's own hover rule inverts
-   text and background and would otherwise leave the selected panel's label paper on paper
-   while the pointer that selected it is still over it. */
-.strip-panel.current {
-  border-width: 2px;
+/* FR-057. The marked slot is heavier and darker, and it says so in words: a marking carried by
+   hue alone is a marking a monochrome print cannot be read from, and a reader who cannot see
+   the border at all still has the label. Held to a measured luminance margin by
+   `tests/shell/enlargement.spec.ts`, the way beat 007 held the attribution hatch. */
+.strip-slot.current {
   border-color: var(--ink);
+  /* The weight, added inside the border rather than by widening it: three pixels of ink where
+     the others have two, and not one pixel of movement anywhere in the strip. A marking that
+     changed the box would move the five slots it is not on. */
+  box-shadow: inset 0 0 0 1px var(--ink);
   background: var(--paper);
   color: var(--ink);
+  font-weight: 600;
 }
 
-.strip-panel .strip-score { font-size: 0.68rem; }
-.strip-panel .figure { font-size: 0.68rem; }
+.strip-slot canvas.strip-thumbnail {
+  flex: 0 0 auto;
+  width: var(--strip-thumbnail-width, 40px);
+  height: var(--strip-thumbnail-width, 40px);
+  image-rendering: pixelated;
+  border: 1px solid var(--rule);
+  background: #fff;
+  display: block;
+}
 
-/* One panel with a region to itself would draw a field taller than the window it is the
-   answer for, and push the strip and the score off the top of the scroller. Bounded by the
-   height it has, the way the analysed field is. */
-.single-panel .panel .field-stack { max-width: min(100%, 52dvh); }
+/* Principle VI: a horizon with no field is a slot that says so, never an empty square. */
+.strip-slot span.strip-thumbnail {
+  flex: 0 0 auto;
+  width: var(--strip-thumbnail-width, 40px);
+  display: block;
+  font-size: 0.62rem;
+  line-height: 1.1;
+}
+
+.strip-slot .strip-label {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  line-height: 1.15;
+  overflow: hidden;
+}
+
+.strip-slot .strip-head { display: flex; align-items: baseline; gap: 0.3rem; min-width: 0; }
+.strip-slot .strip-mark {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.strip-slot .strip-skill { white-space: nowrap; }
+.strip-slot .figure { font-size: 0.68rem; }
+
+/* The enlarged panel (FR-049, FR-051). Two columns: the field on the left at the height the
+   centre has, and beside it the labels, the depth axis of beat 008 and what the drawing means.
+   Stacked, the elevation and a field worth enlarging do not both fit the box the centre keeps,
+   and the box is the requirement. */
+.panel.enlarged {
+  border-color: var(--ink);
+  border-width: 2px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.enlarged-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 0.8rem;
+}
+
+.enlarged-field { flex: 0 0 auto; min-height: 0; min-width: 0; }
+.panel.enlarged .field { height: 100%; min-height: 0; }
+.panel.enlarged .field-stack { height: 100%; aspect-ratio: 1 / 1; max-width: 100%; }
+.panel.enlarged .field-stack canvas { width: 100%; height: 100%; max-width: none; }
+
+/* What a reader opens the panel for, and more of it than the box always has: a declared
+   scroller rather than a column that spills over the scores (one-view.spec fails by name on
+   an undeclared one). */
+.enlarged-aside {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.enlarged-aside .panel-labels { margin-top: 0; }
+.enlarged-aside .legend { font-size: 0.76rem; margin: 0.5rem 0 0; }
+
+/* FR-057. The swap is a replacement of the centre's contents and there is nothing to animate;
+   the marking's border and ink change, and they change at once. This says so rather than
+   leaving it to be inferred, and the test asserts the computed duration is zero. */
+@media (prefers-reduced-motion: reduce) {
+  .strip-slot,
+  .enlarged-centre,
+  .panel.enlarged { transition: none; animation: none; }
+}
 
 .region h2 {
   margin: 0 0 0.4rem;
@@ -305,12 +453,11 @@ body {
    region 1,210 px wide with most of a screen of empty paper under it, which is a region the
    surface is not using and an invitation to build a row a reader has to squint at first.
 
-   The height cap is a subtraction rather than a percentage because the centre's own height is
-   `auto` -- it is sized by its content, so a percentage of it resolves to nothing. What is
-   subtracted is the vertical space the invitation's heading, the field's caption, the scores
-   region's sentence and the page gutter take. It is checked rather than trusted:
-   `tests/shell/viewport-floor.spec.ts` fails if the invitation outgrows the centre at the
-   declared floor, which is where the subtraction is tightest. */
+   Beat 015 gave the centre a declared height, so the cap is a subtraction from that rather
+   than from the window: the invitation has the region the row would have had, less what its
+   heading and the field's caption take. It is checked rather than trusted --
+   `tests/shell/enlargement.spec.ts` fails if the centre's content outgrows the centre in any
+   of the three things it can hold. */
 .row-invitation {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(16rem, 24rem);
@@ -325,7 +472,7 @@ body {
 
 .analysed-field { margin: 0.5rem 0 0; min-width: 0; }
 .analysed-field .field { margin: 0; }
-.analysed-field .field-stack { max-width: min(100%, calc(100dvh - 17rem)); }
+.analysed-field .field-stack { max-width: min(100%, calc(var(--centre-height) - 7.5rem)); }
 /* Written against `.field canvas`, which is later in this file and would otherwise win: the
    28rem cap is for a field in a column of prose, and this one has a region. */
 .analysed-field .field canvas { max-width: none; }
@@ -538,19 +685,8 @@ button[disabled]:hover { background: #fff; color: var(--ink); }
   min-width: 0;
 }
 
-/* FR-014: enlargement is a class on an element. Nothing is recomputed, and the other panels
-   stay visible -- "in place" means in place.
-
-   What it no longer does is take a neighbour's width. The scores beneath share the centre's
-   column tracks by `subgrid` (FR-046), so a panel that took two tracks would take its
-   neighbour's score column with it and a score would sit under the wrong picture. Enlargement
-   therefore buys the depth elevation and the mark's own detail rather than width, which is
-   what a reader opens it for. */
-.panel.enlarged {
-  border-color: var(--ink);
-  border-width: 2px;
-}
-
+/* Beat 015 moved enlargement's own rules up beside the strip's, because the two are one
+   presentation: what the centre holds is the row or one enlarged panel, never both. */
 .panel header { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
 .panel h3 { margin: 0 0 0.35rem; font-size: 1rem; }
 

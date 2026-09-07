@@ -129,7 +129,7 @@ export function fourRegionWidthPx(widths: RegionWidths, horizonCount: number): n
 
 export const configurationSchema = z
   .object({
-    schemaVersion: z.literal(7),
+    schemaVersion: z.literal(8),
 
     run: z.object({
       /**
@@ -225,6 +225,42 @@ export const configurationSchema = z
       panelGapPx: z.number().int().nonnegative(),
       /** What the page keeps clear of the window edge, on both sides together. */
       pageGutterPx: z.number().int().nonnegative(),
+      /**
+       * Beat 015, FR-049. The strip's geometry, declared beside the row's.
+       *
+       * The strip is the row surviving an enlargement: every declared horizon, the enlarged
+       * one marked, each with a thumbnail of its own field and its own skill figures. Its
+       * height is declared rather than fitted because the centre's height is declared, and a
+       * strip that sized itself to its contents would move the panel beneath it whenever a
+       * horizon went from unscored to scored.
+       */
+      strip: z.object({
+        heightPx: z.number().int().positive(),
+        /**
+         * How wide a thumbnail is drawn. It is a *display* size: the canvas is the grid's own
+         * size and the browser scales it, because averaging cells into a smaller array would
+         * be a quantity computed for a picture (FR-040).
+         */
+        thumbnailWidthPx: z.number().int().positive(),
+      }),
+      /**
+       * Beat 015. What the centre costs beyond one panel's field, in CSS pixels.
+       *
+       * The centre's height is declared rather than fitted, and it is what makes FR-049's
+       * "replace the contents of the centre region only" true of the geometry rather than of
+       * the intention: a centre that sized itself to its contents would be a different height
+       * with an enlarged panel in it than with the row, and the scores region beneath would
+       * move on a click.
+       *
+       * It is expressed against the field because that is what the height is mostly made of:
+       * a row panel's field is a square at the track width, so the centre is one track wide
+       * plus this -- the panel's header and labels, the legend beneath the row, and the strip
+       * an enlargement puts above it. Measured from the built layout, as beat 013 measured the
+       * floor, and held by `tests/shell/enlargement.spec.ts`, which requires the centre's
+       * rectangle to be identical with the row and with an enlarged panel in it, and requires
+       * the row to fit it with nothing to spare.
+       */
+      centreChromeHeightPx: z.number().int().positive(),
       /**
        * The half-range the panels draw interface-depth anomalies against. Drawn raw, at a
        * limit that showed any structure at all, six panels were a uniform red; the scorer
@@ -549,6 +585,19 @@ export const configurationSchema = z
       path: ['presentation', 'minimumViewportWidthPx'],
     });
   })
+  /**
+   * Beat 015. A thumbnail is a picture of a panel, so it is smaller than one. A strip whose
+   * slots were panel-width would be a second row, which is the thing the strip replaces.
+   */
+  .refine(
+    (c) => c.presentation.strip.thumbnailWidthPx < c.presentation.minimumPanelWidthPx,
+    {
+      error:
+        'presentation.strip.thumbnailWidthPx is not smaller than presentation.minimumPanelWidthPx, ' +
+        'so the strip is a second row rather than a strip',
+      path: ['presentation', 'strip', 'thumbnailWidthPx'],
+    },
+  )
   /**
    * The reference width is the width the documentation photographs the application at, so it
    * may not be narrower than the width at which the application is whole.

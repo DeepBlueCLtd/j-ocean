@@ -90,11 +90,22 @@ rendered as a panel, and no panel is drawn for a horizon that is not declared.</
 is marked as such wherever it is drawn and never enters a run, a manifest, or any
 simulation-time quantity.</dd>
 
-<dt>Enlarge in place</dt>
-<dd>Growing one panel while the other five stay visible and shrink to their declared
-minimum. Not a modal and not a new page: an enlargement that hid the row would be a slider
-with extra steps. It changes what is shown and never what is computed, and the test asserts
-that by object identity rather than by appearance.</dd>
+<dt>Enlargement</dt>
+<dd>A <em>selection</em>, not a mode. It replaces what the centre region holds and nothing
+else: the controls, the scores and the detail region keep their rectangles to the pixel, and
+whatever was selected stays selected. The row survives above the enlarged panel as the strip,
+so an enlargement never hides the comparison — an enlargement that hid the other five would
+be a slider with extra steps, which is what ADR-0003 rejected. It changes what is shown and
+never what is computed, and the test asserts that by object identity rather than by
+appearance.</dd>
+
+<dt>The strip</dt>
+<dd>Every declared horizon along the top of the centre when one of them is enlarged: a
+thumbnail of that horizon's own field, its lead time, and the same skill figures the scores
+region draws beneath the row. The enlarged one is marked by a heavier, darker border and the
+word <em>enlarged</em>, so the marking survives a monochrome print. Choosing one swaps the
+centre directly. There is one strip and it is the only way the centre ever holds a single
+panel — below the declared viewport floor included.</dd>
 
 <dt>Instrument</dt>
 <dd>The simulated device through which — and only through which — the model may sample

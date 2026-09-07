@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { Score } from '../scoring/scorer.js';
 import { FieldView, type Marker } from './FieldView.js';
 import type { Footprint } from './footprint.js';
@@ -15,6 +16,13 @@ import { NeedleElevation } from './NeedleElevation.js';
  * because a lead time alone leaves a reader doing arithmetic to find out whether two panels
  * are comparable. What its skill is against **both** references, in the words the scorer
  * chose. And where its answer came from, as a field.
+ *
+ * Beat 015 gives the enlarged panel the whole centre and lays it out in two columns: the
+ * field on the left at the height the centre has, and beside it the panel's labels, its depth
+ * elevation and what the drawing means. That is what enlargement buys -- the attribution layer
+ * and the observation marks at full fidelity (FR-051), the depth axis of beat 008 FR-003, and
+ * the room to drag a waypoint -- rather than a bigger picture alone. Which of the six is
+ * enlarged is a selection made in the strip above it and never a mode: see `HorizonStrip.tsx`.
  *
  * Beat 013 divides the panel between two regions. The picture and its labels stay in the
  * centre; the skill figures are `PanelScore`, drawn in the scores region in this panel's own
@@ -60,6 +68,12 @@ export interface PanelProps {
   readonly needleOffsetPx: number;
   readonly levelTickLimit: number;
   readonly enlarged: boolean;
+  /**
+   * What the drawing means, drawn beside the enlarged panel's field and nowhere else. In the
+   * row it is one legend for six panels, under the row; enlarged there is one panel, so it
+   * belongs to it (FR-044: a thing that concerns one panel lives at that panel).
+   */
+  readonly legend?: ReactNode;
   readonly showAttribution: boolean;
   readonly onEnlarge: () => void;
   readonly onSelectCell: (cellIndex: number) => void;
@@ -109,101 +123,112 @@ export function Panel(props: PanelProps) {
         </button>
       </header>
 
-      {/*
-        FR-027. A panel outside its forecast's validity, or before it was issued, draws
-        nothing and says why. There is no field to give it that would not be an
-        extrapolation, and an extrapolation drawn beside five forecasts would read as one.
-      */}
-      {props.refusal !== null ? (
-        <p className="banner warn" data-testid={`panel-refusal-${String(leadHours)}`}>
-          {props.refusal}
-        </p>
-      ) : (
-      <FieldView
-        values={showAttribution ? props.observationWeight : (props.field as Float64Array)}
-        {...(props.showDifference && !showAttribution && props.differenceMagnitude !== null
-          ? {
-              // FR-029's second channel. The region where the edit moved the field by more
-              // than the declared magnitude is outlined, so a reader sees an extent rather
-              // than a colour -- and sees it without colour at all.
-              hatch: props.differenceMagnitude as Float64Array,
-              hatchThreshold: props.differenceOutlineMetres,
-              hatchLabel: `moved by more than ${String(props.differenceOutlineMetres)} m`,
+      {/* Enlarged, the field and everything that describes it are two columns of one body;
+          in the row the panel is one column and this wrapper is the whole of it. */}
+      <div className={enlarged ? 'enlarged-body' : 'panel-body'}>
+        <div className={enlarged ? 'enlarged-field' : undefined}>
+          {/*
+            FR-027. A panel outside its forecast's validity, or before it was issued, draws
+            nothing and says why. There is no field to give it that would not be an
+            extrapolation, and an extrapolation drawn beside five forecasts would read as one.
+          */}
+          {props.refusal !== null ? (
+            <p className="banner warn" data-testid={`panel-refusal-${String(leadHours)}`}>
+              {props.refusal}
+            </p>
+          ) : (
+          <FieldView
+            values={showAttribution ? props.observationWeight : (props.field as Float64Array)}
+            {...(props.showDifference && !showAttribution && props.differenceMagnitude !== null
+              ? {
+                  // FR-029's second channel. The region where the edit moved the field by more
+                  // than the declared magnitude is outlined, so a reader sees an extent rather
+                  // than a colour -- and sees it without colour at all.
+                  hatch: props.differenceMagnitude as Float64Array,
+                  hatchThreshold: props.differenceOutlineMetres,
+                  hatchLabel: `moved by more than ${String(props.differenceOutlineMetres)} m`,
+                }
+              : {})}
+            nx={props.nx}
+            ny={props.ny}
+            limit={showAttribution ? 1 : props.limit}
+            palette={showAttribution ? 'sequential' : 'diverging'}
+            unit={showAttribution ? '' : 'm'}
+            {...(showAttribution
+              ? {
+                  hatch: props.observationsDominant,
+                  hatchThreshold: props.hatchThreshold,
+                  hatchLabel: 'observations lead',
+                }
+              : {})}
+            label={
+              showAttribution
+                ? `Weight carried by observations, valid ${validInstant}`
+                : props.showDifference
+                  ? `Edited minus recorded interface depth, valid ${validInstant}`
+                  : `Interface depth anomaly, valid ${validInstant}`
             }
-          : {})}
-        nx={props.nx}
-        ny={props.ny}
-        limit={showAttribution ? 1 : props.limit}
-        palette={showAttribution ? 'sequential' : 'diverging'}
-        unit={showAttribution ? '' : 'm'}
-        {...(showAttribution
-          ? {
-              hatch: props.observationsDominant,
-              hatchThreshold: props.hatchThreshold,
-              hatchLabel: 'observations lead',
-            }
-          : {})}
-        label={
-          showAttribution
-            ? `Weight carried by observations, valid ${validInstant}`
-            : props.showDifference
-              ? `Edited minus recorded interface depth, valid ${validInstant}`
-              : `Interface depth anomaly, valid ${validInstant}`
-        }
-        testId={`panel-field-${String(leadHours)}`}
-        markers={props.markers}
-        onSelect={props.onSelectCell}
-        onHoverMark={props.onHoverMark}
-        {...(enlarged && props.waypoints !== null
-          ? {
-              waypoints: props.waypoints,
-              onDragWaypoint: props.onDragWaypoint,
-              onDropWaypoint: props.onDropWaypoint,
-            }
-          : {})}
-        caption={false}
-      />
-      )}
+            testId={`panel-field-${String(leadHours)}`}
+            markers={props.markers}
+            onSelect={props.onSelectCell}
+            onHoverMark={props.onHoverMark}
+            {...(enlarged && props.waypoints !== null
+              ? {
+                  waypoints: props.waypoints,
+                  onDragWaypoint: props.onDragWaypoint,
+                  onDropWaypoint: props.onDropWaypoint,
+                }
+              : {})}
+            caption={false}
+          />
+          )}
 
-      {/* FR-003: the depth axis exists only where there is room for it to be read. At row
-          width a drop is a depth-coded glyph; enlarged, it is a needle at its own depths. */}
-      {enlarged && (
-        <NeedleElevation
-          footprint={props.footprint}
-          west={props.box.west}
-          east={props.box.east}
-          heightPx={props.elevationHeightPx}
-          offsetPx={props.needleOffsetPx}
-          levelTickLimit={props.levelTickLimit}
-          hoveredId={props.shownMarkId}
-          onHoverMark={props.onHoverMark}
-          onSelectMark={props.onSelectMark}
-        />
-      )}
+        </div>
 
-      {/* FR-007: a run with quality control off says so on every panel, not in a footnote. */}
-      {!props.footprint.qualityControlEnabled && (
-        <p className="banner warn" data-testid={`quality-control-off-${String(leadHours)}`}>
-          Quality control was off for this run: no observation carries a check.
-        </p>
-      )}
+        <div className={enlarged ? 'enlarged-aside' : undefined} data-scrolls={enlarged ? 'true' : undefined}>
+          {/* FR-003: the depth axis exists only where there is room for it to be read. At row
+              width a drop is a depth-coded glyph; enlarged, it is a needle at its own depths. */}
+          {enlarged && (
+            <NeedleElevation
+              footprint={props.footprint}
+              west={props.box.west}
+              east={props.box.east}
+              heightPx={props.elevationHeightPx}
+              offsetPx={props.needleOffsetPx}
+              levelTickLimit={props.levelTickLimit}
+              hoveredId={props.shownMarkId}
+              onHoverMark={props.onHoverMark}
+              onSelectMark={props.onSelectMark}
+            />
+          )}
 
-      <dl className="panel-labels">
-        {/* FR-015: absolute instants, not only a lead time. Shown to the minute, with the
-            full instant one hover away, because a panel narrow enough for six to fit cannot
-            carry a wrapped ISO string and stay readable. */}
-        <dt>Valid at</dt>
-        <Instant value={validInstant} testId={`panel-valid-${String(leadHours)}`} />
-        <dt>Initialised</dt>
-        <Instant value={initialisedFrom} testId={`panel-initialised-${String(leadHours)}`} />
-        {/* Beat 009: the declared horizon names the panel and fixes the valid instant; this
-            is what was actually asked of the model, and the two differ the moment issue time
-            moves. Conflating them is the confusion the second axis exists to remove. */}
-        <dt>Lead asked</dt>
-        <dd className="computed" data-testid={`panel-actual-lead-${String(leadHours)}`}>
-          +{props.leadFromIssueHours.toFixed(0)} h
-        </dd>
-      </dl>
+          {/* FR-007: a run with quality control off says so on every panel, not in a footnote. */}
+          {!props.footprint.qualityControlEnabled && (
+            <p className="banner warn" data-testid={`quality-control-off-${String(leadHours)}`}>
+              Quality control was off for this run: no observation carries a check.
+            </p>
+          )}
+
+          <dl className="panel-labels">
+            {/* FR-015: absolute instants, not only a lead time. Shown to the minute, with the
+                full instant one hover away, because a panel narrow enough for six to fit cannot
+                carry a wrapped ISO string and stay readable. */}
+            <dt>Valid at</dt>
+            <Instant value={validInstant} testId={`panel-valid-${String(leadHours)}`} />
+            <dt>Initialised</dt>
+            <Instant value={initialisedFrom} testId={`panel-initialised-${String(leadHours)}`} />
+            {/* Beat 009: the declared horizon names the panel and fixes the valid instant; this
+                is what was actually asked of the model, and the two differ the moment issue time
+                moves. Conflating them is the confusion the second axis exists to remove. */}
+            <dt>Lead asked</dt>
+            <dd className="computed" data-testid={`panel-actual-lead-${String(leadHours)}`}>
+              +{props.leadFromIssueHours.toFixed(0)} h
+            </dd>
+          </dl>
+
+          {enlarged && props.legend}
+        </div>
+      </div>
     </article>
   );
 }

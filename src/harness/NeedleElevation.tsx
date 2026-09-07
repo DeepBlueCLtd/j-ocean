@@ -4,9 +4,15 @@ import type { Footprint, Needle } from './footprint.js';
  * The depth axis of an enlarged panel (FR-003, FR-23).
  *
  * A drop flattened to the surface discards the dimension it exists for, so the enlarged panel
- * gains an **elevation**: the same horizontal axis as the field above it, depth downward, and
- * one vertical needle per profile extending exactly to the depth that probe actually reached,
- * with a tick at every level it sampled.
+ * gains an **elevation**: the field's own longitude as the horizontal axis, depth downward,
+ * and one vertical needle per profile extending exactly to the depth that probe actually
+ * reached, with a tick at every level it sampled.
+ *
+ * **Beat 015 moved it from beneath the field to beside it, and that is a real concession.**
+ * The centre keeps one box whatever it holds (FR-049, AT-13), and stacked -- a field worth
+ * enlarging with a 170 px elevation beneath it -- the two do not fit that box at the declared
+ * floor. Beside it they do, and the longitude range is the same range, so the axis is shared
+ * in scale if no longer in position. The caption says which axis is which for that reason.
  *
  * **The projection loses latitude, and says so.** This is a side elevation, not a scene: a
  * needle sits at its longitude, and two profiles at the same longitude and different
@@ -158,7 +164,7 @@ export function NeedleElevation(props: NeedleElevationProps) {
       <figcaption>
         Depth to <span className="declared">{floor.toFixed(0)} m</span>, needles at the depths
         actually reached. A side elevation: longitude is the horizontal axis and latitude is
-        not shown, so position is read from the field above.
+        not shown, so position is read from the field this is drawn beside.
       </figcaption>
     </figure>
   );
