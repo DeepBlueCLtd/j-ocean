@@ -513,18 +513,9 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
           </button>
         </div>
         {/* FR-028's editor has no button of its own, and should not: it edits one measurement,
-            so FR-004 puts it at that measurement. What belongs here is how to reach it. */}
-        <p className="aside" data-testid="profile-editor-entry">
-          A profile is edited where it was measured: enlarge a panel, click a needle, and the
-          measurement fills the detail region with its levels draggable and the measured
-          profile kept behind them as a ghost.
-        </p>
-        {redrawTrack && (
-          <p className="aside" data-testid="redraw-hint">
-            Enlarge a panel and drag a waypoint. The instruments resample truth where you put
-            it, through the same instruments and the same noise streams.
-          </p>
-        )}
+            so FR-004 puts it at that measurement. How a reader reaches it was an explanation
+            rather than a figure, and beat 014 sent it to this control's help entry, which beat
+            016 builds (docs/narrative-disposition.json, help:controls/editing-what-was-measured). */}
         {forecast.trackStretch !== null && (
           <p className="banner warn" data-testid="track-stretch">
             {forecast.trackStretch.statement}

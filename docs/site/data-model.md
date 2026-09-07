@@ -47,6 +47,19 @@ file does not change it; changing any value always does. It is computed in pure 
 so that the browser and Node agree, which they must, because a manifest exported from one
 is imported by the other.
 
+## What has been declared
+
+Every figure here is a value in configuration, validated before anything was computed. No
+component in the tree holds a literal for any of them.
+
+The application still draws the declared figures it uses — the grid and the epoch in its run
+disclosure, the horizons on the row, the domains on the domain choice — each in the declared
+typography, next to the thing it declares. What left the application is this paragraph, which
+is a fact about the tree rather than a figure of the run.
+
+*Was on the application page, in the disclosure headed “What has been declared” (beat 001).
+Moved here by beat 014.*
+
 ## RunManifest
 
 Everything needed to rebuild a run, and none of its state.
@@ -152,6 +165,30 @@ Two things are recorded because they would otherwise be assumed:
   64 x 64 while the model grid is 100 x 100 — a ratio of 1.6, declared in configuration and
   checked by the schema against the box and the grid. Scoring declines to resolve below the
   truth's own resolution.
+
+## The record this run is scored against
+
+Two derived artefacts, regenerated from a digest-verified raw subset by gate G-01. Nothing here
+was edited by hand; a file that had been would fail the build.
+
+- **Native resolution.** The truth record is coarser than the model grid. Scoring will decline
+  to resolve below it.
+- **Instants.** The source is missing occasional snapshots; the record carries its instants as
+  they are and interpolates nothing at build time.
+- **Depth levels.** The record carries the exact levels of the source, so no build-time vertical
+  interpolation.
+- **Argo profiles.** Some levels carry a flag the analysis will not treat as usable. Flagged
+  levels are kept and will be drawn as flagged, never omitted.
+- **Climatology.** It is averaged over a window that overlaps this run's period. Skill against
+  this reference is therefore not a fully independent measure, and the surface will say so
+  beside every such score.
+
+The figures themselves — which domain, which source, how many instants, how many profiles and
+how much overlap — are still in the application, because the domain choice changes every one of
+them while a reader works.
+
+*Was on the application page, in the disclosure headed “The record this run is scored against”
+(beat 002). Moved here by beat 014.*
 
 ## The observation record
 
@@ -284,6 +321,26 @@ that depth — a scale the artefact can answer for), `vertical-inversion`, `argo
 `unresolved`, and `outside-record` (the probe reached somewhere the truth record does not
 cover). Each carries a `detail` good enough to draw and a `usable` boolean, so consumers
 cannot disagree about what a flag means.
+
+## What the instruments measured, and what it was priced at
+
+The counts are on the application, beside the toggles that change them. What each of them means
+is here.
+
+- **XBT drops.** An XBT infers its depth from a fall rate, so each level records the depth it
+  reached, not the depth it was asked for.
+- **What a drop told us.** The observed quantity is the interface depth, inverted from the same
+  two-layer relation the profile above is drawn from. A level far from the thermocline acquires
+  an enormous depth error and weighs almost nothing, through the arithmetic rather than through
+  a rule.
+- **Argo.** The truth record assimilated these profiles, so skill measured against it while
+  assimilating them is not independent evidence, and every score will say so. The score's own
+  independence caveat is still printed beside the score, which is where Principle V wants it.
+- **Flags.** A flagged observation keeps its value and is drawn as flagged. Nothing is dropped,
+  because what the analysis chose to ignore is as interesting as what it used.
+
+*Was on the application page, in the disclosure headed “What the instruments measured”
+(beat 004). Moved here by beat 014.*
 
 ## The analysis
 

@@ -147,17 +147,68 @@ The layout is divided by **what changes when**, not by subject matter.
 
 ## 7. Where the narrative went
 
-Nothing is dropped; this table is the record.
+Nothing is dropped; the table below is the record, and it is **generated** rather than
+written here: the record is `docs/narrative-disposition.json`, `tests/docs/disposition.test.ts`
+holds every destination in it against the tree, and `scripts/docs/build-disposition.ts` renders
+it into this section and into the site's disposition page. A table transcribed twice is two
+tables that disagree the first time an entry is edited.
 
-| Was on the application page | Now |
-|---|---|
-| Introductory matter | Site welcome page |
-| Blog entries | Site welcome page, as its own section |
-| System documentation | Site welcome page |
-| Explanation of attribution | Attribution panel's help (FR-52) |
-| Explanation of lead time and issue time | Horizon row's help, and the controls' help |
-| Explanation of the references and skill | Scores region's help |
-| Explanation of the observation footprint | Enlarged panel's help |
+<!-- generated from docs/narrative-disposition.json by scripts/docs/build-disposition.ts -->
+
+Generated from `docs/narrative-disposition.json`, which is held by `tests/docs/disposition.test.ts`.
+45 pieces of matter: 14 stay in a region,
+23 went to the site, and 8 are **owed to beat
+016-panel-help** — a known hole with a beat number on it, which is not the same as a pass.
+
+| Was on the application page | The matter | Now |
+|---|---|---|
+| The head of the controls region, outside its scroller | j-ocean is not an operational forecast system. Its numerics are real but reduced, its domain small, and its claims are about relative skill between references it computes itself, scored against a truth record it did not author. | Stays, in the **controls** region |
+| The run controls | Which run this is: the recorded case under its declared label, or a run whose seed was drawn for this visit. | Stays, in the **controls** region |
+| The run controls | The measured step time as host time, against the declared frame budget. | Stays, in the **controls** region |
+| The controls region, the disclosure headed The run | The root seed, the domain and its computed cell size, the declared timestep against the stability the criterion admits, the steps taken, the instant the run is valid at, what it was initialised from, the excluded sponge margin and the outcrop clamps. | Stays, in the **controls** region |
+| The controls region, the disclosure headed What has been declared | The declared grid and the declared epoch. | Stays, in the **controls** region |
+| The controls region, the disclosure headed What the instruments measured | The ownship surface count at its declared interval and declared errors, the XBT drops and their declared level count, what each drop told us about the interface depth with its error, whether Argo is assimilated, and how many of each check fired. | Stays, in the **controls** region |
+| The controls region, the disclosure headed The record this run is scored against | The domain, the truth source, its native resolution against the model grid, its instants and their spacing, its depth levels, the Argo profiles and levels with the flagged count, and the climatology window with its overlap with this run's period. | Stays, in the **controls** region |
+| The controls region, the disclosure headed The manifest this run replays from | The build, the digest of the fields and the analysis, the manifest itself, and the controls that download, paste and import one. | Stays, in the **controls** region |
+| The controls region, beneath the issue-time control | How many observations the analysis saw at this issue instant, and how many had not happened yet. | Stays, in the **controls** region |
+| The controls region, beneath the row's toggles | What is drawn over every panel: the surface measurements, the XBT drops, the Argo profiles, how many carry a flag, and whether quality control was on. | Stays, in the **controls** region |
+| The centre region, before the row is built | The weight observations carried in each cell — the analysis's own gain, drawn as a field. | Stays, in the **centre** region |
+| The centre region, before the row is built | Six panels at the declared horizons — each stating what it is valid for, what it was initialised from, and what it was worth against two references. | Stays, in the **centre** region |
+| The scores region, before the row is scored | Each panel's skill against persistence and against climatology appears here, in that panel's own column, once the row has been built and scored. | Stays, in the **scores** region |
+| The detail region, with nothing selected | Nothing is selected. Two things can appear here: a cell's attribution breakdown, from clicking a cell on any field; and a measurement's own profile beside the model's derived one, with the measured levels kept as a ghost, from hovering or clicking its mark. | Stays, in the **detail** region |
+| The controls region, the disclosure headed What has been declared | Every figure here is a value in configuration, validated before anything was computed. No component in the tree holds a literal for any of them. | Site: `docs/site/data-model.md#What has been declared` |
+| The run disclosure, beside the computed cell size | a five-degree box is not square in kilometres | Site, and was already there: `docs/site/data-model.md#Configuration` |
+| The run disclosure, beneath Initialised from | Velocity is put in geostrophic balance with that thickness rather than taken from the truth, which carries motions this model has no layer for. | Site: `docs/site/architecture.md#What the initialisation takes from the truth, and what it does not` |
+| The controls region, the disclosure headed What the instruments measured | Truth becomes an observation in exactly one module, and this is everything that module produced. Every figure below is what a measurement was priced at, not what it turned out to be worth — that is the analysis's question. | Site: `docs/site/architecture.md#How truth reaches the model` |
+| The instruments disclosure, beneath XBT drops | An XBT infers its depth from a fall rate, so each level records the depth it reached, not the depth it was asked for. | Site: `docs/site/data-model.md#What the instruments measured, and what it was priced at` |
+| The instruments disclosure, beneath What a drop told us | The observed quantity is the interface depth, inverted from the same two-layer relation the profile above is drawn from. A level far from the thermocline acquires an enormous depth error and weighs almost nothing, through the arithmetic rather than through a rule. | Site: `docs/site/data-model.md#What the instruments measured, and what it was priced at` |
+| The instruments disclosure, beneath Argo | The truth record assimilated these profiles, so skill measured against it while assimilating them is not independent evidence, and every score will say so. | Site: `docs/site/data-model.md#What the instruments measured, and what it was priced at` |
+| The instruments disclosure, beneath Flags | A flagged observation keeps its value and is drawn as flagged. Nothing is dropped, because what the analysis chose to ignore is as interesting as what it used. | Site: `docs/site/data-model.md#What the instruments measured, and what it was priced at` |
+| The controls region, the disclosure headed The record this run is scored against | Two derived artefacts, regenerated from a digest-verified raw subset by gate G-01. Nothing here was edited by hand; a file that had been would fail the build. | Site: `docs/site/data-model.md#The record this run is scored against` |
+| The truth disclosure, beneath Native resolution | Scoring will decline to resolve below it. | Site: `docs/site/data-model.md#The record this run is scored against` |
+| The truth disclosure, beneath Instants | The source is missing occasional snapshots; the record carries its instants as they are and interpolates nothing at build time. | Site: `docs/site/data-model.md#The record this run is scored against` |
+| The truth disclosure, beneath Depth levels | exact levels of the source, so no build-time vertical interpolation | Site: `docs/site/data-model.md#The record this run is scored against` |
+| The truth disclosure, beneath Argo profiles | Flagged levels are kept and will be drawn as flagged, never omitted. | Site: `docs/site/data-model.md#The record this run is scored against` |
+| The truth disclosure, beneath Climatology | Skill against this reference is therefore not a fully independent measure, and the surface will say so beside every such score. | Site: `docs/site/data-model.md#The record this run is scored against` |
+| The controls region, the disclosure headed The manifest this run replays from | Everything needed to rebuild this run, and none of its state: replay is re-computation, not the restoration of a snapshot. Nothing persists between visits — no storage, no cookie, no run in the URL — so this file is the only thing that leaves and the only thing that comes back. | Site: `docs/site/architecture.md#What the manifest carries, and what replay is` |
+| The centre region, the caption under the analysed field | This is not a picture computed to illustrate the answer; it is the same arithmetic that produced it, exported beside it, which is why it cannot disagree with it. There is no fixture behind this: it is the field the analysis produced on this visit. | Site: `docs/site/architecture.md#The attribution field is the analysis's own gain` |
+| The controls region, beneath the domain choice | The same machinery over a deliberately bland ocean buys much less, and being able to watch it buy less is the point of the second domain. | Site: `docs/site/index.md#Why there are two domains` |
+| The below-the-floor notice | The figure is in CSS pixels, so a window wide enough at 100 per cent is below it at 200 per cent zoom. That is the same answer for the same reason: at that zoom there are as few pixels to read six panels in. | Site, and was already there: `docs/site/data-model.md#Configuration` |
+| The controls region, the disclosure headed What this does not do, and what would change that | Four capabilities are assessed, deferred and cheap to adopt. Each has a trigger, and the triggers are written down rather than remembered. | Site, and was already there: `docs/site/deferred.md#Deferred, and what would trigger it` |
+| The deferrals disclosure, beneath Adaptive sampling | An ensemble, its spread, and a vessel steered by it against a lawnmower track. Deferred until scoring is trusted — which means AT-02, AT-03 and AT-06 have passed. AT-03 has; AT-02 and AT-06 have not, and both fail because two declared numbers disagree about amplitude. A test measures the trigger on every run, so this statement is never out of date. | Site, and was already there: `docs/site/deferred.md#Adaptive sampling — the trigger is measured, and not met` |
+| The deferrals disclosure, beneath Dynamic depth levels | Vertical structure that is advected rather than diagnosed. The trigger is a question about vertical structure evolving in time. The disagreement a reader can see between an XBT and the model's derived profile is not that trigger: it is a static offset, and advected structure would not move it. | Site, and was already there: `docs/site/deferred.md#Dynamic depth levels` |
+| The deferrals disclosure, beneath A GPU kernel | The trigger is the declared frame budget binding at a grid somebody wants. At 100 × 100 it does not. | Site, and was already there: `docs/site/deferred.md#A GPU kernel` |
+| The deferrals disclosure, beneath Observation latency | Observations arriving late rather than not at all. Withholding is its special case, and beat 010 built that. | Site, and was already there: `docs/site/deferred.md#Observation latency and arrival order` |
+| The controls region, beneath Editing what was measured | A profile is edited where it was measured: enlarge a panel, click a needle, and the measurement fills the detail region with its levels draggable and the measured profile kept behind them as a ghost. | Help, owed to beat 016-panel-help: `help:controls/editing-what-was-measured` |
+| The controls region, when the track is being redrawn | Enlarge a panel and drag a waypoint. The instruments resample truth where you put it, through the same instruments and the same noise streams. | Help, owed to beat 016-panel-help: `help:controls/editing-what-was-measured` |
+| The manifest disclosure, above the paste box | Paste one and this visit becomes that run — rebuilt from its seed and its edits, not restored. The schema, the format version, the configuration digest and the domain are all checked before anything is provisioned, so a refused import leaves the run you have alone. | Help, owed to beat 016-panel-help: `help:controls/manifest` |
+| The centre region, before the row is built | Building them means integrating the analysis forward four days, which takes a couple of seconds, so it happens when you ask: Build the horizon row is in the controls. | Help, owed to beat 016-panel-help: `help:centre/horizon-row` |
+| The centre region, beneath Influence radius | An observation across a front influences the far side exactly as much as its own, which the flow would not. | Help, owed to beat 016-panel-help: `help:centre/attribution` |
+| The scores region, before the row is scored | There is no scores table anywhere else: a table would ask you to match a row label against a panel heading at every glance. | Help, owed to beat 016-panel-help: `help:scores` |
+| Each panel's score, in the disclosure headed Where this figure came from | A reduced-gravity model determines departures from a mean and not the mean itself, so every field is compared as an anomaly about its own. The offsets are published rather than absorbed. | Help, owed to beat 016-panel-help: `help:scores` |
+| The detail region, above a cell's breakdown | A breakdown is an instrument of a selected cell, never a per-panel summary — that was specified first and was wrong. | Help, owed to beat 016-panel-help: `help:detail/attribution-breakdown` |
+
+<!-- end generated -->
 
 ---
 

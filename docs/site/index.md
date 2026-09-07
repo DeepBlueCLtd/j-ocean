@@ -43,6 +43,21 @@ Read [Architecture](architecture.html) for how those boundaries are held, the
 [Data model](data-model.html) for what flows across them, and the
 [Glossary](glossary.html) for the words this project uses precisely.
 
+## Why there are two domains
+
+SRD-v1 FR-11 declares an eventful Gulf Stream front and a deliberately bland open gyre, and
+the contrast is a requirement rather than a bonus. The same machinery over a deliberately
+bland ocean buys much less, and being able to watch it buy less is the point of the second
+domain.
+
+One of the two cannot be run today. The vessel's track waypoints are declared once, in the
+eventful domain's longitudes, so the thermometer refuses to sample over the gyre; the
+application prints the instrument's refusal in its own words beside the choice and leaves the
+run you had standing. A track declared per domain is a configuration change and belongs to
+whoever declares the configuration.
+
+*Was on the application page, beneath the domain choice (beat 013). Moved here by beat 014.*
+
 ## Where the tree is
 
 The build order is one feature per beat, in

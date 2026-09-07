@@ -152,7 +152,10 @@ const STEPS: readonly Step[] = [
     ),
   },
   {
-    testIds: ['declared-panel'],
+    // Beat 014 dissolved the declared disclosure: its two figures that were nowhere else
+    // moved into the run disclosure, and its explanation went to the site. The step is about
+    // the declared values rather than about the box they were in, so it follows the figures.
+    testIds: ['run-panel'],
     title: 'Everything that was decided in advance',
     body: (
       <p>
@@ -199,7 +202,8 @@ const STEPS: readonly Step[] = [
     ),
   },
   {
-    testIds: ['deferrals-panel'],
+    // Beat 014: the deferrals are a page of the site, and the application links to it.
+    testIds: ['deferrals-link', 'deferrals-panel'],
     title: 'What it deliberately does not do',
     body: (
       <p>

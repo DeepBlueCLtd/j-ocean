@@ -378,7 +378,10 @@ export function FieldView({
       )}
 
       {caption && (
-        <figcaption>
+        /* The field's own label and its scale: it names what is drawn and what the colours
+           are worth. `figure-label` says so, and is what tests/shell/prose.spec.ts admits as
+           labelling a figure rather than explaining one. */
+        <figcaption className="figure-label">
           {label}
           <span className="scale">
             {palette === 'sequential' ? (

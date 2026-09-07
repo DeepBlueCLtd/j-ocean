@@ -1,0 +1,407 @@
+{
+  "record": "Where every piece of narrative that was on the application page went (SRD-v2 FR-42 and §7; spec 014 FR-002). One entry per piece of matter: where it was, the words themselves, what kind of matter it is, and where it went. The words are carried here rather than only in a diff, so that a piece bound for a help entry beat 016 has not built yet is in the repository rather than lost. Held by tests/docs/disposition.test.ts; §7 of j-ocean-ui-srd.md and docs/site/disposition.md are generated from it by scripts/docs/build-disposition.ts.",
+  "beat": "014-narrative-to-the-site",
+  "kinds": {
+    "stays": "The reader drives it, or reads a live figure from it. It stays, compacted, in the region that owns it, and the destination is one of the four regions of beat 013.",
+    "site": "It states no live figure at all. It goes to a section of a page under docs/site/, and the test holds that section against these words.",
+    "help": "It explains a panel that stays. It goes to that panel's help entry, which beat 016 builds; until then it lives here and the test reports the destination as owed."
+  },
+  "regions": ["controls", "centre", "scores", "detail"],
+  "owedTo": "016-panel-help",
+  "entries": [
+    {
+      "id": "not-operational",
+      "wasAt": "The head of the controls region, outside its scroller",
+      "fromBeat": "001",
+      "kind": "stays",
+      "destination": "controls",
+      "matter": "j-ocean is not an operational forecast system. Its numerics are real but reduced, its domain small, and its claims are about relative skill between references it computes itself, scored against a truth record it did not author.",
+      "note": "FR-003, FR-058 and SRD-v1 FR-02. It is not narrative and it does not move: it is the one sentence the application owes a reader who arrived without context, and it is visible without interaction."
+    },
+    {
+      "id": "recorded-case",
+      "wasAt": "The run controls",
+      "fromBeat": "001",
+      "kind": "stays",
+      "destination": "controls",
+      "matter": "Which run this is: the recorded case under its declared label, or a run whose seed was drawn for this visit.",
+      "note": "SRD-v1 FR-34. A live statement of what is on screen, not an explanation of it. The declared label now carries its declared typography (Principle V)."
+    },
+    {
+      "id": "step-time",
+      "wasAt": "The run controls",
+      "fromBeat": "001",
+      "kind": "stays",
+      "destination": "controls",
+      "matter": "The measured step time as host time, against the declared frame budget.",
+      "note": "NFR-04. Two live figures and their comparison."
+    },
+    {
+      "id": "run-provenance",
+      "wasAt": "The controls region, the disclosure headed The run",
+      "fromBeat": "001",
+      "kind": "stays",
+      "destination": "controls",
+      "matter": "The root seed, the domain and its computed cell size, the declared timestep against the stability the criterion admits, the steps taken, the instant the run is valid at, what it was initialised from, the excluded sponge margin and the outcrop clamps.",
+      "note": "Every line is a live figure. The disclosure stays; the sentences that explained rather than stated have left it."
+    },
+    {
+      "id": "declared-figures",
+      "wasAt": "The controls region, the disclosure headed What has been declared",
+      "fromBeat": "001",
+      "kind": "stays",
+      "destination": "controls",
+      "matter": "The declared grid and the declared epoch.",
+      "note": "FR-004 and Principle V. The disclosure is gone; the two figures it held that were nowhere else relocate into the run disclosure, keeping their declared typography. The declared horizons are on the row and the row invitation, and the declared domains are on the domain control, so those two figures were already inline where they are used."
+    },
+    {
+      "id": "instrument-figures",
+      "wasAt": "The controls region, the disclosure headed What the instruments measured",
+      "fromBeat": "004",
+      "kind": "stays",
+      "destination": "controls",
+      "matter": "The ownship surface count at its declared interval and declared errors, the XBT drops and their declared level count, what each drop told us about the interface depth with its error, whether Argo is assimilated, and how many of each check fired.",
+      "note": "Live figures, and they change with the domain and with the toggles that drive them, so they stay in the region that owns those causes."
+    },
+    {
+      "id": "truth-record-figures",
+      "wasAt": "The controls region, the disclosure headed The record this run is scored against",
+      "fromBeat": "002",
+      "kind": "stays",
+      "destination": "controls",
+      "matter": "The domain, the truth source, its native resolution against the model grid, its instants and their spacing, its depth levels, the Argo profiles and levels with the flagged count, and the climatology window with its overlap with this run's period.",
+      "note": "The spec proposed moving this panel to the site whole, on the ground that derived-artefact facts do not change while a reader works. On the built surface they do: the domain control of SRD-v1 FR-11 changes every figure here. So the figures stay in the controls region, which owns that cause, and only the sentences that explained them went to the site."
+    },
+    {
+      "id": "manifest",
+      "wasAt": "The controls region, the disclosure headed The manifest this run replays from",
+      "fromBeat": "011",
+      "kind": "stays",
+      "destination": "controls",
+      "matter": "The build, the digest of the fields and the analysis, the manifest itself, and the controls that download, paste and import one.",
+      "note": "Replay is something a reader drives. The entry point stays in the controls region; only its explanation left."
+    },
+    {
+      "id": "issue-observations",
+      "wasAt": "The controls region, beneath the issue-time control",
+      "fromBeat": "009",
+      "kind": "stays",
+      "destination": "controls",
+      "matter": "How many observations the analysis saw at this issue instant, and how many had not happened yet.",
+      "note": "The clearest live consequence of the control it sits under."
+    },
+    {
+      "id": "footprint-summary",
+      "wasAt": "The controls region, beneath the row's toggles",
+      "fromBeat": "008",
+      "kind": "stays",
+      "destination": "controls",
+      "matter": "What is drawn over every panel: the surface measurements, the XBT drops, the Argo profiles, how many carry a flag, and whether quality control was on.",
+      "note": "The spec proposed sending the footprint figures to the detail region. The built surface already draws them in the controls region, beside the toggles that change them, and FR-047 gives the detail region to whatever was last selected. So they stay where they are."
+    },
+    {
+      "id": "analysed-field",
+      "wasAt": "The centre region, before the row is built",
+      "fromBeat": "005",
+      "kind": "stays",
+      "destination": "centre",
+      "matter": "The weight observations carried in each cell — the analysis's own gain, drawn as a field.",
+      "note": "The picture, its label, the influence radius as a property of the declared correlation length scale, and the counts of what entered and was excluded from the analysis."
+    },
+    {
+      "id": "row-invitation",
+      "wasAt": "The centre region, before the row is built",
+      "fromBeat": "013",
+      "kind": "stays",
+      "destination": "centre",
+      "matter": "Six panels at the declared horizons — each stating what it is valid for, what it was initialised from, and what it was worth against two references.",
+      "note": "FR-048: a region with nothing in it says what would appear there. This is that statement, and it is what the region is entitled to say."
+    },
+    {
+      "id": "scores-empty",
+      "wasAt": "The scores region, before the row is scored",
+      "fromBeat": "013",
+      "kind": "stays",
+      "destination": "scores",
+      "matter": "Each panel's skill against persistence and against climatology appears here, in that panel's own column, once the row has been built and scored.",
+      "note": "FR-048."
+    },
+    {
+      "id": "detail-empty",
+      "wasAt": "The detail region, with nothing selected",
+      "fromBeat": "013",
+      "kind": "stays",
+      "destination": "detail",
+      "matter": "Nothing is selected. Two things can appear here: a cell's attribution breakdown, from clicking a cell on any field; and a measurement's own profile beside the model's derived one, with the measured levels kept as a ghost, from hovering or clicking its mark.",
+      "note": "FR-048."
+    },
+
+    {
+      "id": "declared-aside",
+      "wasAt": "The controls region, the disclosure headed What has been declared",
+      "fromBeat": "001",
+      "kind": "site",
+      "destination": "docs/site/data-model.md#What has been declared",
+      "matter": "Every figure here is a value in configuration, validated before anything was computed. No component in the tree holds a literal for any of them."
+    },
+    {
+      "id": "cell-size",
+      "wasAt": "The run disclosure, beside the computed cell size",
+      "fromBeat": "003",
+      "kind": "site",
+      "destination": "docs/site/data-model.md#Configuration",
+      "arrived": true,
+      "matter": "a five-degree box is not square in kilometres",
+      "restatedAs": "a five-degree box is not square in kilometres at Gulf Stream latitudes",
+      "note": "Already there when this beat opened the disclosure. Recorded as arrived rather than moved."
+    },
+    {
+      "id": "initialisation-geostrophy",
+      "wasAt": "The run disclosure, beneath Initialised from",
+      "fromBeat": "003",
+      "kind": "site",
+      "destination": "docs/site/architecture.md#What the initialisation takes from the truth, and what it does not",
+      "matter": "Velocity is put in geostrophic balance with that thickness rather than taken from the truth, which carries motions this model has no layer for."
+    },
+    {
+      "id": "instruments-boundary",
+      "wasAt": "The controls region, the disclosure headed What the instruments measured",
+      "fromBeat": "004",
+      "kind": "site",
+      "destination": "docs/site/architecture.md#How truth reaches the model",
+      "matter": "Truth becomes an observation in exactly one module, and this is everything that module produced. Every figure below is what a measurement was priced at, not what it turned out to be worth — that is the analysis's question."
+    },
+    {
+      "id": "xbt-fall-rate",
+      "wasAt": "The instruments disclosure, beneath XBT drops",
+      "fromBeat": "004",
+      "kind": "site",
+      "destination": "docs/site/data-model.md#What the instruments measured, and what it was priced at",
+      "matter": "An XBT infers its depth from a fall rate, so each level records the depth it reached, not the depth it was asked for."
+    },
+    {
+      "id": "interface-inversion",
+      "wasAt": "The instruments disclosure, beneath What a drop told us",
+      "fromBeat": "004",
+      "kind": "site",
+      "destination": "docs/site/data-model.md#What the instruments measured, and what it was priced at",
+      "matter": "The observed quantity is the interface depth, inverted from the same two-layer relation the profile above is drawn from. A level far from the thermocline acquires an enormous depth error and weighs almost nothing, through the arithmetic rather than through a rule."
+    },
+    {
+      "id": "argo-independence",
+      "wasAt": "The instruments disclosure, beneath Argo",
+      "fromBeat": "004",
+      "kind": "site",
+      "destination": "docs/site/data-model.md#What the instruments measured, and what it was priced at",
+      "matter": "The truth record assimilated these profiles, so skill measured against it while assimilating them is not independent evidence, and every score will say so.",
+      "note": "The caveat itself is not lost from the application: every score still carries its own independence caveat beside it, which is where Principle V wants it."
+    },
+    {
+      "id": "flags-kept",
+      "wasAt": "The instruments disclosure, beneath Flags",
+      "fromBeat": "004",
+      "kind": "site",
+      "destination": "docs/site/data-model.md#What the instruments measured, and what it was priced at",
+      "matter": "A flagged observation keeps its value and is drawn as flagged. Nothing is dropped, because what the analysis chose to ignore is as interesting as what it used."
+    },
+    {
+      "id": "truth-artefacts",
+      "wasAt": "The controls region, the disclosure headed The record this run is scored against",
+      "fromBeat": "002",
+      "kind": "site",
+      "destination": "docs/site/data-model.md#The record this run is scored against",
+      "matter": "Two derived artefacts, regenerated from a digest-verified raw subset by gate G-01. Nothing here was edited by hand; a file that had been would fail the build."
+    },
+    {
+      "id": "truth-resolution",
+      "wasAt": "The truth disclosure, beneath Native resolution",
+      "fromBeat": "002",
+      "kind": "site",
+      "destination": "docs/site/data-model.md#The record this run is scored against",
+      "matter": "Scoring will decline to resolve below it."
+    },
+    {
+      "id": "truth-instants",
+      "wasAt": "The truth disclosure, beneath Instants",
+      "fromBeat": "002",
+      "kind": "site",
+      "destination": "docs/site/data-model.md#The record this run is scored against",
+      "matter": "The source is missing occasional snapshots; the record carries its instants as they are and interpolates nothing at build time."
+    },
+    {
+      "id": "truth-levels",
+      "wasAt": "The truth disclosure, beneath Depth levels",
+      "fromBeat": "002",
+      "kind": "site",
+      "destination": "docs/site/data-model.md#The record this run is scored against",
+      "matter": "exact levels of the source, so no build-time vertical interpolation"
+    },
+    {
+      "id": "truth-flagged-levels",
+      "wasAt": "The truth disclosure, beneath Argo profiles",
+      "fromBeat": "002",
+      "kind": "site",
+      "destination": "docs/site/data-model.md#The record this run is scored against",
+      "matter": "Flagged levels are kept and will be drawn as flagged, never omitted."
+    },
+    {
+      "id": "climatology-overlap",
+      "wasAt": "The truth disclosure, beneath Climatology",
+      "fromBeat": "002",
+      "kind": "site",
+      "destination": "docs/site/data-model.md#The record this run is scored against",
+      "matter": "Skill against this reference is therefore not a fully independent measure, and the surface will say so beside every such score."
+    },
+    {
+      "id": "manifest-replay",
+      "wasAt": "The controls region, the disclosure headed The manifest this run replays from",
+      "fromBeat": "011",
+      "kind": "site",
+      "destination": "docs/site/architecture.md#What the manifest carries, and what replay is",
+      "matter": "Everything needed to rebuild this run, and none of its state: replay is re-computation, not the restoration of a snapshot. Nothing persists between visits — no storage, no cookie, no run in the URL — so this file is the only thing that leaves and the only thing that comes back."
+    },
+    {
+      "id": "attribution-not-illustration",
+      "wasAt": "The centre region, the caption under the analysed field",
+      "fromBeat": "005",
+      "kind": "site",
+      "destination": "docs/site/architecture.md#The attribution field is the analysis's own gain",
+      "matter": "This is not a picture computed to illustrate the answer; it is the same arithmetic that produced it, exported beside it, which is why it cannot disagree with it. There is no fixture behind this: it is the field the analysis produced on this visit."
+    },
+    {
+      "id": "two-domains",
+      "wasAt": "The controls region, beneath the domain choice",
+      "fromBeat": "013",
+      "kind": "site",
+      "destination": "docs/site/index.md#Why there are two domains",
+      "matter": "The same machinery over a deliberately bland ocean buys much less, and being able to watch it buy less is the point of the second domain."
+    },
+    {
+      "id": "floor-css-pixels",
+      "wasAt": "The below-the-floor notice",
+      "fromBeat": "013",
+      "kind": "site",
+      "destination": "docs/site/data-model.md#Configuration",
+      "arrived": true,
+      "matter": "The figure is in CSS pixels, so a window wide enough at 100 per cent is below it at 200 per cent zoom. That is the same answer for the same reason: at that zoom there are as few pixels to read six panels in.",
+      "restatedAs": "in CSS pixels — so a large window at 200 % zoom is below it and gets the same answer",
+      "note": "Already there when this beat opened the notice. Recorded as arrived rather than moved."
+    },
+    {
+      "id": "deferrals",
+      "wasAt": "The controls region, the disclosure headed What this does not do, and what would change that",
+      "fromBeat": "012",
+      "kind": "site",
+      "destination": "docs/site/deferred.md#Deferred, and what would trigger it",
+      "arrived": true,
+      "matter": "Four capabilities are assessed, deferred and cheap to adopt. Each has a trigger, and the triggers are written down rather than remembered.",
+      "restatedAs": "Four capabilities are assessed, deferred and cheap to adopt. That posture is a requirement rather than a habit: a deferral without a trigger is a wish, and a deferral without an assessment is an excuse.",
+      "note": "The site page carried the deferrals and their triggers before this beat opened the disclosure, and tests/run/deferral-trigger.test.ts still measures them on every run. The panel becomes a named link to that page. Recorded as arrived, because performing a move that has already happened would be theatre."
+    },
+    {
+      "id": "deferral-adaptive",
+      "wasAt": "The deferrals disclosure, beneath Adaptive sampling",
+      "fromBeat": "012",
+      "kind": "site",
+      "destination": "docs/site/deferred.md#Adaptive sampling — the trigger is measured, and not met",
+      "arrived": true,
+      "matter": "An ensemble, its spread, and a vessel steered by it against a lawnmower track. Deferred until scoring is trusted — which means AT-02, AT-03 and AT-06 have passed. AT-03 has; AT-02 and AT-06 have not, and both fail because two declared numbers disagree about amplitude. A test measures the trigger on every run, so this statement is never out of date.",
+      "restatedAs": "The trigger is that scoring be trusted, and the development plan says what that means: AT-02, AT-03 and AT-06 have passed."
+    },
+    {
+      "id": "deferral-depth",
+      "wasAt": "The deferrals disclosure, beneath Dynamic depth levels",
+      "fromBeat": "012",
+      "kind": "site",
+      "destination": "docs/site/deferred.md#Dynamic depth levels",
+      "arrived": true,
+      "matter": "Vertical structure that is advected rather than diagnosed. The trigger is a question about vertical structure evolving in time. The disagreement a reader can see between an XBT and the model's derived profile is not that trigger: it is a static offset, and advected structure would not move it.",
+      "restatedAs": "Vertical structure that is advected rather than diagnosed."
+    },
+    {
+      "id": "deferral-gpu",
+      "wasAt": "The deferrals disclosure, beneath A GPU kernel",
+      "fromBeat": "012",
+      "kind": "site",
+      "destination": "docs/site/deferred.md#A GPU kernel",
+      "arrived": true,
+      "matter": "The trigger is the declared frame budget binding at a grid somebody wants. At 100 × 100 it does not.",
+      "restatedAs": "The trigger is the declared frame budget binding at a grid somebody wants. At 100 × 100 it does"
+    },
+    {
+      "id": "deferral-latency",
+      "wasAt": "The deferrals disclosure, beneath Observation latency",
+      "fromBeat": "012",
+      "kind": "site",
+      "destination": "docs/site/deferred.md#Observation latency and arrival order",
+      "arrived": true,
+      "matter": "Observations arriving late rather than not at all. Withholding is its special case, and beat 010 built that.",
+      "restatedAs": "Observations arriving late rather than not at all. Withholding is its special case, and beat 010 built that"
+    },
+
+    {
+      "id": "help-profile-editor",
+      "wasAt": "The controls region, beneath Editing what was measured",
+      "fromBeat": "010",
+      "kind": "help",
+      "destination": "help:controls/editing-what-was-measured",
+      "matter": "A profile is edited where it was measured: enlarge a panel, click a needle, and the measurement fills the detail region with its levels draggable and the measured profile kept behind them as a ghost."
+    },
+    {
+      "id": "help-redraw-track",
+      "wasAt": "The controls region, when the track is being redrawn",
+      "fromBeat": "010",
+      "kind": "help",
+      "destination": "help:controls/editing-what-was-measured",
+      "matter": "Enlarge a panel and drag a waypoint. The instruments resample truth where you put it, through the same instruments and the same noise streams."
+    },
+    {
+      "id": "help-manifest-import",
+      "wasAt": "The manifest disclosure, above the paste box",
+      "fromBeat": "011",
+      "kind": "help",
+      "destination": "help:controls/manifest",
+      "matter": "Paste one and this visit becomes that run — rebuilt from its seed and its edits, not restored. The schema, the format version, the configuration digest and the domain are all checked before anything is provisioned, so a refused import leaves the run you have alone."
+    },
+    {
+      "id": "help-build-the-row",
+      "wasAt": "The centre region, before the row is built",
+      "fromBeat": "013",
+      "kind": "help",
+      "destination": "help:centre/horizon-row",
+      "matter": "Building them means integrating the analysis forward four days, which takes a couple of seconds, so it happens when you ask: Build the horizon row is in the controls."
+    },
+    {
+      "id": "help-influence-radius",
+      "wasAt": "The centre region, beneath Influence radius",
+      "fromBeat": "005",
+      "kind": "help",
+      "destination": "help:centre/attribution",
+      "matter": "An observation across a front influences the far side exactly as much as its own, which the flow would not."
+    },
+    {
+      "id": "help-no-scores-table",
+      "wasAt": "The scores region, before the row is scored",
+      "fromBeat": "013",
+      "kind": "help",
+      "destination": "help:scores",
+      "matter": "There is no scores table anywhere else: a table would ask you to match a row label against a panel heading at every glance."
+    },
+    {
+      "id": "help-anomaly-about-its-own-mean",
+      "wasAt": "Each panel's score, in the disclosure headed Where this figure came from",
+      "fromBeat": "006",
+      "kind": "help",
+      "destination": "help:scores",
+      "matter": "A reduced-gravity model determines departures from a mean and not the mean itself, so every field is compared as an anomaly about its own. The offsets are published rather than absorbed."
+    },
+    {
+      "id": "help-breakdown-is-of-a-cell",
+      "wasAt": "The detail region, above a cell's breakdown",
+      "fromBeat": "005",
+      "kind": "help",
+      "destination": "help:detail/attribution-breakdown",
+      "matter": "A breakdown is an instrument of a selected cell, never a per-panel summary — that was specified first and was wrong."
+    }
+  ]
+}

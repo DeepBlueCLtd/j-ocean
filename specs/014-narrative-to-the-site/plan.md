@@ -83,4 +83,37 @@ every check in this repository is.
 
 ## Measured
 
-_Filled in when the beat lands._
+**Forty-five pieces of matter**, in `docs/narrative-disposition.json`. Fourteen stay in a
+region, twenty-three went to the site, and **eight are owed to beat 016** — the count is
+asserted, so the holes cannot grow quietly. Thirty-one paragraphs left the application page.
+
+`tests/docs/disposition.test.ts` was watched failing on a planted entry pointing at a heading
+no page has: it named the entry and the destination it expected (SC-002). It also fails on a
+page that does not exist, on a heading whose section does not contain the matter, and on
+something that stays in a region that is not one of the four.
+
+**The spec's proposed table was wrong in three places, and the built surface won.**
+
+- *The record this run is scored against* was proposed for the site whole, on the ground that
+  derived-artefact facts do not change while a reader works. They do: the domain choice beat
+  013 built changes every figure in that panel. The figures stayed in the controls region and
+  only the sentences explaining them went to the site.
+- The **footprint figures** were proposed for the detail region. FR-047 gives that region to
+  whatever was last selected, and the footprint counts have been in the controls column beside
+  the toggles that change them since beat 008. They stayed where they are.
+- There is **no footer aside** to move. Beat 013 had already removed it.
+
+**Two figures were found being drawn as prose** (Principle V, and both are display faults
+rather than computation ones). The cell breakdown's per-observation shares had been printed as
+plain text since beat 005; `run.recordedCaseLabel` was being drawn as ordinary text. Both now
+carry their kind.
+
+**G-07 is green and its record is untouched.** All forty-one digests are byte-identical, which
+is what removing prose should do, so there is no FR-40 finding here.
+
+**The floor was re-measured and did not fall: 2,038 x 682 CSS px, unchanged.** The floor is set
+by the centre stack -- six panels at the declared minimum and the score statements beneath them
+-- and the prose this beat removed was in the controls column, the disclosures and the detail
+region. No declared figure changed, so no digest was re-recorded.
+
+266 headless tests, 59 shell tests, eight gates.

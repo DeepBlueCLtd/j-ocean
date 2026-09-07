@@ -273,9 +273,6 @@ export function PanelScore(props: PanelScoreProps) {
               Means removed: forecast{' '}
               <span className="computed">{score.meanOffsets.forecast.value.toFixed(1)} m</span>,
               truth <span className="computed">{score.meanOffsets.truth.value.toFixed(1)} m</span>.
-              A reduced-gravity model determines departures from a mean and not the mean
-              itself, so every field is compared as an anomaly about its own. The offsets are
-              published rather than absorbed.
             </p>
             {/* Review R-3. The caveat when there was something external to caveat, and the
                 statement that there was not when there was not -- a reader cannot tell the

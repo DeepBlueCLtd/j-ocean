@@ -60,6 +60,56 @@ host-time gate honours nowhere else:
 A third request is evidence the principle is being eroded and has to be argued on its own
 merits, never by analogy.
 
+## How truth reaches the model
+
+Truth becomes an observation in exactly one module, and this is everything that module
+produced. Every figure below is what a measurement was priced at, not what it turned out to be
+worth — that is the analysis's question.
+
+That sentence is the whole of Principle II, and gate G-02 is what keeps it true: the analysis
+may not import the truth-source port, the model may not either, and there is one construction
+site for an `Observation`. The application still reports what the instruments produced on this
+visit, beside the toggles that change it; what left the application is the explanation of why
+there is only one route.
+
+*Was on the application page, in the disclosure headed “What the instruments measured”
+(beat 004). Moved here by beat 014.*
+
+## What the initialisation takes from the truth, and what it does not
+
+The grid is laid over the truth record at the run's first instant and the layer thickness is
+read from it. Velocity is put in geostrophic balance with that thickness rather than taken from
+the truth, which carries motions this model has no layer for.
+
+*Was on the application page, in the run disclosure (beat 003). Moved here by beat 014.*
+
+## What the manifest carries, and what replay is
+
+Everything needed to rebuild this run, and none of its state: replay is re-computation, not the
+restoration of a snapshot. Nothing persists between visits — no storage, no cookie, no run in
+the URL — so this file is the only thing that leaves and the only thing that comes back.
+
+The manifest itself, its digests and the controls that export and import one are still in the
+application, because replay is something a reader drives. This paragraph is why they behave as
+they do.
+
+*Was on the application page, in the disclosure headed “The manifest this run replays from”
+(beat 011). Moved here by beat 014.*
+
+## The attribution field is the analysis's own gain
+
+Principle IV says attribution is derived and never authored, and the field the application
+draws is the analysis's own weights read back out. This is not a picture computed to illustrate
+the answer; it is the same arithmetic that produced it, exported beside it, which is why it
+cannot disagree with it. There is no fixture behind this: it is the field the analysis produced
+on this visit.
+
+Gate G-06 holds the claim — one construction site for the weights, and no writer for them in
+the harness.
+
+*Was on the application page, in the caption under the analysed field (beat 005). Moved here by
+beat 014.*
+
 ## The gates
 
 Gates live in `scripts/gates/` and run with one command, `pnpm gates`. Gates that have not
