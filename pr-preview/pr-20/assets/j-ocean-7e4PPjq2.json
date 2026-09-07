@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "run": {
     "defaultSeed": "6a09e667f3bcc908",
     "recordedCaseLabel": "the recorded case"
@@ -27,8 +27,12 @@
     "frameBudgetMs": 33
   },
   "presentation": {
-    "referenceViewportWidthPx": 1400,
+    "referenceViewportWidthPx": 2038,
     "minimumPanelWidthPx": 190,
+    "minimumViewportWidthPx": 2038,
+    "minimumViewportHeightPx": 682,
+    "controlsWidthPx": 390,
+    "detailWidthPx": 390,
     "panelGapPx": 10,
     "pageGutterPx": 48,
     "anomalyLimitMetres": 220,
