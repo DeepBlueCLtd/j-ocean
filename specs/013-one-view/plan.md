@@ -133,6 +133,20 @@ Two figures came out of building them, and both change a declared value.
   **2 038**. The centre must not answer that by scrolling horizontally — that is beat 007's own
   finding coming back through a different door, and it is what FR-43 exists to answer instead. So
   the floor is declared at the measured figure and below it the application says the size it needs.
+- **T040 measured both figures from the built layout: 2 038 × 682 CSS px.** The width is the
+  arithmetic above and agrees with it to the pixel, because it is a sum of declared boxes. The
+  height was not predictable and was not predicted: the row with its labels and its six score
+  statements is 634 px tall at that width, and the page gutter is the other 48. The height is
+  measured at the *floor's own width* rather than at a roomy one, because a score statement is a
+  sentence that wraps in its column and a wider panel is a shorter score.
+- **`referenceViewportWidthPx` is raised from 1400 to 2038.** It is the width the documentation
+  photographs the application at, and photographing it at a width where the centre scrolled would
+  be publishing the fault. The schema now refuses a reference below the floor.
+- **The two column widths are declared rather than derived.** `controlsWidthPx` and
+  `detailWidthPx` were left optional and absent so that G-07's `configuration` digest would not
+  move; that is the gate shaping the design instead of holding it. They are required, they are
+  390 each — two panels and the gap between them, which is what the detail region needs to draw a
+  profile editor whole — and `schemaVersion` goes to 7 with them.
 - **G-07's first quantity is a digest of the whole validated configuration**, so declaring any
   presentation figure — a column width, the floor itself — moves a recorded digest although
   nothing computed moves. That is a real cost of the gate and it is stated rather than worked

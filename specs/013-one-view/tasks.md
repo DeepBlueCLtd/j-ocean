@@ -47,22 +47,34 @@ changes, because FR-001 says so and because the rest of this list is otherwise u
 
 ## The floor (US7, FR-009, FR-010)
 
-- [ ] **T040** `tests/shell/viewport-floor.spec.ts`: measures the smallest viewport at which
-      the layout still holds and prints both figures.
-- [ ] **T041** `presentation.minimumViewportWidthPx` and `minimumViewportHeightPx` declared,
-      schema-refined against the declared horizons, handed to CSS as custom properties.
-- [ ] **T042** Below the floor: the statement with the required size as a `Declared` figure,
-      and the single-panel fallback, operable, with the strip present.
+- [X] **T039** The two column widths declared rather than derived: `controlsWidthPx` and
+      `detailWidthPx` are required and are in `config/j-ocean.json` at 390 each, the fallback
+      in `Regions.tsx` and in `tests/shell/declared-geometry.ts` is gone, and `schemaVersion`
+      is 7. Beat 013 left them optional because declaring one moves G-07's `configuration`
+      digest; the gate was shaping the design instead of holding it.
+- [X] **T040** `tests/shell/viewport-floor.spec.ts`: measures the smallest viewport at which
+      the layout still holds and prints both figures. **2038 x 682 CSS px**, measured — the
+      regions cost 848 px of width and 48 of height, and the row needs 1,190.
+- [X] **T041** `presentation.minimumViewportWidthPx` and `minimumViewportHeightPx` declared at
+      the measured figures, schema-refined against the declared horizons with the arithmetic
+      in the refusal, and `referenceViewportWidthPx` raised from 1400 to the same 2038.
+- [X] **T042** Below the floor: the statement with the required size as a `Declared` figure,
+      and the single-panel fallback, operable, with FR-049's strip present. The centre's
+      horizontal scroll is gone, which is what FR-043 replaces.
 
 ## Holding it (SC-001 to SC-006)
 
 - [X] **T050** `tests/shell/one-view.spec.ts`: no page scroll on either axis in each of
       loaded, row-unbuilt, row-built, scored, cell-selected, over-budget and
       configuration-failure; every declared scrolling region declared as one.
-- [ ] **T051** A control is changed and every panel and every score is inside the viewport
-      rectangle before and after (AT-12).
-- [ ] **T052** Selecting a cell changes no region's bounding rectangle (FR-047).
-- [ ] **T053** Screenshots recaptured at the declared reference width and at the floor.
+- [X] **T051** A control is changed — the forecast reissued twelve hours earlier, which is the
+      one control that moves every panel and every score — and both are inside the viewport
+      rectangle before and after, and every panel and every score has changed (AT-12).
+- [X] **T052** Selecting a cell changes no region's bounding rectangle (FR-047). Asserted in
+      `one-view.spec.ts`'s walk of the seven states, to the pixel, rather than a second time
+      here.
+- [X] **T053** Screenshots recaptured at the declared reference width, at the floor
+      (`013-at-the-floor.png`) and below it (`013-below-the-floor.png`).
 
 ## The record (FR-011, FR-040)
 

@@ -6,6 +6,13 @@ import { fileURLToPath } from 'node:url';
  *
  * One module rather than a copy in each spec, because two tests that each recompute the same
  * arithmetic can agree with configuration and still disagree with each other.
+ *
+ * Every figure here is **declared**. Beat 013 left the two column widths undeclared and
+ * derived them in code, and T041 finished the job: `controlsWidthPx`, `detailWidthPx` and the
+ * viewport floor are all in `config/j-ocean.json`, so this file reads them and computes
+ * nothing. The floor itself was measured from the built layout by
+ * `tests/shell/viewport-floor.spec.ts`, which still checks that the declaration is the
+ * measurement.
  */
 
 export const CONFIG_PATH = fileURLToPath(new URL('../../config/j-ocean.json', import.meta.url));
@@ -14,10 +21,13 @@ export interface DeclaredGeometry {
   readonly presentation: {
     readonly referenceViewportWidthPx: number;
     readonly minimumPanelWidthPx: number;
+    /** FR-009, FR-010: the smallest viewport the four regions hold, measured then declared. */
+    readonly minimumViewportWidthPx: number;
+    readonly minimumViewportHeightPx: number;
     readonly panelGapPx: number;
     readonly pageGutterPx: number;
-    readonly controlsWidthPx?: number;
-    readonly detailWidthPx?: number;
+    readonly controlsWidthPx: number;
+    readonly detailWidthPx: number;
   };
   readonly horizons: { readonly leadHours: number[] };
 }
@@ -26,32 +36,3 @@ export const declared = JSON.parse(readFileSync(CONFIG_PATH, 'utf8')) as Declare
 
 /** The declared horizons, in order. The row draws exactly these and no others (G-05). */
 export const LEADS: readonly number[] = [...declared.horizons.leadHours].sort((a, b) => a - b);
-
-/**
- * The width at which beat 013's four regions hold every declared horizon at the declared
- * minimum panel width.
- *
- * `referenceViewportWidthPx` was declared by beat 007 for a page on which the row had the whole
- * window. The row now shares the window with a controls column and a detail column, so the
- * width at which "all six visible at once" is a promise is this arithmetic and no longer that
- * figure. T041 measures the floor from the built layout and declares it; until then the
- * geometry is measured against a figure derived from what configuration declares, so it moves
- * with the declaration rather than being chosen here.
- */
-export const FOUR_REGION_WIDTH = ((): number => {
-  const { presentation } = declared;
-  // `flankingWidth` in `src/harness/Regions.tsx`: two panels and the gap between them, which
-  // is what a column has to be to draw the profile editor whole.
-  const flanking = 2 * presentation.minimumPanelWidthPx + presentation.panelGapPx;
-  const controls = presentation.controlsWidthPx ?? flanking;
-  const detail = presentation.detailWidthPx ?? flanking;
-  const panels = LEADS.length;
-  return (
-    presentation.pageGutterPx +
-    controls +
-    detail +
-    2 * presentation.panelGapPx +
-    panels * presentation.minimumPanelWidthPx +
-    (panels - 1) * presentation.panelGapPx
-  );
-})();

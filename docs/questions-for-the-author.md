@@ -178,13 +178,31 @@ half panels were on screen. A reference width that no longer holds six panels is
 returning by a different door — the number is declared, the tests use it, and it has quietly
 stopped describing a layout a reader can use.
 
+**What was measured.** `tests/shell/viewport-floor.spec.ts` took both figures from the built
+layout with the row built and scored: **2038 × 682 CSS px**. The width agrees with the arithmetic
+above to the pixel, because it is a sum of declared boxes. The height was not predicted and could
+not have been: the row with its labels and its six score statements is 634 px tall at that width,
+and the page gutter is the other 48. It is measured at the floor's own width rather than at a
+roomy one, because a score statement is a sentence that wraps in its column, so a wider panel is a
+shorter score and a height measured beside wide panels is a height the floor has not got.
+
 **The question.** This one the beat answers rather than asks, and it is recorded here because the
-answer changes a declared figure the author chose: `referenceViewportWidthPx` is raised to the
-measured minimum, and below that the application gives the FR-43 answer — it states the size it
-needs and offers the single-panel presentation — rather than scrolling the row. What is left for
-the author is whether 190 px is still the right `minimumPanelWidthPx` now that six of them plus
-two columns is the binding constraint on the window, or whether the panels should be allowed to
-be narrower than beat 007 declared.
+answer changes a declared figure the author chose: `referenceViewportWidthPx` is raised from 1400
+to the measured 2038, and below the floor the application gives the FR-43 answer — it states the
+size it needs and offers the single-panel presentation — rather than scrolling the row. The
+centre's horizontal scroll is gone.
+
+What is left for the author is whether 190 px is still the right `minimumPanelWidthPx` now that
+six of them plus two columns is the binding constraint on the window, or whether the panels should
+be allowed to be narrower than beat 007 declared. The arithmetic is now printed by the schema
+itself: a configuration whose floor cannot hold its horizons is refused with the sum in the
+message, so the cost of any answer to that question is visible before it is committed.
+
+**And what the answer cost.** 2038 × 682 is a large window. A 13-inch laptop at its default
+scaling has about 1440 × 800 CSS pixels and is below the floor on both axes, so the reader on one
+gets the single-panel fallback rather than the row — the instrument this project is about. That is
+the honest consequence of six legible panels beside two columns, and it is the second half of the
+`minimumPanelWidthPx` question rather than a separate one.
 
 ---
 

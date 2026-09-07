@@ -8,7 +8,7 @@ const raw = (): Record<string, unknown> => JSON.parse(readFileSync(CONFIG_PATH, 
 describe('the configuration loader', () => {
   it('loads the declared configuration and digests it', () => {
     const { config, digest } = declaredConfiguration();
-    expect(config.schemaVersion).toBe(6);
+    expect(config.schemaVersion).toBe(7);
     expect(config.grid.nx).toBe(100);
     expect(config.grid.ny).toBe(100);
     expect(digest).toMatch(/^[0-9a-f]{64}$/);
@@ -135,11 +135,47 @@ describe('the configuration loader', () => {
       expect(() => validateConfiguration(broken)).toThrow(/does not match the box, the grid/);
     });
 
-    it('rejects a seventh horizon the declared reference width cannot show at once', () => {
-      // FR-013 is a promise about geometry, and the promise is arithmetic: a horizon added
-      // without widening the row is refused at load rather than found in a screenshot.
+    it('rejects a seventh horizon the declared minimum viewport cannot hold', () => {
+      // FR-009 and FR-010. The floor is a promise about geometry and the promise is
+      // arithmetic: a horizon added without widening the floor is refused at load, with the
+      // sum printed, rather than found in a screenshot three beats later.
       const horizons = raw()['horizons'] as { leadHours: number[] };
       const broken = { ...raw(), horizons: { leadHours: [...horizons.leadHours, 120] } };
+      expect(() => validateConfiguration(broken)).toThrow(/cannot hold 7 declared horizons/);
+      expect(() => validateConfiguration(broken)).toThrow(
+        /7 x 190 panels \+ 6 x 10 panel gaps = 2238 px/,
+      );
+    });
+
+    it('accepts a seventh horizon once the floor is widened for it', () => {
+      // The other half of the same claim: the refusal is about the arithmetic and not about
+      // the number six, so declaring the width the seventh panel needs makes it admissible.
+      const horizons = raw()['horizons'] as { leadHours: number[] };
+      const presentation = raw()['presentation'] as Record<string, unknown>;
+      const forecast = raw()['forecast'] as Record<string, unknown>;
+      const widened = {
+        ...raw(),
+        horizons: { leadHours: [...horizons.leadHours, 120] },
+        forecast: { ...forecast, validityWindowHours: 120 },
+        presentation: {
+          ...presentation,
+          minimumViewportWidthPx: 2238,
+          referenceViewportWidthPx: 2238,
+        },
+      };
+      expect(() => validateConfiguration(widened)).not.toThrow();
+    });
+
+    it('rejects a reference width narrower than the row it is the reference for', () => {
+      const presentation = raw()['presentation'] as Record<string, unknown>;
+      const broken = {
+        ...raw(),
+        presentation: {
+          ...presentation,
+          referenceViewportWidthPx: 1200,
+          minimumViewportWidthPx: 1200,
+        },
+      };
       expect(() => validateConfiguration(broken)).toThrow(/too narrow to show every declared horizon/);
     });
 
@@ -154,6 +190,6 @@ describe('the configuration loader', () => {
   });
 
   it('rejects a schema version it does not know', () => {
-    expect(() => validateConfiguration({ ...raw(), schemaVersion: 7 })).toThrow(/schemaVersion/);
+    expect(() => validateConfiguration({ ...raw(), schemaVersion: 8 })).toThrow(/schemaVersion/);
   });
 });

@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react';
+import { useLayoutEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import type { Configuration } from '../config/schema.js';
 
 /**
@@ -45,36 +45,50 @@ export interface RegionsProps {
   readonly detail: ReactNode;
 }
 
-/**
- * A flanking column's width, where configuration has not declared one.
- *
- * Two panels and the gap between them. It is not a round number somebody liked: the detail
- * region has to draw FR-028's profile editor whole, and a column one panel wide clips it --
- * which would leave a reader dragging a point they cannot see the end of. The controls column
- * takes the same width because a column narrower than that turns every button's label into one
- * word per line.
- *
- * Both are built out of `minimumPanelWidthPx` and `panelGapPx`, which are declared. That is a
- * declared figure standing in for a declared figure, and not a literal standing in for one.
- * `controlsWidthPx` and `detailWidthPx` are in the schema and take precedence the moment
- * `config/j-ocean.json` declares them, which is a one-line change and needs no code.
- */
-const flankingWidth = (presentation: Configuration['presentation']): number =>
-  2 * presentation.minimumPanelWidthPx + presentation.panelGapPx;
-
 /** The declared geometry, handed to the stylesheet (Principle X). */
 export function regionGeometry(config: Configuration): CSSProperties {
   const { presentation, horizons } = config;
-  const controls = presentation.controlsWidthPx ?? flankingWidth(presentation);
-  const detail = presentation.detailWidthPx ?? flankingWidth(presentation);
   return {
     '--horizon-count': String(horizons.leadHours.length),
-    '--controls-width': `${String(controls)}px`,
-    '--detail-width': `${String(detail)}px`,
+    '--controls-width': `${String(presentation.controlsWidthPx)}px`,
+    '--detail-width': `${String(presentation.detailWidthPx)}px`,
     '--panel-minimum-width': `${String(presentation.minimumPanelWidthPx)}px`,
     '--panel-gap': `${String(presentation.panelGapPx)}px`,
     '--page-gutter': `${String(presentation.pageGutterPx)}px`,
   } as CSSProperties;
+}
+
+/**
+ * Whether this window is at or above the declared floor (FR-009, FR-043, US7 scenario 3).
+ *
+ * A media query rather than a resize listener, for two reasons. It is answered in **CSS
+ * pixels**, so a reader at 200 per cent zoom on a nominally adequate window is below the
+ * floor and gets the floor's answer -- which is correct, because they have as few pixels to
+ * read six panels in as the reader with a small window. And it fires on the crossing rather
+ * than on every pixel of a drag, so crossing the floor swaps the presentation without a
+ * reload and without the surface being rebuilt on the way.
+ */
+export function useAboveFloor(config: Configuration | null): boolean {
+  const query =
+    config === null
+      ? null
+      : `(min-width: ${String(config.presentation.minimumViewportWidthPx)}px) and ` +
+        `(min-height: ${String(config.presentation.minimumViewportHeightPx)}px)`;
+  const [above, setAbove] = useState(true);
+
+  // A layout effect rather than an ordinary one: the query only becomes answerable in the
+  // commit where the configuration arrives, and an ordinary effect would let the browser
+  // paint the four regions into a window that cannot hold them before correcting itself.
+  useLayoutEffect(() => {
+    if (query === null) return;
+    const media = window.matchMedia(query);
+    setAbove(media.matches);
+    const onChange = (event: MediaQueryListEvent): void => { setAbove(event.matches); };
+    media.addEventListener('change', onChange);
+    return () => { media.removeEventListener('change', onChange); };
+  }, [query]);
+
+  return above;
 }
 
 export function Regions({ config, statement, controls, centre, scores, detail }: RegionsProps) {
@@ -111,6 +125,74 @@ export function Regions({ config, statement, controls, centre, scores, detail }:
       <section className="region detail" data-testid="region-detail" data-scrolls="true">
         {detail}
       </section>
+    </main>
+  );
+}
+
+export interface BelowFloorProps {
+  readonly config: Configuration;
+  readonly statement: ReactNode;
+  /**
+   * The size the application needs (FR-009, FR-043). Built by the shell, because that size is
+   * a **declared** figure and the figure kinds live with the shell; this module places it and
+   * does not phrase it.
+   */
+  readonly notice: ReactNode;
+  /** FR-049's strip and the one panel enlarged beneath it, or the row's invitation. */
+  readonly centre: ReactNode;
+  /** The shown panel's skill figures, and no others: there is one panel to be beneath. */
+  readonly scores: ReactNode;
+  readonly detail: ReactNode;
+  readonly controls: ReactNode;
+}
+
+/**
+ * The answer below the declared floor (FR-009, FR-043, US7).
+ *
+ * Three regions side by side need the two declared column widths and every declared horizon
+ * at the declared minimum. A window that has not got them invites two obvious answers --
+ * shrink the panels past legibility, or scroll the row -- and both are the fault the row
+ * exists to prevent (ADR-0003). So this is the third: **say the size, and show one panel at a
+ * time.**
+ *
+ * The four named regions are all still here and still named, in one column. What changes is
+ * their arrangement and what the centre carries -- not what exists, and not what is computed.
+ * The statement of FR-02 and the required size stay out of the scroller, because a statement
+ * a reader has to scroll to find is not one the surface is making.
+ */
+export function BelowFloor(props: BelowFloorProps) {
+  return (
+    <main
+      className="one-view below-floor"
+      data-testid="one-view"
+      data-presentation="single-panel"
+      style={regionGeometry(props.config)}
+    >
+      <section className="region floor-answer" data-testid="region-floor">
+        {props.statement}
+        {props.notice}
+      </section>
+
+      <div className="below-floor-body" data-testid="below-floor-body" data-scrolls="true">
+        <section className="region centre" data-testid="region-centre">
+          {props.centre}
+        </section>
+        <section className="region scores" data-testid="region-scores">
+          {props.scores}
+        </section>
+        <section className="region detail" data-testid="region-detail">
+          {props.detail}
+        </section>
+        {/*
+          Last rather than first, and that is the one thing this arrangement gives up: above
+          the floor the causes are the first column a reader meets. Below it the payload has
+          to come first, because a reader who has been told the window is too small needs to
+          see what they are being offered instead before they are offered controls for it.
+        */}
+        <section className="region controls" data-testid="region-controls">
+          {props.controls}
+        </section>
+      </div>
     </main>
   );
 }

@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Request } from '@playwright/test';
-import { declared, FOUR_REGION_WIDTH } from './declared-geometry.js';
+import { declared } from './declared-geometry.js';
 
 /**
  * SC-003 and User Story 3 of spec 001.
@@ -210,7 +210,10 @@ test.describe('the shell', () => {
   }) => {
     // FR-013's "all visible at once" is a claim about geometry at a declared width, so it is
     // measured. The centre's container may scroll below that width; the page may not, ever.
-    await page.setViewportSize({ width: FOUR_REGION_WIDTH, height: 1000 });
+    await page.setViewportSize({
+      width: declared.presentation.minimumViewportWidthPx,
+      height: declared.presentation.minimumViewportHeightPx,
+    });
     await page.goto('/');
     await page.getByTestId('build-row').click();
     await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });

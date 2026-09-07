@@ -98,9 +98,38 @@ const domainSchema = z
   .refine((d) => d.east > d.west, { error: 'east must be greater than west' })
   .refine((d) => d.north > d.south, { error: 'north must be greater than south' });
 
+/** The declared widths the four regions of beat 013 are built out of. */
+export interface RegionWidths {
+  readonly pageGutterPx: number;
+  readonly controlsWidthPx: number;
+  readonly detailWidthPx: number;
+  readonly panelGapPx: number;
+  readonly minimumPanelWidthPx: number;
+}
+
+/**
+ * The window width those regions need to hold every declared horizon at the declared minimum
+ * panel width: the page gutter, the two fixed columns, the two gaps that separate them from
+ * the centre, and the panels with their own gaps between them.
+ *
+ * One function rather than the sum written out wherever it is wanted. Two copies of an
+ * arithmetic can each agree with configuration and still disagree with each other, which is
+ * how a declared figure quietly stops describing the layout it names.
+ */
+export function fourRegionWidthPx(widths: RegionWidths, horizonCount: number): number {
+  return (
+    widths.pageGutterPx +
+    widths.controlsWidthPx +
+    widths.detailWidthPx +
+    2 * widths.panelGapPx +
+    horizonCount * widths.minimumPanelWidthPx +
+    (horizonCount - 1) * widths.panelGapPx
+  );
+}
+
 export const configurationSchema = z
   .object({
-    schemaVersion: z.literal(6),
+    schemaVersion: z.literal(7),
 
     run: z.object({
       /**
@@ -163,20 +192,36 @@ export const configurationSchema = z
       /** Below this a panel stops being legible, so the row stops shrinking panels. */
       minimumPanelWidthPx: z.number().int().positive(),
       /**
+       * Beat 013, FR-009 and FR-010. The smallest viewport the four regions hold, in CSS
+       * pixels, **measured from the built layout** by `tests/shell/viewport-floor.spec.ts`
+       * rather than chosen here. Below it the application says the size it needs and offers
+       * the single-panel presentation of FR-049; it does not shrink six panels past
+       * legibility and it does not scroll the row.
+       *
+       * CSS pixels, so a nominally adequate window at 200 per cent zoom is below the floor
+       * and gets the same answer. That is the correct behaviour and not a bug: the reader at
+       * 200 per cent has as few pixels to read six panels in as the reader with a small
+       * window.
+       */
+      minimumViewportWidthPx: z.number().int().positive(),
+      minimumViewportHeightPx: z.number().int().positive(),
+      /**
        * Beat 013. The width of the controls column, which is fixed because FR-047 says
        * selecting something may not move any other region by a pixel, and a column that
        * sizes itself to its contents moves whenever its contents change.
        *
-       * Optional, and undeclared in `config/j-ocean.json`, for a reason that is a finding
-       * rather than a preference: gate G-07 digests the *whole* validated configuration as
-       * one of its quantities, so declaring any presentation figure moves a recorded digest
-       * even though nothing computed moves. Until the author re-records, the column falls
-       * back to `minimumPanelWidthPx` -- a declared figure, not a literal. Declaring it is a
-       * one-line change here and one in the configuration, and needs no code change.
+       * It is 390 px because that is two panels and the gap between them. The detail region
+       * has to draw FR-028's profile editor whole and a column one panel wide clips it,
+       * which would leave a reader dragging a point they cannot see the end of; the controls
+       * column takes the same width because a narrower one turns every button's label into
+       * one word per line. The number is here rather than derived in code so that a reader
+       * asking how wide the column is finds the answer in the file that declares the
+       * geometry (Principle X) -- and so that changing it is a change to a declared figure
+       * rather than to an expression.
        */
-      controlsWidthPx: z.number().int().positive().optional(),
-      /** The detail column's width, fixed and optional for the same two reasons. */
-      detailWidthPx: z.number().int().positive().optional(),
+      controlsWidthPx: z.number().int().positive(),
+      /** The detail column's width. 390 px, for the reason above. */
+      detailWidthPx: z.number().int().positive(),
       panelGapPx: z.number().int().nonnegative(),
       /** What the page keeps clear of the window edge, on both sides together. */
       pageGutterPx: z.number().int().nonnegative(),
@@ -477,6 +522,43 @@ export const configurationSchema = z
     {
       error:
         'presentation.referenceViewportWidthPx is too narrow to show every declared horizon at presentation.minimumPanelWidthPx',
+      path: ['presentation', 'referenceViewportWidthPx'],
+    },
+  )
+  /**
+   * Beat 013, FR-009 and FR-010. The declared floor has to be a floor for *this*
+   * configuration. A seventh horizon costs a panel and a gap, and a floor that no longer
+   * holds the horizons beside it is the fault beat 007 found coming back: a declared number
+   * that has quietly stopped describing the layout it names. So the arithmetic is done here,
+   * and the refusal prints it rather than asserting a verdict.
+   */
+  .superRefine((c, ctx) => {
+    const p = c.presentation;
+    const n = c.horizons.leadHours.length;
+    const needed = fourRegionWidthPx(p, n);
+    if (p.minimumViewportWidthPx >= needed) return;
+    ctx.addIssue({
+      code: 'custom',
+      message:
+        `presentation.minimumViewportWidthPx (${String(p.minimumViewportWidthPx)}) cannot hold ` +
+        `${String(n)} declared horizons at presentation.minimumPanelWidthPx: ` +
+        `${String(p.pageGutterPx)} gutter + ${String(p.controlsWidthPx)} controls + ` +
+        `${String(p.detailWidthPx)} detail + 2 x ${String(p.panelGapPx)} column gaps + ` +
+        `${String(n)} x ${String(p.minimumPanelWidthPx)} panels + ` +
+        `${String(n - 1)} x ${String(p.panelGapPx)} panel gaps = ${String(needed)} px`,
+      path: ['presentation', 'minimumViewportWidthPx'],
+    });
+  })
+  /**
+   * The reference width is the width the documentation photographs the application at, so it
+   * may not be narrower than the width at which the application is whole.
+   */
+  .refine(
+    (c) => c.presentation.referenceViewportWidthPx >= c.presentation.minimumViewportWidthPx,
+    {
+      error:
+        'presentation.referenceViewportWidthPx is below presentation.minimumViewportWidthPx, ' +
+        'so the reference is a viewport the application refuses to lay out',
       path: ['presentation', 'referenceViewportWidthPx'],
     },
   )

@@ -27,7 +27,9 @@ lives here, and no component in the tree holds a literal for one.
 | `horizons.leadHours` | Strictly increasing. Every one is rendered; no panel is drawn for anything else. |
 | `budget.frameBudgetMs` | The frame budget, a number rather than a judgement made at review time. |
 | `presentation.referenceViewportWidthPx` | The window width at which *all six visible at once* is a promise. The schema refuses a value too narrow for the declared horizons; a browser test measures the rendered geometry at it. |
-| `presentation.minimumPanelWidthPx` | Below this a panel stops being legible, so the row stops shrinking panels and its own container scrolls. The page never does. |
+| `presentation.minimumPanelWidthPx` | Below this a panel stops being legible, so the row stops shrinking panels. Neither the row nor the page scrolls: below the declared floor the application says the size it needs and shows one panel at a time. |
+| `presentation.minimumViewportWidthPx`, `minimumViewportHeightPx` | The smallest viewport the four regions hold, **measured from the built layout** rather than chosen, and in CSS pixels — so a large window at 200 % zoom is below it and gets the same answer. The schema refuses a floor that cannot hold every declared horizon at the minimum panel width beside the two columns and the gutter, and prints the arithmetic. |
+| `presentation.controlsWidthPx`, `presentation.detailWidthPx` | The two flanking columns, fixed rather than fitted: selecting something may not move any region by a pixel (FR-47), and a column sized to its contents moves whenever its contents change. 390 px is two panels and the gap between them, which is what the detail region needs to draw a profile editor whole. |
 | `presentation.panelGapPx`, `presentation.pageGutterPx` | The rest of the row's arithmetic, so that no width is a literal in the stylesheet. |
 | `presentation.anomalyLimitMetres` | The half-range the panels draw interface-depth anomalies against. |
 | `presentation.attributionHatchThreshold` | The weight above which a cell is hatched rather than merely tinted — the second channel that makes the layer readable without colour. |

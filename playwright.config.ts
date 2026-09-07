@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { defineConfig, devices } from '@playwright/test';
 
 const PORT = 4317;
@@ -7,6 +9,31 @@ const PORT = 4317;
 // error to read. Naming the host on both sides removes the question.
 const HOST = '127.0.0.1';
 const chromium = process.env['J_OCEAN_CHROMIUM'];
+
+/**
+ * The window every browser project opens in: the **declared floor**, read from the file the
+ * shell is served (spec 013 FR-009, FR-010).
+ *
+ * Playwright's own default is 1280 x 720, which is below the floor beat 013 measured -- so a
+ * suite left on it would run every test against FR-043's single-panel fallback and report the
+ * absence of the horizon row as a failure of the row. The floor is where the application is
+ * whole and tightest, which makes it the honest default; a test that wants another size sets
+ * one. Nothing here is a literal: both figures come from `presentation`.
+ */
+const declared = JSON.parse(
+  readFileSync(fileURLToPath(new URL('./config/j-ocean.json', import.meta.url)), 'utf8'),
+) as {
+  presentation: {
+    minimumViewportWidthPx: number;
+    minimumViewportHeightPx: number;
+    referenceViewportWidthPx: number;
+  };
+};
+
+const FLOOR = {
+  width: declared.presentation.minimumViewportWidthPx,
+  height: declared.presentation.minimumViewportHeightPx,
+};
 
 // SC-003: the site is loaded from a static file server, not from a dev server, so that
 // "no network request other than the site's own assets" is a claim about what ships.
@@ -26,6 +53,7 @@ export default defineConfig({
       testMatch: '**/shell/*.spec.ts',
       use: {
         ...devices['Desktop Chrome'],
+        viewport: FLOOR,
         // Ordinarily Playwright's own browser, installed with `pnpm exec playwright
         // install`. Where a machine already carries a Chromium — a CI image, or this
         // project's remote environment — J_OCEAN_CHROMIUM points at it, so the shell test
@@ -40,6 +68,7 @@ export default defineConfig({
       testMatch: '**/*.gate.ts',
       use: {
         ...devices['Desktop Chrome'],
+        viewport: FLOOR,
         ...(chromium === undefined ? {} : { launchOptions: { executablePath: chromium } }),
       },
     },
@@ -51,7 +80,9 @@ export default defineConfig({
       testMatch: '**/shell/*.shots.ts',
       use: {
         ...devices['Desktop Chrome'],
-        viewport: { width: 1200, height: 900 },
+        // Overridden by every capture, which sets the width it wants from configuration; this
+        // is the width a capture gets that forgets to.
+        viewport: { width: declared.presentation.referenceViewportWidthPx, height: FLOOR.height },
         deviceScaleFactor: 2,
         ...(chromium === undefined ? {} : { launchOptions: { executablePath: chromium } }),
       },

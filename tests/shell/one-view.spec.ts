@@ -14,14 +14,16 @@ import { declared, LEADS } from './declared-geometry.js';
  * first mean something -- every element that actually scrolls is one that said it would, and
  * an undeclared scrollbar fails by name.
  *
- * The viewport is the declared reference width, read from the file the shell is served, and a
- * height a laptop has. Neither is a literal chosen here.
+ * The viewport is the **declared floor** on both axes, read from the file the shell is served:
+ * the smallest window the four regions hold, measured from the built layout by
+ * `tests/shell/viewport-floor.spec.ts` and declared in configuration. Asserting the property
+ * at the tightest window the application admits is the only place it is worth asserting --
+ * anything larger passes for reasons that have nothing to do with the layout.
  */
 
 const CONFIG_REQUEST = /j-ocean.*\.json$/;
-const WIDTH = declared.presentation.referenceViewportWidthPx;
-/** A laptop's height. The floor is measured and declared by T041; this is not that figure. */
-const HEIGHT = 900;
+const WIDTH = declared.presentation.minimumViewportWidthPx;
+const HEIGHT = declared.presentation.minimumViewportHeightPx;
 
 /**
  * What the page's own scroll extents are, and which elements are genuinely scrolling.
@@ -132,6 +134,49 @@ test.describe('one view, four regions', () => {
     expect(after.scores).toEqual(before.scores);
     expect(after.detail).toEqual(before.detail);
     await holdsOneView(page, 'cell-selected');
+  });
+
+  test('shows the change in every panel and every score without the reader moving', async ({
+    page,
+  }) => {
+    test.setTimeout(300_000);
+    await page.goto('/');
+    await page.getByTestId('build-row').click();
+    await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+    await page.getByTestId('score-row').click();
+    await expect(page.getByTestId('panel-score-24')).toContainText('persistence', { timeout: 60_000 });
+
+    const before = await everythingVisible(page);
+    expect(
+      before.outside,
+      `these panels and scores were not inside the viewport before the control changed: ${before.outside.join(', ')}`,
+    ).toEqual([]);
+
+    // One control change: the forecast is reissued twelve hours earlier.
+    const control = page.getByTestId('issue-time');
+    await control.fill(String(Number(await control.inputValue()) - 12 * 3_600_000));
+    await page.getByTestId('reissue').click();
+    await expect(page.getByTestId('issue-stale')).toHaveCount(0, { timeout: 180_000 });
+    await page.getByTestId('score-row').click();
+    await expect(page.getByTestId('panel-score-24')).toContainText('persistence', { timeout: 120_000 });
+
+    const after = await everythingVisible(page);
+    expect(
+      after.outside,
+      `these panels and scores were not inside the viewport after the control changed: ${after.outside.join(', ')}`,
+    ).toEqual([]);
+
+    // And the change is a change: every panel and every score the control governs moved.
+    for (const lead of LEADS) {
+      for (const testId of [`panel-${String(lead)}`, `panel-score-${String(lead)}`]) {
+        expect(
+          after.text[testId],
+          `${testId} is unchanged after the issue time moved, so nothing was there to see`,
+        ).not.toBe(before.text[testId]);
+      }
+    }
+
+    await holdsOneView(page, 'reissued and rescored');
   });
 
   /**
@@ -251,6 +296,55 @@ test.describe('one view, four regions', () => {
     }
   });
 });
+
+/**
+ * SC-003 and AT-12. A control is changed, and the change in every panel and every score is
+ * visible without the reader moving.
+ *
+ * "Without the reader moving" is a claim about rectangles, so it is measured as one: every
+ * panel and every score is inside the viewport rectangle before the change and inside it
+ * after. And it is a claim about a *change*, so the second half is that the things the
+ * control governs did change -- a layout that held still because nothing happened would
+ * satisfy the first half and none of the requirement.
+ *
+ * The control is the issue time, which is the one control that moves every panel and every
+ * score at once: each panel is asked for a different lead from a different instant, and each
+ * score is recomputed against it (beat 009).
+ */
+async function everythingVisible(
+  page: Page,
+): Promise<{ readonly text: Record<string, string>; readonly outside: readonly string[] }> {
+  return page.evaluate((leads) => {
+    const root = document.documentElement;
+    const text: Record<string, string> = {};
+    const outside: string[] = [];
+    const inspect = (testId: string): void => {
+      const element = document.querySelector<HTMLElement>(`[data-testid="${testId}"]`);
+      if (element === null) {
+        outside.push(`${testId} (absent)`);
+        return;
+      }
+      text[testId] = (element.innerText || '').replace(/\s+/g, ' ').trim();
+      const box = element.getBoundingClientRect();
+      const inViewport =
+        box.top >= -0.5 &&
+        box.left >= -0.5 &&
+        box.bottom <= root.clientHeight + 0.5 &&
+        box.right <= root.clientWidth + 0.5;
+      if (!inViewport) {
+        outside.push(
+          `${testId} at ${String(Math.round(box.left))},${String(Math.round(box.top))} ` +
+            `${String(Math.round(box.width))}x${String(Math.round(box.height))}`,
+        );
+      }
+    };
+    for (const lead of leads) {
+      inspect(`panel-${String(lead)}`);
+      inspect(`panel-score-${String(lead)}`);
+    }
+    return { text, outside };
+  }, [...LEADS]);
+}
 
 async function regionBoxes(page: Page): Promise<Record<string, unknown>> {
   const boxes: Record<string, unknown> = {};

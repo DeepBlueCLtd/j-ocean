@@ -18,7 +18,7 @@ import { FieldView, type Marker } from './FieldView.js';
 import { footprintOf, markersFrom, type Footprint } from './footprint.js';
 import type { Edit } from '../instruments/edits.js';
 import { useHorizonRow } from './HorizonRow.js';
-import { Regions } from './Regions.js';
+import { BelowFloor, Regions, useAboveFloor } from './Regions.js';
 import { departureBrief, runForecast, type DepartureBrief, type ForecastResult } from '../run/forecast.js';
 import { climatologyReferenceOver } from '../instruments/climatology-reference.js';
 import { interfaceFieldFromContainer } from '../instruments/interface-field.js';
@@ -59,8 +59,15 @@ import { Walkthrough } from './Walkthrough.js';
 /** How far the shell integrates when a reader asks. Twelve hours, in declared timesteps. */
 const ADVANCE_HOURS = 12;
 
-/** Principle V: declared, computed and derived are typographically distinct, always. */
-function Declared({ children }: { children: React.ReactNode }) {
+/**
+ * Principle V: declared, computed and derived are typographically distinct, always.
+ *
+ * `Declared` is exported because the three kinds are the surface's vocabulary rather than
+ * this file's private business: a module that has a figure from configuration to draw should
+ * reach for this one instead of inventing a second. FR-009's required viewport size is such a
+ * figure -- it comes from configuration, so it is drawn as configuration.
+ */
+export function Declared({ children }: { children: React.ReactNode }) {
   return <span className="figure declared" title="declared in configuration">{children}</span>;
 }
 
@@ -159,6 +166,11 @@ function flagSummary(view: RunView): [string, number][] {
 
 export function App() {
   const [loaded, setLoaded] = useState<LoadedConfiguration | null>(null);
+  /**
+   * FR-009 and US7 scenario 3. Whether the window is at or above the declared floor, in CSS
+   * pixels, answered continuously: crossing the floor swaps the presentation with no reload.
+   */
+  const aboveFloor = useAboveFloor(loaded?.config ?? null);
   const [failure, setFailure] = useState<string | null>(null);
   /** Beat 011: what the reader pasted, and what happened when it was read. */
   const [pasted, setPasted] = useState('');
@@ -653,6 +665,9 @@ export function App() {
     onShowMark: showMark,
     onPinMark: pinMark,
     markPinned: mark?.pinned ?? false,
+    /* FR-043. Below the declared floor the row is one panel and a strip, not six panels
+       shrunk past legibility. Which panels are drawn is display; nothing here recomputes. */
+    presentation: aboveFloor ? 'row' : 'single-panel',
   });
 
   /*
@@ -1233,16 +1248,8 @@ export function App() {
    */
   const centre =
     view.forecast === null ? (
-      <div className="full" data-testid="row-invitation">
+      <div className="full row-invitation" data-testid="row-invitation">
         <h2>The row</h2>
-        <p className="aside">
-          Six panels at the declared horizons &mdash;{' '}
-          <Declared>{config.horizons.leadHours.join(', ')} h</Declared> &mdash; each stating
-          what it is valid for, what it was initialised from, and what it was worth against two
-          references. Building them means integrating the analysis forward four days, which
-          takes a couple of seconds, so it happens when you ask: <em>Build the horizon row</em>
-          {' '}is in the controls.
-        </p>
         <figure className="analysed-field" data-testid="analysed-field">
           <FieldView
             values={view.analysis.attribution.observationWeight}
@@ -1264,22 +1271,32 @@ export function App() {
             produced on this visit. Click a cell and its breakdown fills the detail region.
           </figcaption>
         </figure>
-        <dl>
-          <dt>Influence radius</dt>
-          <dd data-testid="influence-radius">
-            A property of the{' '}
-            <Declared>{config.analysis.correlationLengthScaleKilometres} km</Declared> declared
-            correlation length scale, not of the ocean. An observation across a front influences
-            the far side exactly as much as its own, which the flow would not.
-          </dd>
-          <dt>Observations used</dt>
-          <dd data-testid="analysis-counts">
-            <Computed>{view.analysis.used.length}</Computed> entered the analysis;{' '}
-            <Computed>{view.analysis.excluded.length}</Computed> were excluded and are still
-            drawn. <Computed>{view.analysis.attribution.clampedCells}</Computed> cells had a
-            weight clamped and renormalised.
-          </dd>
-        </dl>
+        <div className="row-invitation-prose">
+          <p className="aside">
+            Six panels at the declared horizons &mdash;{' '}
+            <Declared>{config.horizons.leadHours.join(', ')} h</Declared> &mdash; each stating
+            what it is valid for, what it was initialised from, and what it was worth against two
+            references. Building them means integrating the analysis forward four days, which
+            takes a couple of seconds, so it happens when you ask: <em>Build the horizon row</em>
+            {' '}is in the controls.
+          </p>
+          <dl>
+            <dt>Influence radius</dt>
+            <dd data-testid="influence-radius">
+              A property of the{' '}
+              <Declared>{config.analysis.correlationLengthScaleKilometres} km</Declared> declared
+              correlation length scale, not of the ocean. An observation across a front influences
+              the far side exactly as much as its own, which the flow would not.
+            </dd>
+            <dt>Observations used</dt>
+            <dd data-testid="analysis-counts">
+              <Computed>{view.analysis.used.length}</Computed> entered the analysis;{' '}
+              <Computed>{view.analysis.excluded.length}</Computed> were excluded and are still
+              drawn. <Computed>{view.analysis.attribution.clampedCells}</Computed> cells had a
+              weight clamped and renormalised.
+            </dd>
+          </dl>
+        </div>
       </div>
     ) : (
       row.centre
@@ -1356,20 +1373,75 @@ export function App() {
     </>
   );
 
+  /*
+   * FR-009 and FR-043. The size the application needs, said as what it is: a declared figure,
+   * in the kind every declared figure on this surface is drawn in. It is not an apology and
+   * it is not a deferral -- the window is told what it is short of, and offered the
+   * presentation that fits it.
+   *
+   * The window's own size is deliberately not printed beside it. It is neither declared nor
+   * computed by anything this project runs, and a fourth kind of figure invented for a
+   * banner would be worth less than the sentence it saved.
+   */
+  const floorNotice = (
+    <section className="banner floor-notice" data-testid="viewport-floor-notice" role="note">
+      <h2>This window is smaller than j-ocean&rsquo;s horizon row needs.</h2>
+      <p>
+        All{' '}
+        <Declared>{config.horizons.leadHours.length}</Declared> declared horizons side by
+        side, each at the declared minimum of{' '}
+        <Declared>{config.presentation.minimumPanelWidthPx} px</Declared>, want a viewport of
+        at least{' '}
+        <Declared>
+          {config.presentation.minimumViewportWidthPx} &times;{' '}
+          {config.presentation.minimumViewportHeightPx} px
+        </Declared>{' '}
+        once the controls column (<Declared>{config.presentation.controlsWidthPx} px</Declared>
+        ), the detail column (<Declared>{config.presentation.detailWidthPx} px</Declared>) and
+        the page gutter (<Declared>{config.presentation.pageGutterPx} px</Declared>) have
+        taken theirs. That figure was measured from the built layout, not chosen.
+      </p>
+      <p>
+        So this is one horizon at a time instead. The strip carries all{' '}
+        <Declared>{config.horizons.leadHours.length}</Declared> and what each was worth,
+        because comparison across horizons is the lesson; choosing one in the strip swaps the
+        panel beneath it. Widen the window past the figure above and the full row returns
+        without a reload.
+      </p>
+      <p className="aside">
+        The figure is in CSS pixels, so a window wide enough at 100 per cent is below it at
+        200 per cent zoom. That is the same answer for the same reason: at that zoom there are
+        as few pixels to read six panels in.
+      </p>
+    </section>
+  );
+
   return (
     <>
       {/* The walkthrough sits outside every region because it is about all of them, and
           before them in the document so that a reader tabbing in reaches the explanation of
           the surface before the surface itself. */}
       <Walkthrough />
-      <Regions
-        config={config}
-        statement={statement}
-        controls={controls}
-        centre={centre}
-        scores={scores}
-        detail={detail}
-      />
+      {aboveFloor ? (
+        <Regions
+          config={config}
+          statement={statement}
+          controls={controls}
+          centre={centre}
+          scores={scores}
+          detail={detail}
+        />
+      ) : (
+        <BelowFloor
+          config={config}
+          statement={statement}
+          notice={floorNotice}
+          controls={controls}
+          centre={centre}
+          scores={scores}
+          detail={detail}
+        />
+      )}
     </>
   );
 }

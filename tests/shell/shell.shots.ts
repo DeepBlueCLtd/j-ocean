@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { declared, FOUR_REGION_WIDTH } from './declared-geometry.js';
+import { declared } from './declared-geometry.js';
 
 /**
  * The documentation site's figures, captured from the real application.
@@ -23,6 +23,15 @@ const IMAGES = fileURLToPath(new URL('../../docs/site/images/', import.meta.url)
 /** The row is captured at the width configuration declares it fits in, not at a round number. */
 const REFERENCE_WIDTH = declared.presentation.referenceViewportWidthPx;
 
+/** The declared floor: the smallest viewport the four regions hold, measured by T040. */
+const FLOOR_WIDTH = declared.presentation.minimumViewportWidthPx;
+const FLOOR_HEIGHT = declared.presentation.minimumViewportHeightPx;
+
+/**
+ * The height the figures are taken at: comfortably above the declared floor of
+ * `minimumViewportHeightPx`, because a capture at the floor exactly has no room for an opened
+ * disclosure and half of these figures open one. The floor gets its own capture below.
+ */
 const HEIGHT = 950;
 
 test.beforeAll(() => {
@@ -30,8 +39,8 @@ test.beforeAll(() => {
 });
 
 /** Everything is captured in one viewport, because that is what the application now is. */
-async function inOneView(page: Page, width = FOUR_REGION_WIDTH): Promise<void> {
-  await page.setViewportSize({ width, height: HEIGHT });
+async function inOneView(page: Page, width = REFERENCE_WIDTH, height = HEIGHT): Promise<void> {
+  await page.setViewportSize({ width, height });
 }
 
 /** A disclosure has to be opened before it can be photographed. */
@@ -210,6 +219,40 @@ test('the shell, refusing an invalid configuration', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('configuration-failure')).toBeVisible();
   await page.screenshot({ path: `${IMAGES}001-shell-invalid-configuration.png` });
+});
+
+/**
+ * Beat 013's own two figures: the four regions at the floor, and the answer below it.
+ *
+ * The floor is the declared minimum on both axes -- the smallest window the application
+ * admits, measured from the built layout -- so this is the tightest the surface ever is and
+ * the only capture at which "it fits" is worth photographing.
+ */
+test('the four regions at the declared floor', async ({ page }) => {
+  test.setTimeout(240_000);
+  await inOneView(page, FLOOR_WIDTH, FLOOR_HEIGHT);
+  await page.goto('/');
+  await page.getByTestId('build-row').click();
+  await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId('score-row').click();
+  await expect(page.getByTestId('panel-score-24')).toContainText('persistence', { timeout: 60_000 });
+  await page.screenshot({ path: `${IMAGES}013-at-the-floor.png` });
+});
+
+test('the answer below the floor', async ({ page }) => {
+  test.setTimeout(240_000);
+  // Narrower and shorter than the floor on both axes: a window this instrument cannot be
+  // laid out in, which is the state FR-043 exists to answer.
+  await inOneView(page, 900, 700);
+  await page.goto('/');
+  await expect(page.getByTestId('viewport-floor-notice')).toBeVisible();
+  await page.getByTestId('build-row').click();
+  await expect(page.getByTestId('single-panel')).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId('score-row').click();
+  await expect(page.getByTestId('panel-score-0')).toContainText('persistence', { timeout: 60_000 });
+  await page.getByTestId('strip-48').click();
+  await expect(page.getByTestId('panel-48')).toBeVisible();
+  await page.screenshot({ path: `${IMAGES}013-below-the-floor.png` });
 });
 
 test('the walkthrough', async ({ page }) => {

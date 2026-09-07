@@ -30,6 +30,12 @@ import type { DepartureBrief } from '../run/forecast.js';
  * is shown and never what is computed, and the test asserts it by identity: the same
  * `Float64Array` object is in the panel before and after.
  *
+ * **Two presentations, one set of panels.** `presentation` chooses between the row and the
+ * single-panel fallback FR-043 gives below the declared viewport floor: the strip of FR-049
+ * and one panel enlarged beneath it. Both draw panels through one `panelFor`, from the same
+ * fields and the same scores, so the fallback cannot quietly become a different picture.
+ * Which panels are drawn is display; nothing about it recomputes anything.
+ *
  * **Why this is a hook and not a component.** Beat 013 divides the surface by what changes
  * when, and the row's parts belong to three different regions: the controls that drive it are
  * causes and go left (FR-044), the panels are the payload and hold the centre alone (FR-045),
@@ -69,6 +75,14 @@ export interface HorizonRowInputs {
   readonly onShowMark: (mark: { readonly id: string; readonly leadHours: number } | null) => void;
   readonly onPinMark: (mark: { readonly id: string; readonly leadHours: number }) => void;
   readonly markPinned: boolean;
+  /**
+   * FR-043 and FR-049. `'row'` is every declared horizon side by side, which is the design
+   * (ADR-0003). `'single-panel'` is the answer below the declared viewport floor: the strip
+   * of FR-049 and one panel enlarged beneath it, because six panels shrunk to fit a small
+   * window are six panels nobody can read. Nothing is recomputed either way -- the fields,
+   * the analysis and the scores are the same objects, and which of them is drawn is display.
+   */
+  readonly presentation?: 'row' | 'single-panel';
 }
 
 /** What the row puts in each region. Null where the row has not been built. */
@@ -96,6 +110,9 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
   );
 
   const [enlarged, setEnlarged] = useState<number | null>(null);
+  /** FR-043's fallback: one panel where six will not fit, and which one that is. */
+  const singlePanel = props.presentation === 'single-panel';
+  const shownHorizon = singlePanel ? (enlarged ?? horizons[0] ?? null) : null;
   const [showAttribution, setShowAttribution] = useState(false);
   const [showDifference, setShowDifference] = useState(false);
   const [scores, setScores] = useState<ReadonlyMap<number, Score | null> | null>(null);
@@ -587,61 +604,116 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
     </>
   );
 
+  /**
+   * One panel. A function rather than two copies of a thirty-property element, because the
+   * row and the single-panel fallback have to draw the *same* panel from the same fields --
+   * two lists of properties would be two panels that could quietly disagree.
+   */
+  const panelFor = (leadHours: number, isEnlarged: boolean): ReactNode => (
+    <Panel
+      key={leadHours}
+      leadHours={leadHours}
+      validInstant={new Date(
+        forecast.byHorizon.get(leadHours)?.validInstantMs ??
+          forecast.anchorInstantMs + leadHours * 3_600_000,
+      ).toISOString()}
+      initialisedFrom={issued}
+      field={
+        showDifference
+          ? (differences.get(leadHours) ?? null)
+          : (anomalies.get(leadHours) ?? null)
+      }
+      showDifference={showDifference}
+      differenceOutlineMetres={config.counterfactual.differenceOutlineMetres}
+      differenceMagnitude={differenceMagnitudes.get(leadHours) ?? null}
+      waypoints={redrawTrack ? waypointsOnGrid : null}
+      onDragWaypoint={dragWaypoint}
+      onDropWaypoint={dropWaypoint}
+      nx={forecast.parameters.grid.nx}
+      ny={forecast.parameters.grid.ny}
+      limit={
+        showDifference
+          ? config.counterfactual.differenceLimitMetres
+          : config.presentation.anomalyLimitMetres
+      }
+      observationWeight={analysis.attribution.observationWeight}
+      observationsDominant={observationsDominant}
+      hatchThreshold={config.presentation.attributionHatchThreshold}
+      refusal={forecast.byHorizon.get(leadHours)?.refusal ?? null}
+      leadFromIssueHours={forecast.byHorizon.get(leadHours)?.leadFromIssueHours ?? leadHours}
+      markers={markers}
+      footprint={footprint}
+      box={forecast.box}
+      elevationHeightPx={config.presentation.footprint.elevationHeightPx}
+      needleOffsetPx={config.presentation.footprint.needleOffsetPx}
+      levelTickLimit={config.presentation.footprint.levelTickLimit}
+      enlarged={isEnlarged}
+      showAttribution={showAttribution}
+      onEnlarge={() => {
+        setEnlarged((current) => (current === leadHours ? null : leadHours));
+      }}
+      onSelectCell={props.onSelectCell}
+      shownMarkId={props.shownMark?.id ?? null}
+      onHoverMark={(id) => {
+        props.onShowMark(id === null ? null : { id, leadHours });
+      }}
+      onSelectMark={(id) => { props.onPinMark({ id, leadHours }); }}
+    />
+  );
+
+  /**
+   * FR-049's strip, and FR-050's reason for it: comparison across horizons is the lesson, so
+   * a presentation that shows one panel still shows the other five and what each was worth.
+   * It scrolls within itself where the window is too narrow for six buttons, and says so.
+   */
+  const strip = (
+    <div className="horizon-strip" data-testid="horizon-strip" data-scrolls="true">
+      {horizons.map((leadHours) => {
+        const score = scores?.get(leadHours) ?? null;
+        return (
+          <button
+            key={leadHours}
+            type="button"
+            className={`strip-panel${leadHours === shownHorizon ? ' current' : ''}`}
+            data-testid={`strip-${String(leadHours)}`}
+            aria-pressed={leadHours === shownHorizon}
+            onClick={() => { setEnlarged(leadHours); }}
+          >
+            <span className="figure declared" title="declared in configuration">
+              +{leadHours} h
+            </span>
+            <span className="strip-score">
+              {score === null ? (
+                <span className="unmeasured">not scored</span>
+              ) : score.skillAgainstPersistence === null ? (
+                <span className="unmeasured">undefined</span>
+              ) : (
+                <>
+                  <span className="figure computed" title="computed by the model">
+                    {score.skillAgainstPersistence.value.toFixed(3)}
+                  </span>{' '}
+                  vs persistence
+                </>
+              )}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+
   const centre = (
     <>
-      <div className="horizon-row" data-testid="horizon-row">
-        {horizons.map((leadHours) => (
-          <Panel
-            key={leadHours}
-            leadHours={leadHours}
-            validInstant={new Date(
-              forecast.byHorizon.get(leadHours)?.validInstantMs ??
-                forecast.anchorInstantMs + leadHours * 3_600_000,
-            ).toISOString()}
-            initialisedFrom={issued}
-            field={
-              showDifference
-                ? (differences.get(leadHours) ?? null)
-                : (anomalies.get(leadHours) ?? null)
-            }
-            showDifference={showDifference}
-            differenceOutlineMetres={config.counterfactual.differenceOutlineMetres}
-            differenceMagnitude={differenceMagnitudes.get(leadHours) ?? null}
-            waypoints={redrawTrack ? waypointsOnGrid : null}
-            onDragWaypoint={dragWaypoint}
-            onDropWaypoint={dropWaypoint}
-            nx={forecast.parameters.grid.nx}
-            ny={forecast.parameters.grid.ny}
-            limit={
-              showDifference
-                ? config.counterfactual.differenceLimitMetres
-                : config.presentation.anomalyLimitMetres
-            }
-            observationWeight={analysis.attribution.observationWeight}
-            observationsDominant={observationsDominant}
-            hatchThreshold={config.presentation.attributionHatchThreshold}
-            refusal={forecast.byHorizon.get(leadHours)?.refusal ?? null}
-            leadFromIssueHours={forecast.byHorizon.get(leadHours)?.leadFromIssueHours ?? leadHours}
-            markers={markers}
-            footprint={footprint}
-            box={forecast.box}
-            elevationHeightPx={config.presentation.footprint.elevationHeightPx}
-            needleOffsetPx={config.presentation.footprint.needleOffsetPx}
-            levelTickLimit={config.presentation.footprint.levelTickLimit}
-            enlarged={enlarged === leadHours}
-            showAttribution={showAttribution}
-            onEnlarge={() => {
-              setEnlarged((current) => (current === leadHours ? null : leadHours));
-            }}
-            onSelectCell={props.onSelectCell}
-            shownMarkId={props.shownMark?.id ?? null}
-            onHoverMark={(id) => {
-              props.onShowMark(id === null ? null : { id, leadHours });
-            }}
-            onSelectMark={(id) => { props.onPinMark({ id, leadHours }); }}
-          />
-        ))}
-      </div>
+      {singlePanel ? (
+        <div className="single-panel" data-testid="single-panel">
+          {strip}
+          {shownHorizon === null ? null : panelFor(shownHorizon, true)}
+        </div>
+      ) : (
+        <div className="horizon-row" data-testid="horizon-row">
+          {horizons.map((leadHours) => panelFor(leadHours, enlarged === leadHours))}
+        </div>
+      )}
 
       <p className="legend full" data-testid="row-legend">
         {showAttribution ? (
@@ -697,9 +769,15 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
     </>
   );
 
+  const scoredHorizons = singlePanel
+    ? shownHorizon === null
+      ? []
+      : [shownHorizon]
+    : horizons;
+
   const scoresSlot = (
     <>
-      {horizons.map((leadHours) => (
+      {scoredHorizons.map((leadHours) => (
         <PanelScore
           key={leadHours}
           leadHours={leadHours}
