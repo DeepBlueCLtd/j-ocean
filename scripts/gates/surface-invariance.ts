@@ -6,6 +6,7 @@ import { sha256Bytes } from '../../src/config/digest.js';
 import { loadConfiguration, type LoadedConfiguration } from '../../src/config/load.js';
 import type { Configuration } from '../../src/config/schema.js';
 import { footprintOf, type Footprint } from '../../src/harness/footprint.js';
+import { scoreEveryHorizon } from '../../src/harness/scoring-run.js';
 import { climatologyReferenceOver } from '../../src/instruments/climatology-reference.js';
 import {
   interfaceFieldFromContainer,
@@ -488,58 +489,38 @@ export function quantitiesOfRecordedCase(root: string): readonly Quantity[] {
   const brief = departureBrief(inputs);
   add('brief', 'departureBrief in src/run/forecast.ts: the frozen quay-side analysis, computed once and never refreshed.', brief);
 
-  // ---- HorizonRow scoreAll, which has no headless producer -----------------------------
-  // The per-panel scores live inside a React component's state today (plan 013, "What is
-  // digested"). Re-derived here from runForecast and score, in scoreAll's own order.
-  const rowRegion = domainRegion(config, forecast.parameters.grid.nx, forecast.parameters.grid.ny);
-  const rowClimatology = interfaceFieldFromContainer(
-    climatology,
-    forecast.parameters.thermalStructure,
-    forecast.box,
-    forecast.parameters.grid,
-  );
+  // ---- HorizonRow's scoring, through the producer the row itself calls -----------------
+  // Until T020 this block was a transcription of `HorizonRow.scoreAll`, because the scores
+  // lived inside a React callback and there was nothing headless to call. `scoreEveryHorizon`
+  // is now that callback's arithmetic, and the row calls the same function, so these entries
+  // digest the shell's own code rather than a copy of it (plan 013, "What the record cannot
+  // hold"). The digests did not move when it was lifted, which is what says the lift was one.
+  const scoring = scoreEveryHorizon({ config, domain, forecast, truth, climatology, brief });
   for (const leadHours of horizons) {
-    const panel = forecast.byHorizon.get(leadHours);
-    if (panel === undefined || panel.field === null) {
+    const panelScore = scoring.scores.get(leadHours) ?? null;
+    if (panelScore === null) {
       add(`score.${leadName(leadHours)}`, 'score in src/scoring/scorer.ts: a panel with no field has nothing to score, and says so.', null);
       add(`briefScore.${leadName(leadHours)}`, 'score in src/scoring/scorer.ts, against the departure brief: nothing to score at this horizon.', null);
       continue;
     }
-    const truthAtValidInstant = interfaceFieldFromTruth(
-      truth,
-      forecast.parameters.thermalStructure,
-      forecast.box,
-      forecast.parameters.grid,
-      panel.validInstantMs,
-    );
-    const common = {
-      config,
-      domain,
-      truth,
-      initial: forecast.initial,
-      climatology: rowClimatology,
-      truthAtValidInstant,
-      region: rowRegion,
-      fromInstantMs: forecast.issueInstantMs,
-      validInstantMs: panel.validInstantMs,
-      externalObservationIds: forecast.externalObservationIds,
-    };
     add(
       `score.${leadName(leadHours)}`,
       'score in src/scoring/scorer.ts, over domainRegion and interfaceFieldFromTruth: both skills and all three errors for this declared horizon.',
-      score({ ...common, forecast: panel.field }),
+      panelScore,
     );
     add(
       `briefScore.${leadName(leadHours)}`,
       'score in src/scoring/scorer.ts, the departure brief held and scored at the same instant so the two figures are comparable.',
-      score({ ...common, forecast: brief.field, initial: brief.field }),
+      scoring.briefScores.get(leadHours) ?? null,
     );
   }
 
   // ---- App.tsx footprintFor ------------------------------------------------------------
-  // Called once here per footprint the surface draws. In `App.tsx` it is constructed three
-  // times per render, uncached, plus once more inside `HorizonRow`; that is finding 2 of the
-  // spec and not a thing this file quietly fixes.
+  // Called once here per footprint the surface draws, which is now also once per footprint in
+  // `App.tsx`: T021 put each behind a `useMemo` keyed on what a footprint is made of, where
+  // before they were built three times per render inline in JSX. The digests below did not
+  // move, which is the whole of the claim. (`HorizonRow` builds none of its own; it is handed
+  // the row's and reads the derivations.)
   const levels = config.model.thermalStructure.displayLevelsMetres;
   const footprint = (
     initialisedFromMs: number,

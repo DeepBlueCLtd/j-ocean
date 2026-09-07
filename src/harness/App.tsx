@@ -143,11 +143,6 @@ function footprintFor(config: Configuration, view: RunView, initialisedFromMs: n
   });
 }
 
-function markersFor(config: Configuration, view: RunView): Marker[] {
-  // The panels outside the row show the run as it stands, initialised at the run's own start.
-  return markersFrom(footprintFor(config, view, Date.parse(config.clock.epoch)));
-}
-
 /** How many of each check fired, across everything the instruments produced. */
 function flagSummary(view: RunView): [string, number][] {
   const counts = new Map<string, number>();
@@ -553,6 +548,46 @@ export function App() {
     [view],
   );
 
+  /**
+   * The two footprints this page reads, each built once (T021, spec 013 finding 2).
+   *
+   * There are genuinely two: the panels outside the row show the run as it stands, initialised
+   * at the run's own start, and the row shows the forecast's own observations, initialised at
+   * the issue instant. Neither is new here. What is new is that each is built once per change
+   * to what determines it, rather than three times per render inline in JSX -- and that the
+   * row is handed the same object each time, so its own `useMemo` around `markersFrom` can
+   * hit. Nothing about `footprintOf` or its inputs is touched: FR-011 says this beat moves no
+   * number, and G-07 digests both footprints.
+   *
+   * The dependencies are what a footprint is made of -- the configuration and the run's
+   * observations, box and grid -- and not `view` itself, which changes identity when a reader
+   * selects a cell or moves the issue-time control.
+   */
+  const runFootprint = useMemo(
+    () =>
+      loaded === null || view === null
+        ? null
+        : footprintFor(loaded.config, view, Date.parse(loaded.config.clock.epoch)),
+    [loaded?.config, view?.forecast, view?.surface, view?.drops, view?.argo, view?.box, view?.results],
+  );
+  const rowFootprint = useMemo(
+    () =>
+      loaded === null || view === null || view.forecast === null
+        ? null
+        : footprintFor(loaded.config, view, view.forecast.issueInstantMs),
+    [loaded?.config, view?.forecast, view?.surface, view?.drops, view?.argo, view?.box, view?.results],
+  );
+  /** One producer of marks for everything outside the row, as the footprint is one producer. */
+  const runMarkers = useMemo<Marker[]>(
+    () => (runFootprint === null ? [] : markersFrom(runFootprint)),
+    [runFootprint],
+  );
+  /** The attribution field draws the same marks without the track, which is a filter, not a build. */
+  const attributionMarkers = useMemo(
+    () => runMarkers.filter((marker) => marker.kind !== 'track'),
+    [runMarkers],
+  );
+
   return (
     <main>
       {/* The walkthrough sits outside every panel because it is about all of them, and
@@ -748,7 +783,7 @@ export function App() {
               limit={0.8}
               label={`Sea-surface height anomaly over ${view.run.domainId}, valid at ${view.instant}`}
               testId="field-view"
-              markers={markersFor(loaded.config, view)}
+              markers={runMarkers}
             />
             <p className="legend">
               <span>
@@ -814,7 +849,7 @@ export function App() {
               analysis={view.forecast.analysis}
               truth={record?.truth as never}
               climatology={record?.climatology as never}
-              footprint={footprintFor(loaded.config, view, view.forecast.issueInstantMs)}
+              footprint={rowFootprint as Footprint}
               brief={view.brief as DepartureBrief}
               issueInstantMs={view.forecast.issueInstantMs}
               defaultIssueInstantMs={
@@ -931,7 +966,7 @@ export function App() {
               unit=""
               label="Weight carried by observations in each cell"
               testId="attribution-view"
-              markers={markersFor(loaded.config, view).filter((marker) => marker.kind !== 'track')}
+              markers={attributionMarkers}
               onSelect={(cellIndex) => {
                 setView((current) => (current === null ? current : { ...current, selectedCell: cellIndex }));
               }}

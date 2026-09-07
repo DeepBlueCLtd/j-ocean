@@ -22,9 +22,9 @@ changes, because FR-001 says so and because the rest of this list is otherwise u
 
 ## The regions (US2, US3, FR-002 to FR-006, FR-012)
 
-- [ ] **T020** `src/harness/scoring-run.ts`: `scoreAll` lifted out of `HorizonRow` into a
+- [X] **T020** `src/harness/scoring-run.ts`: `scoreAll` lifted out of `HorizonRow` into a
       module the gate and the shell both call. G-07 proves the lift moved nothing.
-- [ ] **T021** `footprintFor` memoised once per view instead of constructed three times per
+- [X] **T021** `footprintFor` memoised once per view instead of constructed three times per
       render. Same gate, same proof.
 - [ ] **T022** `src/harness/Regions.tsx` and the grid in `index.css`: four named areas, the
       centre's column count from `horizons.leadHours.length` as a custom property.
