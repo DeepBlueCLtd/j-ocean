@@ -20,7 +20,8 @@
     "record-invariance": "tsx scripts/gates/record-surface-invariance.ts",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm gates && pnpm build && pnpm site",
     "screenshots": "playwright test --project=screenshots",
-    "site": "tsx scripts/docs/build-site.ts",
+    "disposition": "tsx scripts/docs/build-disposition.ts",
+    "site": "tsx scripts/docs/build-disposition.ts && tsx scripts/docs/build-site.ts",
     "manifest-schema": "tsx scripts/docs/build-manifest-schema.ts"
   },
   "dependencies": {

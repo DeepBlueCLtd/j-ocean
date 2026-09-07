@@ -64,6 +64,22 @@ body {
 
 .controls > .not-operational h1 { font-size: 1.1rem; margin: 0 0 0.2rem; }
 
+/* FR-005. The narrative left this page in beat 014, so the way to it is on the page and not
+   behind anything: two named links, outside the controls column's scroller for the same
+   reason the statement is, and small, because they are the way out rather than the payload. */
+.site-links {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+
+.site-links a { color: var(--declared); }
+
+.below-floor .floor-answer > .site-links { margin-top: 0.3rem; }
+
 .controls-scroll {
   flex: 1 1 auto;
   min-height: 0;

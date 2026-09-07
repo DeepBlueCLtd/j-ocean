@@ -162,12 +162,18 @@ test('the counterfactuals', async ({ page }) => {
   await page.getByTestId('run-status').screenshot({ path: `${IMAGES}010-run-status.png` });
 });
 
-test('what it does not do', async ({ page }) => {
+/**
+ * Beat 014 took the deferrals off the application: the site already carried them and the panel
+ * became a named link, so there is no deferrals panel left to capture. `012-deferrals.png` is
+ * beat 012's own record of the panel as it was on the day and is left where it is; what is
+ * captured here is what replaced it, which is the way out of the application.
+ */
+test('where the narrative went', async ({ page }) => {
   await inOneView(page);
   await page.goto('/');
-  await expect(page.getByTestId('deferrals-panel')).toBeVisible();
-  await open(page, 'deferrals-panel');
-  await page.getByTestId('deferrals-panel').screenshot({ path: `${IMAGES}012-deferrals.png` });
+  await expect(page.getByTestId('site-links')).toBeVisible();
+  await page.getByTestId('region-controls').screenshot({ path: `${IMAGES}014-controls.png` });
+  await page.getByTestId('site-links').screenshot({ path: `${IMAGES}014-site-links.png` });
 });
 
 test('what the forecast was worth', async ({ page }) => {

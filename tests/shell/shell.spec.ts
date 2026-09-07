@@ -87,9 +87,13 @@ test.describe('the shell', () => {
     const panel = page.getByTestId('analysed-field');
     await expect(panel).toBeVisible();
     await expect(panel.getByRole('img')).toBeVisible();
-    await expect(panel).toContainText('no fixture behind this');
+    // Beat 014 took the caption's claims -- that this is the analysis's own arithmetic and
+    // not a picture drawn to illustrate it -- to the site's architecture page, where
+    // tests/docs/disposition.test.ts holds them. What is left here is the label of the
+    // picture, and the picture is still the analysis's own field.
+    await expect(panel).toContainText('the analysis’s own gain');
     await openDisclosure(page, 'run-panel');
-    await expect(page.getByTestId('initialisation')).toContainText('geostrophic balance');
+    await expect(page.getByTestId('initialisation')).toContainText('layer thickness');
     // FR-003: the criterion is on the surface, not only in a test.
     await expect(page.getByTestId('stability')).toContainText('the declared criterion admits');
     await expect(page.getByTestId('outcrops')).toContainText('counted rather than swallowed');
@@ -168,17 +172,14 @@ test.describe('the shell', () => {
     // leaving a reader to assume otherwise.
     await expect(panel).toContainText('coarser than the model grid');
 
-    // The gaps in the source are stated, not smoothed over.
-    await expect(page.getByTestId('truth-instants')).toContainText('interpolates nothing at build time');
-
-    // FR-24: flagged levels are kept, and the surface says they will be drawn as flagged.
-    await expect(page.getByTestId('observation-count')).toContainText('drawn as flagged, never omitted');
-
-    // ADR-0008: the climatology's dependence on the same subset is on the surface, not in a
-    // document the surface does not carry.
-    await expect(page.getByTestId('climatology-overlap')).toContainText(
-      'not a fully independent measure',
-    );
+    // The figures the domain choice changes are still here: the instants and their spacing,
+    // the profiles and how many carry a flag, and the climatology's overlap with this run's
+    // period. What each of them *means* went to the site's data-model page in beat 014, and
+    // tests/docs/disposition.test.ts holds the words against that page.
+    await expect(page.getByTestId('truth-instants')).toContainText('hours apart');
+    await expect(page.getByTestId('observation-count')).toContainText('carry a flag');
+    await expect(page.getByTestId('climatology-overlap')).toContainText('days');
+    await expect(page.getByTestId('climatology-overlap').locator('.figure.computed')).toHaveCount(1);
   });
 
   test('draws one panel per declared horizon, in order, each saying what it is', async ({ page }) => {
@@ -784,8 +785,10 @@ test.describe('the shell', () => {
     await page.getByTestId('build-row').click();
     await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
 
+    // The hint that said what redrawing would resample is owed to this control's help entry
+    // (beat 016); the control itself says which state it is in, which is what a reader drives.
     await page.getByTestId('toggle-redraw-track').click();
-    await expect(page.getByTestId('redraw-hint')).toContainText('resample truth');
+    await expect(page.getByTestId('toggle-redraw-track')).toContainText('Stop redrawing');
 
     await page.getByTestId('enlarge-24').click();
     const overlay = page.getByTestId('panel-field-24-overlay');
@@ -951,17 +954,22 @@ test.describe('the shell', () => {
     expect(page.url()).not.toContain('?');
   });
 
-  test('says what it does not do, and what would change that', async ({ page }) => {
+  /**
+   * Beat 014: the deferrals page was already carrying all four with their triggers, and
+   * `tests/run/deferral-trigger.test.ts` still measures them on every run. So the panel became
+   * a named link rather than a second copy that could drift from the first -- and the link is
+   * outside every disclosure, because a reader has to be able to find what the harness does
+   * not do without opening anything.
+   */
+  test('says where what it does not do is written down, without anything being opened', async ({
+    page,
+  }) => {
     await page.goto('/');
-    const panel = page.getByTestId('deferrals-panel');
-    await expect(panel).toBeVisible();
-
-    // Four deferrals, each with its trigger, where a reader meets the run. Leaving them off
-    // would make the harness look more capable than it is.
-    await expect(page.getByTestId('deferral-adaptive')).toContainText('AT-03 has; AT-02 and AT-06 have not');
-    await expect(page.getByTestId('deferral-depth')).toContainText('is not that trigger');
-    await expect(page.getByTestId('deferral-gpu')).toContainText('frame budget');
-    await expect(page.getByTestId('deferral-latency')).toContainText('special case');
+    const link = page.getByTestId('deferrals-link');
+    await expect(link).toBeVisible();
+    await expect(link).toContainText('What this does not do, and what would change that');
+    await expect(link).toHaveAttribute('href', '../deferred.html');
+    await expect(page.getByTestId('deferrals-panel')).toHaveCount(0);
   });
 
   /**
@@ -980,7 +988,7 @@ test.describe('the shell', () => {
     page,
   }) => {
     await page.goto('/');
-    await expect(page.getByTestId('scores-empty')).toContainText('no scores table anywhere else');
+    await expect(page.getByTestId('scores-empty')).toContainText('in that panel’s own column');
     await page.getByTestId('build-row').click();
     await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId('panel-score-24')).toContainText('not scored yet');
@@ -1001,7 +1009,10 @@ test.describe('the shell', () => {
     await expect(provenance).toContainText('root-mean-square');
     await expect(provenance).toContainText('sponge margin');
     await expect(provenance).toContainText('declining to resolve below');
-    await expect(provenance).toContainText('published rather than absorbed');
+    // Beat 014 took the harness's own gloss on the offsets to this panel's help, which beat
+    // 016 builds. The reason is not lost with it: the scorer says it itself, in the metric it
+    // names, and the scorer's words are what the surface prints verbatim.
+    await expect(provenance).toContainText('the means removed are published beside the score');
 
     // ADR-0007 and review R-3: the caveat travels with the figure, and where there is none
     // the panel says so rather than leaving a space a reader has to interpret.
@@ -1019,7 +1030,7 @@ test.describe('the shell', () => {
     await page.goto('/');
     const field = page.getByTestId('analysed-field');
     await expect(field).toBeVisible();
-    await expect(field).toContainText('cannot disagree with it');
+    await expect(field).toContainText('the analysis’s own gain');
 
     // Review R-7: the radius is a property of the declared length scale, and the surface
     // says so rather than letting a reader take it for a property of the ocean.
@@ -1030,33 +1041,40 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('detail-empty')).toContainText('attribution breakdown');
     await expect(page.getByTestId('cell-breakdown')).toHaveCount(0);
 
-    // FR-18: a breakdown is an instrument of a selected cell, never a per-panel summary.
+    // FR-18: a breakdown is an instrument of a selected cell. It says which cell, and the
+    // sentence explaining why it is never a per-panel summary is owed to this region's help.
     await page.getByTestId('attribution-view-overlay').click({ position: { x: 200, y: 200 } });
     const breakdown = page.getByTestId('cell-breakdown');
-    await expect(breakdown).toContainText('never a per-panel summary');
+    await expect(breakdown).toContainText('as the analysis weighted it');
     await expect(breakdown).toContainText('observations');
     await expect(breakdown).toContainText('climatology');
+    // Principle V: every share the breakdown prints is a computed figure and is drawn as one.
+    await expect(breakdown.locator('.figure.computed').first()).toBeVisible();
   });
 
+  /**
+   * What the instruments produced, as figures. Beat 014 sent every sentence that explained one
+   * of them to the site's data-model page -- the fall rate, the inversion, Argo's dependence
+   * on the truth record, and what a flag does and does not do -- and
+   * `tests/docs/disposition.test.ts` holds each of them against the section it went to. What
+   * belongs here is the counts, because the toggles that change them are in this column.
+   */
   test('says what the instruments measured and what each measurement was priced at', async ({
     page,
   }) => {
     await page.goto('/');
     const panel = page.getByTestId('instruments-panel');
     await expect(panel).toBeVisible();
-    await expect(panel).toContainText('Truth becomes an observation in exactly one module');
+    await openDisclosure(page, 'instruments-panel');
     await expect(page.getByTestId('surface-count')).toContainText('representativeness');
-    await expect(page.getByTestId('drop-count')).toContainText('the depth it');
+    await expect(page.getByTestId('drop-count')).toContainText('levels each');
+    await expect(page.getByTestId('argo-state')).toContainText(/external|not assimilated/);
+    await expect(page.getByTestId('flag-summary')).toBeVisible();
+    await expect(page.getByTestId('interface-estimates').locator('.figure.computed').first()).toBeVisible();
 
-    // ADR-0007: the dependency travels with the figure, not in a document the surface does
-    // not carry.
-    await expect(page.getByTestId('argo-state')).toContainText('not independent evidence');
-
-    // FR-24: a flagged observation keeps its value and is drawn as flagged.
-    await expect(page.getByTestId('flag-summary')).toContainText('drawn as flagged');
-
-    // ADR-0005: the operator's justification, on the surface.
-    await expect(page.getByTestId('interface-estimates')).toContainText('interface depth');
+    // ADR-0007's caveat is not lost with the sentence that carried it: every score still
+    // prints its own independence caveat, which is where Principle V wants it.
+    await expect(panel.locator('.figure.declared').first()).toBeVisible();
   });
 
   /**
@@ -1097,14 +1115,29 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('run-panel')).toContainText('gulf-stream-front');
   });
 
+  /**
+   * Beat 014 dissolved the "What has been declared" disclosure: it was a list of declared
+   * figures under a paragraph explaining what declared means, and the paragraph went to the
+   * site's data-model page. FR-004 says a figure inside removed prose is relocated rather than
+   * deleted, so the two figures that were nowhere else -- the grid and the epoch -- are in the
+   * run disclosure now, and the other two were already inline where they are used.
+   */
   test('states the declared values, so that no figure on the page is unattributed', async ({
     page,
   }) => {
     await page.goto('/');
-    await openDisclosure(page, 'declared-panel');
+    await expect(page.getByTestId('declared-panel')).toHaveCount(0);
+
+    // The horizons, where the row that draws them says what it will show.
     await expect(page.getByTestId('horizons')).toContainText('0, 12, 24, 48, 72, 96 h');
-    await expect(page.getByTestId('declared-panel')).toContainText('100 × 100');
-    await expect(page.getByTestId('declared-panel').locator('.figure.declared').first()).toBeVisible();
+    // The domains, on the control that chooses one.
+    await expect(page.getByTestId('domain-control').locator('.figure.declared').first()).toBeVisible();
+
+    await openDisclosure(page, 'run-panel');
+    const run = page.getByTestId('run-panel');
+    await expect(run).toContainText('100 × 100');
+    await expect(page.getByTestId('stability')).toContainText('2013-09');
+    await expect(run.locator('.figure.declared').first()).toBeVisible();
   });
 });
 
@@ -1148,7 +1181,7 @@ test.describe('the walkthrough', () => {
 
   test('finds an anchor for every step it declares', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByTestId('deferrals-panel')).toBeVisible();
+    await expect(page.getByTestId('deferrals-link')).toBeVisible();
     await page.getByTestId('help-button').click();
 
     const titles: string[] = [];
@@ -1258,7 +1291,10 @@ test.describe('the walkthrough', () => {
     await page.goto('/');
 
     await page.getByTestId('help-button').click();
-    await expect(page.getByTestId('walkthrough-progress')).toContainText('Step 1 of 1');
+    // Two steps while the page is still provisioning: what you are looking at, and -- since
+    // beat 014 -- the link to what the harness does not do, which is on the page before any
+    // run is.
+    await expect(page.getByTestId('walkthrough-progress')).toContainText('Step 1 of 2');
 
     await expect(page.getByTestId('run-panel')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId('walkthrough-progress')).toContainText(
@@ -1282,8 +1318,15 @@ test.describe('the walkthrough', () => {
     await expect(page.getByTestId('configuration-failure')).toBeVisible();
 
     await page.getByTestId('help-button').click();
-    await expect(page.getByTestId('walkthrough-progress')).toContainText('Step 1 of 1');
+    // Two of the eleven declared steps have an anchor here: the statement, and the link to
+    // the deferrals page. The other nine describe panels that were never provisioned and are
+    // dropped rather than shown against nothing.
+    await expect(page.getByTestId('walkthrough-progress')).toContainText('Step 1 of 2');
     await expect(page.getByTestId('walkthrough-title')).toContainText('What you are looking at');
+    await page.getByTestId('walkthrough-next').click();
+    await expect(page.getByTestId('walkthrough-title')).toContainText(
+      'What it deliberately does not do',
+    );
     await expect(page.getByTestId('walkthrough-done')).toBeVisible();
   });
 });

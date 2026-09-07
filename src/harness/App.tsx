@@ -676,14 +676,33 @@ export function App() {
    * above the controls column's own scroller, so no amount of scrolling takes it off screen.
    */
   const statement = (
-    <section className="not-operational" data-testid="not-operational" role="note">
-      <h1>j-ocean</h1>
-      <p>
-        <strong>j-ocean is not an operational forecast system.</strong> Its numerics are real
-        but reduced, its domain small, and its claims are about <em>relative</em> skill between
-        references it computes itself, scored against a truth record it did not author.
-      </p>
-    </section>
+    <>
+      <section className="not-operational" data-testid="not-operational" role="note">
+        <h1>j-ocean</h1>
+        <p>
+          <strong>j-ocean is not an operational forecast system.</strong> Its numerics are real
+          but reduced, its domain small, and its claims are about <em>relative</em> skill between
+          references it computes itself, scored against a truth record it did not author.
+        </p>
+      </section>
+      {/*
+        FR-005 and spec 014 T023, T024. The narrative left this page for the welcome site in
+        beat 014, so the page names the site rather than leaving a reader to guess where it
+        went -- and names the deferrals page, which is where the panel that used to say what
+        this harness does not do now points. The site publishes the application at /app/, so
+        the way out is one level up; the href is a literal for the same reason it is a literal
+        in scripts/docs/build-site.ts, being the shape of the published tree rather than a
+        declared figure of the run.
+      */}
+      <nav className="site-links" data-testid="site-links" aria-label="The j-ocean site">
+        <a href="../index.html" data-testid="site-link">
+          The j-ocean site: what this is, how it is built, and the notes
+        </a>
+        <a href="../deferred.html" data-testid="deferrals-link">
+          What this does not do, and what would change that
+        </a>
+      </nav>
+    </>
   );
 
   /*
@@ -739,10 +758,6 @@ export function App() {
             <Declared>{domain.label}</Declared> ({domain.character})
           </label>
         ))}
-        <p className="aside">
-          The same machinery over a deliberately bland ocean buys much less, and being able to
-          watch it buy less is the point of the second domain.
-        </p>
         {domainFailure !== null && (
           <p className="banner warn" data-testid="domain-failure">
             That domain could not be run, so nothing was provisioned and the run you had is
@@ -756,9 +771,14 @@ export function App() {
       <div className="control-group" data-testid="run-controls">
         <h3>The run</h3>
         <p data-testid="recorded-case">
-          {view.recordedCase
-            ? `This is ${config.run.recordedCaseLabel}: the declared seed, unchanged.`
-            : 'This is not the recorded case. A seed was drawn for this visit and nothing about it persists.'}
+          {view.recordedCase ? (
+            <>
+              This is <Declared>{config.run.recordedCaseLabel}</Declared>: the declared seed,
+              unchanged.
+            </>
+          ) : (
+            'This is not the recorded case. A seed was drawn for this visit and nothing about it persists.'
+          )}
         </p>
         <div className="row-controls">
           <button
@@ -819,9 +839,11 @@ export function App() {
       </div>
 
       {/*
-        Beat 014 takes the narrative off the application entirely (SRD-v2 FR-42). Until it
-        lands, everything that was a vertical section is a disclosure here: reachable, closed
-        by default, and no longer holding a claim on the reader's vertical space.
+        The run's provenance, behind disclosures (FR-044). Beat 014 opened each of these and
+        asked the spec's question of it: does a reader drive this, or read a live figure from
+        it, or is it an explanation? What is left is the figures and their labels. Every
+        sentence that explained rather than stated has a row in docs/narrative-disposition.json
+        saying where it went, and tests/docs/disposition.test.ts holds it there.
       */}
       <div className="disclosures">
         <details data-testid="run-panel">
@@ -836,17 +858,22 @@ export function App() {
 
             <dt>Domain</dt>
             <dd>
-              <Declared>{view.run.domainId}</Declared>, cells laid over{' '}
+              <Declared>{view.run.domainId}</Declared>,{' '}
+              <Declared>
+                {config.grid.nx} &times; {config.grid.ny}
+              </Declared>{' '}
+              cells laid over{' '}
               <Computed>
                 {view.results.grid.cellSizeXMetres.toFixed(0)} &times;{' '}
                 {view.results.grid.cellSizeYMetres.toFixed(0)} m
-              </Computed>{' '}
-              &mdash; a five-degree box is not square in kilometres.
+              </Computed>
+              .
             </dd>
 
             <dt>Timestep</dt>
             <dd data-testid="stability">
-              <Declared>{view.run.stability.declaredTimestepSeconds} s</Declared>, inside the{' '}
+              <Declared>{view.run.stability.declaredTimestepSeconds} s</Declared> from{' '}
+              <Declared>{config.clock.epoch}</Declared>, inside the{' '}
               <Computed>{view.run.stability.largestStableTimestepSeconds.toFixed(1)} s</Computed>{' '}
               the declared criterion admits (the scheme&rsquo;s linear boundary is{' '}
               <Computed>{view.run.stability.linearStabilityBoundarySeconds.toFixed(1)} s</Computed>
@@ -884,9 +911,7 @@ export function App() {
                 {view.initialisation.thicknessRangeMetres[1].toFixed(0)} m
               </Computed>{' '}
               about a declared mean of{' '}
-              <Declared>{config.model.meanUpperLayerThicknessMetres} m</Declared>. Velocity is
-              put in geostrophic balance with that thickness rather than taken from the truth,
-              which carries motions this model has no layer for.
+              <Declared>{config.model.meanUpperLayerThicknessMetres} m</Declared>.
             </dd>
 
             <dt>Excluded margin</dt>
@@ -905,47 +930,8 @@ export function App() {
           </dl>
         </details>
 
-        <details data-testid="declared-panel">
-          <summary>What has been declared</summary>
-          <p className="aside">
-            Every figure here is a value in configuration, validated before anything was
-            computed. No component in the tree holds a literal for any of them.
-          </p>
-          <dl>
-            <dt>Grid</dt>
-            <dd>
-              <Declared>
-                {config.grid.nx} &times; {config.grid.ny}
-              </Declared>{' '}
-              cells
-            </dd>
-            <dt>Timestep</dt>
-            <dd>
-              <Declared>{config.clock.timestepSeconds} s</Declared>, from{' '}
-              <Declared>{config.clock.epoch}</Declared>
-            </dd>
-            <dt>Horizons</dt>
-            <dd data-testid="horizons">
-              <Declared>{config.horizons.leadHours.join(', ')} h</Declared>
-            </dd>
-            <dt>Domains</dt>
-            <dd>
-              {config.domains.list.map((domain) => (
-                <span key={domain.id} className="domain">
-                  <Declared>{domain.label}</Declared> ({domain.character})
-                </span>
-              ))}
-            </dd>
-          </dl>
-        </details>
-
         <details data-testid="instruments-panel">
           <summary>What the instruments measured</summary>
-          <p className="aside">
-            Truth becomes an observation in exactly one module, and this is everything that
-            module produced. Every figure below is what a measurement was priced at, not what
-            it turned out to be worth &mdash; that is the analysis&rsquo;s question.
-          </p>
           <dl>
             <dt>Ownship surface</dt>
             <dd data-testid="surface-count">
@@ -963,9 +949,7 @@ export function App() {
             <dt>XBT drops</dt>
             <dd data-testid="drop-count">
               <Computed>{view.drops.length}</Computed> drops of{' '}
-              <Declared>{config.instruments.xbt.depthsMetres.length}</Declared> levels each. An
-              XBT infers its depth from a fall rate, so each level records the depth it{' '}
-              <em>reached</em>, not the depth it was asked for.
+              <Declared>{config.instruments.xbt.depthsMetres.length}</Declared> levels each.
             </dd>
 
             <dt>What a drop told us</dt>
@@ -982,11 +966,6 @@ export function App() {
                   )}
                 </span>
               ))}
-              <br />
-              The observed quantity is the interface depth, inverted from the same two-layer
-              relation the profile above is drawn from. A level far from the thermocline
-              acquires an enormous depth error and weighs almost nothing, through the
-              arithmetic rather than through a rule.
             </dd>
 
             <dt>Argo</dt>
@@ -994,9 +973,7 @@ export function App() {
               {config.instruments.argo.assimilate ? (
                 <>
                   <Computed>{view.argo.length}</Computed> profiles admitted, marked{' '}
-                  <em>external</em>. The truth record assimilated these profiles, so skill
-                  measured against it while assimilating them is not independent evidence, and
-                  every score will say so.
+                  <em>external</em>.
                 </>
               ) : (
                 <>Drawn, not assimilated. The toggle is off.</>
@@ -1018,10 +995,6 @@ export function App() {
                   </span>
                 ))
               )}
-              <br />
-              A flagged observation keeps its value and is drawn as flagged. Nothing is
-              dropped, because what the analysis chose to ignore is as interesting as what it
-              used.
             </dd>
           </dl>
         </details>
@@ -1029,10 +1002,6 @@ export function App() {
         {record !== null && (
           <details data-testid="truth-panel">
             <summary>The record this run is scored against</summary>
-            <p className="aside">
-              Two derived artefacts, regenerated from a digest-verified raw subset by gate
-              G-01. Nothing here was edited by hand; a file that had been would fail the build.
-            </p>
             <dl>
               <dt>Domain</dt>
               <dd data-testid="truth-domain">
@@ -1052,7 +1021,7 @@ export function App() {
                     ?.truthToModelResolutionRatio}
                   &times;
                 </Declared>{' '}
-                coarser than the model grid. Scoring will decline to resolve below it.
+                coarser than the model grid.
               </dd>
 
               <dt>Instants</dt>
@@ -1063,14 +1032,12 @@ export function App() {
                     ' and ',
                   )}
                 </Computed>{' '}
-                hours apart. The source is missing occasional snapshots; the record carries its
-                instants as they are and interpolates nothing at build time.
+                hours apart.
               </dd>
 
               <dt>Depth levels</dt>
               <dd>
-                <Declared>{record.truth.depthLevelsMetres().join(', ')} m</Declared> &mdash;
-                exact levels of the source, so no build-time vertical interpolation.
+                <Declared>{record.truth.depthLevelsMetres().join(', ')} m</Declared>
               </dd>
 
               <dt>Argo profiles</dt>
@@ -1078,8 +1045,7 @@ export function App() {
                 <Computed>{record.observations.profiles.length}</Computed> profiles,{' '}
                 <Computed>{levelCount(record.observations)}</Computed> levels, of which{' '}
                 <Computed>{flaggedLevelCount(record.observations)}</Computed> carry a flag the
-                analysis will not treat as usable. Flagged levels are kept and will be drawn as
-                flagged, never omitted.
+                analysis will not treat as usable.
               </dd>
 
               <dt>Climatology</dt>
@@ -1098,8 +1064,7 @@ export function App() {
                 <Computed>
                   {String(record.climatology.header.provenance['overlapWithRunPeriodDays'])}
                 </Computed>{' '}
-                days. Skill against this reference is therefore not a fully independent
-                measure, and the surface will say so beside every such score.
+                days.
               </dd>
             </dl>
           </details>
@@ -1107,12 +1072,6 @@ export function App() {
 
         <details data-testid="manifest-panel">
           <summary>The manifest this run replays from</summary>
-          <p className="aside">
-            Everything needed to rebuild this run, and none of its state: replay is
-            re-computation, not the restoration of a snapshot. Nothing persists between visits
-            &mdash; no storage, no cookie, no run in the URL &mdash; so this file is the only
-            thing that leaves and the only thing that comes back.
-          </p>
 
           <dl>
             <dt>This build</dt>
@@ -1145,12 +1104,6 @@ export function App() {
           <pre data-testid="manifest">{manifest}</pre>
 
           <h3>Import a manifest</h3>
-          <p className="aside">
-            Paste one and this visit becomes that run &mdash; rebuilt from its seed and its
-            edits, not restored. The schema, the format version, the configuration digest and
-            the domain are all checked before anything is provisioned, so a refused import
-            leaves the run you have alone.
-          </p>
           <textarea
             data-testid="manifest-input"
             rows={4}
@@ -1194,48 +1147,6 @@ export function App() {
           )}
         </details>
 
-        {/*
-          What this harness does not do, and what would have to be true before it did.
-          §10's deferrals are assessed, not vague: each has a trigger somebody wrote down,
-          and one of them is measured on every test run. Leaving them off the surface would
-          make the harness look more capable than it is, which is the failure mode this
-          project spends most of its effort avoiding.
-        */}
-        <details data-testid="deferrals-panel">
-          <summary>What this does not do, and what would change that</summary>
-          <p className="aside">
-            Four capabilities are assessed, deferred and cheap to adopt. Each has a trigger,
-            and the triggers are written down rather than remembered.
-          </p>
-          <dl>
-            <dt>Adaptive sampling</dt>
-            <dd data-testid="deferral-adaptive">
-              An ensemble, its spread, and a vessel steered by it against a lawnmower track.
-              Deferred until scoring is trusted &mdash; which means AT-02, AT-03 and AT-06 have
-              passed. <strong>AT-03 has; AT-02 and AT-06 have not</strong>, and both fail
-              because two declared numbers disagree about amplitude. A test measures the
-              trigger on every run, so this statement is never out of date.
-            </dd>
-            <dt>Dynamic depth levels</dt>
-            <dd data-testid="deferral-depth">
-              Vertical structure that is advected rather than diagnosed. The trigger is a
-              question about vertical structure evolving in time. The disagreement a reader can
-              see between an XBT and the model&rsquo;s derived profile is{' '}
-              <em>not that trigger</em>: it is a static offset, and advected structure would
-              not move it.
-            </dd>
-            <dt>A GPU kernel</dt>
-            <dd data-testid="deferral-gpu">
-              The trigger is the declared frame budget binding at a grid somebody wants. At
-              100 &times; 100 it does not.
-            </dd>
-            <dt>Observation latency</dt>
-            <dd data-testid="deferral-latency">
-              Observations arriving late rather than not at all. Withholding is its special
-              case, and beat 010 built that.
-            </dd>
-          </dl>
-        </details>
       </div>
     </>
   );
@@ -1263,30 +1174,26 @@ export function App() {
             markers={attributionMarkers}
             onSelect={selectCell}
           />
-          <figcaption>
+          <figcaption className="figure-label">
             The weight observations carried in each cell &mdash; the analysis&rsquo;s own gain,
-            drawn as a field. This is not a picture computed to illustrate the answer; it is
-            the same arithmetic that produced it, exported beside it, which is why it cannot
-            disagree with it. There is no fixture behind this: it is the field the analysis
-            produced on this visit. Click a cell and its breakdown fills the detail region.
+            drawn as a field.
           </figcaption>
         </figure>
         <div className="row-invitation-prose">
-          <p className="aside">
+          <p className="region-empty" data-testid="row-invitation-statement">
             Six panels at the declared horizons &mdash;{' '}
-            <Declared>{config.horizons.leadHours.join(', ')} h</Declared> &mdash; each stating
-            what it is valid for, what it was initialised from, and what it was worth against two
-            references. Building them means integrating the analysis forward four days, which
-            takes a couple of seconds, so it happens when you ask: <em>Build the horizon row</em>
-            {' '}is in the controls.
+            <Declared>
+              <span data-testid="horizons">{config.horizons.leadHours.join(', ')} h</span>
+            </Declared>{' '}
+            &mdash; each stating what it is valid for, what it was initialised from, and what it
+            was worth against two references.
           </p>
           <dl>
             <dt>Influence radius</dt>
             <dd data-testid="influence-radius">
               A property of the{' '}
               <Declared>{config.analysis.correlationLengthScaleKilometres} km</Declared> declared
-              correlation length scale, not of the ocean. An observation across a front influences
-              the far side exactly as much as its own, which the flow would not.
+              correlation length scale, not of the ocean.
             </dd>
             <dt>Observations used</dt>
             <dd data-testid="analysis-counts">
@@ -1307,9 +1214,7 @@ export function App() {
     view.forecast === null ? (
       <p className="region-empty full" data-testid="scores-empty">
         Each panel&rsquo;s skill against persistence and against climatology appears here, in
-        that panel&rsquo;s own column, once the row has been built and scored. There is no
-        scores table anywhere else: a table would ask you to match a row label against a panel
-        heading at every glance.
+        that panel&rsquo;s own column, once the row has been built and scored.
       </p>
     ) : (
       row.scores
@@ -1332,8 +1237,6 @@ export function App() {
               <>
                 <p>
                   Cell <Computed>{view.selectedCell}</Computed>, as the analysis weighted it.
-                  A breakdown is an instrument of a selected cell, never a per-panel summary
-                  &mdash; that was specified first and was wrong.
                 </p>
                 <dl>
                   <dt>observations</dt>
@@ -1350,12 +1253,17 @@ export function App() {
                   </dd>
                 </dl>
                 {breakdown.shares.length > 0 && (
+                  /* Principle V: each share is a figure the analysis computed, so it is drawn
+                     in the computed kind rather than joined into a sentence. Beat 014 found
+                     these four figures had been printed as plain text since beat 005. */
                   <p data-testid="cell-shares">
                     of which{' '}
-                    {breakdown.shares
-                      .slice(0, 3)
-                      .map((share) => `${share.id} ${(share.share * 100).toFixed(1)}%`)
-                      .join(', ')}
+                    {breakdown.shares.slice(0, 3).map((share, at) => (
+                      <span key={share.id} className="estimate">
+                        {at === 0 ? '' : ', '}
+                        {share.id} <Computed>{(share.share * 100).toFixed(1)}%</Computed>
+                      </span>
+                    ))}
                   </p>
                 )}
               </>
@@ -1407,11 +1315,6 @@ export function App() {
         because comparison across horizons is the lesson; choosing one in the strip swaps the
         panel beneath it. Widen the window past the figure above and the full row returns
         without a reload.
-      </p>
-      <p className="aside">
-        The figure is in CSS pixels, so a window wide enough at 100 per cent is below it at
-        200 per cent zoom. That is the same answer for the same reason: at that zoom there are
-        as few pixels to read six panels in.
       </p>
     </section>
   );
