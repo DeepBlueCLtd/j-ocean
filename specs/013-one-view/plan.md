@@ -66,8 +66,12 @@ recorded as findings rather than resolved quietly:
   derivation, and the gate is what proves the lift changed nothing. This is finding 2 of the
   spec — *a computation that happens because something is drawn* — and it is the reason the
   gate had to come first rather than the reason it can be skipped.
-- **`footprintOf` is called three times per render** from `App.tsx`, uncached, plus once more
-  inside `HorizonRow`. Same finding, second instance.
+- **The footprint is built in order to be drawn.** `footprintFor` runs three times per render
+  from `App.tsx`, inline in JSX and uncached; and because the prop it hands the row is a fresh
+  object each render, `HorizonRow`'s own `useMemo` around `markersFrom` never hits, so `marksOf`
+  runs at least seven times more. Same finding, second instance. (An earlier reading of this
+  plan said `HorizonRow` constructs a fourth footprint; it does not — it imports only the
+  derivations.)
 
 ## Decisions this plan makes
 

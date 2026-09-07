@@ -66,7 +66,7 @@ changes, because FR-001 says so and because the rest of this list is otherwise u
 
 ## The record (FR-011, FR-040)
 
-- [ ] **T060** `docs/questions-for-the-author.md`: the three findings the spec names —
+- [X] **T060** `docs/questions-for-the-author.md`: the three findings the spec names —
       whether the drawn attribution is the analysis's own gain, every computation that happens
       because something is drawn, and any figure with no producer in the model.
 - [ ] **T061** ADR-0012: one view, four regions, and why the division is by rate of change.
