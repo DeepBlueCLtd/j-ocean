@@ -101,6 +101,14 @@ drawn amplitude of every skill curve. Two more are genuinely new but correctly l
 the projected step time (`App.tsx:355–358`) is an extrapolation drawn as host time, which also
 gates whether the model integrates at all (`:362`).
 
+One more, found by lifting the row's scoring out of React. The departure brief is scored at every
+horizon with its own field passed as **both** the forecast and the persistence reference
+(`src/harness/scoring-run.ts:109`, preserved verbatim from what `HorizonRow` did), so
+`skillAgainstPersistence` in every brief score is zero by construction. Only `forecastError` is
+drawn (`src/harness/Panel.tsx:272`). Six skill figures are therefore computed at every scoring,
+carry no information, and are never shown; and seven of G-07's forty-one recorded quantities are
+digests that include them.
+
 Two entanglements of presentation with computation, which is what FR-40 expects this refactor to
 expose. **Scoring happens inside a component:** `scoreAll` (`HorizonRow.tsx:159–229`) builds the
 region, the climatology field and a truth field per horizon and calls `score` twice per panel,
