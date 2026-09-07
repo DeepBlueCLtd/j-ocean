@@ -73,6 +73,27 @@ recorded as findings rather than resolved quietly:
   plan said `HorizonRow` constructs a fourth footprint; it does not — it imports only the
   derivations.)
 
+## What the record cannot hold, stated before it is relied on
+
+Writing G-07 found three limits, and a gate whose limits are not written down is trusted for
+more than it holds.
+
+- **The `score.*` and `briefScore.*` entries are a digest of a transcription.** `scoreAll` lives
+  inside a React callback, so the gate re-derives the per-horizon scores by copying its body.
+  Until T020 lifts `scoreAll` onto that same derivation and both call one producer, a divergence
+  between what the gate digests and what the row draws would be invisible to the gate rather than
+  caught by it. T020 is therefore not an optimisation; it is what makes seventeen of the entries
+  mean what they say.
+- **Seven of the forty-one entries cannot detect a change to the analysis.** `quaysideOffsetHours`
+  is zero, so `departureBrief` analyses at the run's start with nothing sampled: the brief is the
+  prior blend of background and climatology, exactly as `forecast.ts` says, and no analysis
+  coefficient can move it. The record is weaker than its count suggests, and it says so here
+  rather than in a footnote nobody reads.
+- **Two of the walk's inputs are literals with no declaration behind them.** `ADVANCE_HOURS = 12`
+  and `scoringLeadHours = 24` are numbers in a component; the gate had to copy them, so the record
+  is pinned to two values no schema would refuse a change to. That is finding 3 of this beat, and
+  it is recorded rather than fixed.
+
 ## Decisions this plan makes
 
 - **The grid is CSS grid with four named areas, and the column count comes from
