@@ -97,9 +97,12 @@ test('the horizon row', async ({ page }) => {
   await page.getByTestId('toggle-attribution').click();
   await page.getByTestId('horizon-row').screenshot({ path: `${IMAGES}007-attribution-row.png` });
 
+  // Beat 015 made enlargement a selection: the centre now holds the strip and one panel, so
+  // the figure of an enlarged panel is a figure of the centre rather than of the row.
   await page.getByTestId('toggle-attribution').click();
   await page.getByTestId('enlarge-24').click();
-  await page.getByTestId('horizon-row').screenshot({ path: `${IMAGES}007-enlarged.png` });
+  await expect(page.getByTestId('enlarged-centre')).toBeVisible();
+  await page.getByTestId('enlarged-centre').screenshot({ path: `${IMAGES}007-enlarged.png` });
 });
 
 test('the observation footprint', async ({ page }) => {
@@ -253,12 +256,34 @@ test('the answer below the floor', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('viewport-floor-notice')).toBeVisible();
   await page.getByTestId('build-row').click();
-  await expect(page.getByTestId('single-panel')).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId('enlarged-centre')).toBeVisible({ timeout: 60_000 });
   await page.getByTestId('score-row').click();
   await expect(page.getByTestId('panel-score-0')).toContainText('persistence', { timeout: 60_000 });
   await page.getByTestId('strip-48').click();
   await expect(page.getByTestId('panel-48')).toBeVisible();
   await page.screenshot({ path: `${IMAGES}013-below-the-floor.png` });
+});
+
+/**
+ * Beat 015's own figures: an enlargement is a selection, so what it changes is the centre and
+ * nothing else. The whole viewport is captured for that reason -- a figure cropped to the
+ * centre could not show that the other three regions did not move -- and the strip is captured
+ * on its own because the marking and the figures in it are the beat's claim.
+ */
+test('enlargement is a selection', async ({ page }) => {
+  test.setTimeout(240_000);
+  await inOneView(page, REFERENCE_WIDTH, FLOOR_HEIGHT);
+  await page.goto('/');
+  await page.getByTestId('build-row').click();
+  await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId('score-row').click();
+  await expect(page.getByTestId('panel-score-24')).toContainText('persistence', { timeout: 60_000 });
+  await page.screenshot({ path: `${IMAGES}015-the-row.png` });
+
+  await page.getByTestId('enlarge-48').click();
+  await expect(page.getByTestId('enlarged-centre')).toBeVisible();
+  await page.screenshot({ path: `${IMAGES}015-enlarged.png` });
+  await page.getByTestId('horizon-strip').screenshot({ path: `${IMAGES}015-strip.png` });
 });
 
 test('the walkthrough', async ({ page }) => {

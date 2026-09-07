@@ -71,4 +71,46 @@ would otherwise drift.
 
 ## Measured
 
-_Filled in when the beat lands._
+**One strip, and the second implementation is gone.** `HorizonStrip.tsx` is the only component
+that draws a strip and `Panel` with `enlarged` is the only enlarged panel; `Regions.tsx` no
+longer knows the difference. The below-floor presentation forces `CentreContent` to `enlarged`
+through `resolveCentreContent` and lays out nothing of its own -- the `.single-panel` element,
+the `.strip-panel` rules and the `singlePanel` branch of `useHorizonRow` are all deleted.
+
+**The centre's height had to become a declared figure, and the floor moved with it.** The beat's
+requirement is that the controls, scores and detail regions keep their rectangles to the pixel
+while the centre's contents are replaced. The scores region sits directly beneath the centre, so
+that is a claim about the centre's *height*: a centre sized by its contents is one height with
+six small panels in it and another with one large one. It is now
+`track width + centreChromeHeightPx + strip.heightPx`, worked out in CSS from declared figures,
+and `presentation.minimumViewportHeightPx` goes from 682 to **728** -- the extra 46 px is the
+strip's height, which the centre reserves in both states. `tests/shell/viewport-floor.spec.ts`
+re-measures it and agrees; nothing in it was relaxed.
+
+**What that cost.** The depth elevation of beat 008 no longer sits beneath the enlarged field.
+Inside a box the centre keeps, a field worth enlarging and a 170 px elevation do not both fit
+vertically at the floor, so the elevation is beside the field: the same longitude range, the
+same scale, and the caption says so. The field is 328 px against the row's 174.
+
+**Field identity was asserted by something else.** Beat 007's own words are that the assertion
+is by identity, and the browser test compared the canvas's rendering backend -- because an
+object cannot be got out of `page.evaluate`, which returns a structured clone. `FieldView` now
+leaves the drawn array on the canvas and the test compares `===` *inside the page*, across an
+enlargement, across a swap, and between a panel and the strip thumbnail of the same horizon.
+
+**The marking's greyscale margin, measured on rendered pixels:** 176 of 255 (marked border 21.9,
+unmarked 198.0), against a bar of 40. The strip is photographed and the PNG decoded, because
+reading `getComputedStyle` would be a measurement of the stylesheet and a monochrome print is
+made of pixels.
+
+**The domain-change edge case is not reachable and is not asserted.** The only other declared
+domain has no artefact over its box and refuses, and a refused domain change re-provisions the
+run -- which takes the built row away and leaves FR-048's invitation, so there is no
+enlargement left for the rule to be about. The reissue half is asserted in the browser; the
+undeclared-horizon edge case is asserted headlessly, because configuration is read once at load
+and a selection does not survive a reload until beat 017 makes it addressable.
+
+**G-07: one digest moved.** `configuration`, because this beat declares
+`presentation.strip.heightPx`, `presentation.strip.thumbnailWidthPx` and
+`presentation.centreChromeHeightPx` and raises the viewport floor. The other forty are
+byte-identical.

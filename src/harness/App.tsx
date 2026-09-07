@@ -665,9 +665,11 @@ export function App() {
     onShowMark: showMark,
     onPinMark: pinMark,
     markPinned: mark?.pinned ?? false,
-    /* FR-043. Below the declared floor the row is one panel and a strip, not six panels
-       shrunk past legibility. Which panels are drawn is display; nothing here recomputes. */
-    presentation: aboveFloor ? 'row' : 'single-panel',
+    /* FR-043. Below the declared floor the centre is forced to an enlargement -- the strip
+       and one panel -- because six panels shrunk past legibility are six panels nobody can
+       read. It is the same enlargement a reader chooses above the floor, not a second
+       presentation. Which panels are drawn is display; nothing here recomputes. */
+    aboveFloor,
   });
 
   /*

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { FieldSurface, type Palette } from './field-surface.js';
+import { holdsField } from './field-identity.js';
 
 /**
  * A field, drawn through the one rendering module, with its marks and its scale.
@@ -105,6 +106,10 @@ export function FieldView({
       palette,
       ...(hatch === undefined ? {} : { hatch, hatchThreshold }),
     });
+    // FR-051, and FR-14 carried: the panel draws the array it was handed and never a copy of
+    // it. Left on the canvas so the browser test can assert identity rather than equality --
+    // see `field-identity.ts` for why equality would not be the same claim.
+    holdsField(element, values);
   }, [values, nx, ny, limit, palette, hatch, hatchThreshold]);
 
   useEffect(() => {

@@ -270,7 +270,10 @@ test.describe('the viewport floor', () => {
       await scoredRowBelowFloor(page);
 
       // FR-049 and FR-050: one panel, and the strip carrying all six with what each was worth.
-      await expect(page.getByTestId('single-panel')).toBeVisible();
+      // Beat 015 made this presentation the *enlarged* one -- the fallback selects an
+      // enlargement rather than laying out a single panel of its own -- so the element this
+      // asserted on is now named for what it is at every viewport. The assertion is unchanged.
+      await expect(page.getByTestId('enlarged-centre')).toBeVisible();
       await expect(page.getByTestId('horizon-row')).toHaveCount(0);
       for (const lead of LEADS) {
         await expect(page.getByTestId(`strip-${String(lead)}`)).toHaveCount(1);
@@ -372,7 +375,7 @@ async function scoredRowBelowFloor(page: Page): Promise<void> {
   await page.goto('/');
   await expect(page.getByTestId('viewport-floor-notice')).toBeVisible();
   await page.getByTestId('build-row').click();
-  await expect(page.getByTestId('single-panel')).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId('enlarged-centre')).toBeVisible({ timeout: 60_000 });
   await page.getByTestId('score-row').click();
   await expect(page.getByTestId(`panel-score-${String(LEADS[0])}`)).toContainText('persistence', {
     timeout: 60_000,
