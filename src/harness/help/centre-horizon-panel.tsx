@@ -64,6 +64,12 @@ export const ENTRY: HelpEntry = {
             large that was drawn small. What the room buys is fidelity &mdash; each measurement
             at the depth it actually reached, and a waypoint you can drag.
           </p>
+          <p>
+            The depth axis beside the field is a side elevation: longitude is the horizontal
+            axis and latitude is not shown, so position is read from the field this is drawn
+            beside. Each needle hangs to the depth that measurement actually reached, which for
+            an XBT is inferred from its fall rate rather than asked for.
+          </p>
         </>
       ),
     },

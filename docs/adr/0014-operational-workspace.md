@@ -49,7 +49,7 @@ may scroll a list but never a body of text.**
 
 ## The persistence question, answered rather than assumed
 
-Principle I says nothing persists between visits, and it was written about runs: a run is a seed
+Principle IX says nothing persists between visits, and it was written about runs: a run is a seed
 and a manifest, and replay is *re-computation from a manifest*, never restoration from a
 snapshot. A persisted run would be a second way to bring a forecast back with none of the
 manifest's checks — no code version, no configuration digest, no refusal when the tree has moved.
@@ -58,10 +58,48 @@ A persisted pane width is not that. It is a preference about furniture, and it s
 because a reader who arranged their workspace should not have to arrange it twice.
 
 So the constitution now draws the line explicitly rather than leaving it to be inferred — because
-a reader of Principle I could reasonably have inferred the opposite, and one did. What is stored
+a reader of Principle IX could reasonably have inferred the opposite, and one did. The clause is
+Principle IX's rather than Principle I's, which this beat's own drafts had it as: *no forecast
+input or output persists between visits* is a bullet of *Derived Artefacts, Not Fixtures*, and
+"nothing persists" is only how the rule is remembered. What is stored
 is held by a key-set test in the same shape as feature 017's address grammar: geometry and pane
 identity only, and a planted `seed` fails by name. The two mechanisms that could smuggle a run
 out of a session are now guarded the same way.
+
+## What was measured after it was built
+
+The numbers in Context were beat 017's. These are beat 018's, taken from the built workspace
+with the same instruments:
+
+- **Dead space at 2 560 × 1 440, row built and scored: 71.9 per cent before, 56.0 per cent
+  after.** Measured as the share of an eight-pixel grid over the viewport containing no
+  rendered ink — no text, no canvas, no control, no drawn shape, no rule — with clipped and
+  unpainted content excluded, and a background fill not counted as ink. What is left is
+  reported rather than hidden: a selection pane with nothing selected in it (95.6 per cent of
+  its own rectangle), the slack in the controls pane below the last control (74.1 per cent),
+  and the band beneath the skill curve (97.6 per cent of 1 750 × 356).
+- **That last band is where FR-45 had to overrule the instrument.** Left to fill what the row
+  did not use, the skill curve grew to 698 px for six points — taller than the row it
+  annotates — and the dead-space figure fell to 42.5 per cent. A stretched plot is ink to a
+  grid of cells and is not information to a reader, so the share the curve may take is
+  declared (`presentation.workspace.skillCurveFraction`) and the row keeps the dominant space
+  FR-45 gives it. The 13.5 points that costs are reported rather than absorbed by a chart.
+- **A horizon panel is 190 px at the floor and 280 px at the reference viewport.** Beat 017's
+  was 277 px at 2 560 and could not have been anything else: the tracks were fixed.
+- **The declared floor came down from 2 038 × 728 to 1 658 × 960.** The width fell because
+  828 px of beat 013's floor was chrome declared unshrinkable — two 390 px columns and a 48 px
+  gutter — and in a workspace the flanking panes flex to the width below which they cannot be
+  *read*. The height rose because each panel now carries its own skill figures and because the
+  controls pane, at its narrowest, wraps. **A 2 000 px window now shows the six-panel row**; on
+  beat 017's head it got the fallback, which is what the author's screenshot showed.
+- **Nothing scrolls at the reference viewport** — not loaded, not with the row built and
+  scored, not with a cell selected, not on any of the four provenance tabs, not with a panel
+  enlarged — except with a profile pinned, when the selection pane scrolls that profile's
+  levels, which is a list. At the declared floor one pane scrolls and it scrolls a list: the
+  run's own term list of figures. Below the floor two do, and both are lists: the panes one
+  under another, and the horizon strip sideways.
+- **One digest moved**: `configuration`, and only because declared presentation figures
+  changed. The other forty are byte-identical.
 
 ## Consequences
 
@@ -70,6 +108,20 @@ out of a session are now guarded the same way.
 - **Ninety-one shell tests were written against the region grid.** Their claims mostly survive
   and their selectors mostly do not; each that loses its subject is recorded against the claim it
   made, as beat 016 recorded the walkthrough's.
+- **Explanation left the legend as well as the controls.** The prose test exempted `.legend` as
+  a whole block, and the legend beneath the row is a paragraph, so two explanations of twenty
+  words each lived inside a class that means *this labels a mark*. Every legend entry is
+  counted on its own now. FR-51's requirement that the row *state* it is showing the field
+  alone is met by a label of eight words; what the enlarged panel adds is the row's own help.
+- **The scorer's statement is behind the disclosure and not over the figures.** FR-008 asked
+  for the figure to be the readout and the scorer's words one disclosure away, and a two-line
+  sentence drawn above the two figures that said the same thing was the readout-written-as-
+  prose the review named. Principle VI is met by the figure: the skill against climatology is
+  negative on screen with nothing opened, and a test reads it as a number rather than looking
+  for a form of words.
+- **The below-the-floor answer was itself two paragraphs of prose**, which is the fault this
+  ADR exists to fix, arriving in the one presentation nobody was looking at. It is one line now
+  — the size, as the declared figure it is — and the two paragraphs are the walkthrough's.
 - **The walkthrough returns**, which beat 016 retired. Both decisions were right about different
   questions: panel help answers *what is this panel*, and a workspace of docked panes raises
   *what am I looking at*, which panel help cannot answer.

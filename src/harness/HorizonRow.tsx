@@ -6,7 +6,7 @@ import type { Score } from '../scoring/scorer.js';
 import type { TruthSource } from '../ports/truth-source.js';
 import type { FieldContainer } from '../truth/container.js';
 import type { ForecastResult } from '../run/forecast.js';
-import { Panel, PanelScore } from './Panel.js';
+import { Panel } from './Panel.js';
 import { HorizonStrip, type StripSlot } from './HorizonStrip.js';
 import { CentreLedger, resolveCentreContent, THE_ROW, type CentreContent } from './CentreContent.js';
 import { profileFromInterfaceDepth } from '../model/profile.js';
@@ -16,7 +16,7 @@ import { Counterfactuals } from './Counterfactuals.js';
 import { PanelHead } from './Help.js';
 import { ObservationHover } from './ObservationHover.js';
 import { scoreEveryHorizon } from './scoring-run.js';
-import { SkillInset, type SkillCurve } from './SkillInset.js';
+import { SkillPane, type SkillCurve } from './SkillInset.js';
 import type { Edit } from '../instruments/edits.js';
 import type { DepartureBrief } from '../run/forecast.js';
 
@@ -112,11 +112,20 @@ export interface HorizonRowInputs {
   readonly onRequest: (next: CentreContent) => void;
 }
 
-/** What the row puts in each region. Null where the row has not been built. */
+/**
+ * What the row puts in each pane. Null where the row has not been built.
+ *
+ * Beat 013 had a `scores` slot, because the scores were a region of their own aligned to the
+ * centre's tracks by CSS `subgrid`. Beat 018 puts each panel's figures **inside its own
+ * panel**, which is what FR-046 asked for and is not achievable across independent panes -- so
+ * the slot is gone and `skill` takes its place: the curve over lead time, which is about all
+ * six panels and belongs to none of them.
+ */
 export interface HorizonRowSlots {
   readonly controls: ReactNode;
   readonly centre: ReactNode;
-  readonly scores: ReactNode;
+  /** The skill curve, beneath the row in the horizons pane. Null until something is scored. */
+  readonly skill: ReactNode;
   readonly detail: ReactNode;
 }
 
@@ -436,7 +445,7 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
   );
 
   if (config === null || forecast === null || analysis === null || props.footprint === null) {
-    return { controls: null, centre: null, scores: null, detail: null };
+    return { controls: null, centre: null, skill: null, detail: null };
   }
 
   const footprint = props.footprint;
@@ -505,18 +514,28 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
           </p>
         )}
 
-        <p className="aside" data-testid="issue-observations">
-          The analysis at this issue instant saw{' '}
-          <span className="computed" data-testid="observations-available">
-            {forecast.observationsAvailable}
-          </span>{' '}
-          {forecast.observationsAvailable === 1 ? 'observation' : 'observations'};{' '}
-          <span className="computed" data-testid="observations-withheld">
-            {forecast.observationsWithheld}
-          </span>{' '}
-          had not happened yet.
-          {forecast.observationsAvailable === 0 && ' No observations at this issue time: the analysis is the background and the climatology.'}
-        </p>
+        {/*
+          Beat 018. This was a sentence -- "The analysis at this issue instant saw 2
+          observations; 29 had not happened yet" -- which is a readout wearing a sentence's
+          clothes, and it moved the reader's eye across a line of prose to find two numbers.
+          It is now the two numbers with their labels. What the pair *means*, and why moving
+          the issue time earlier is the clearest way to watch skill change, is this panel's own
+          help (docs/narrative-disposition.json records the move).
+        */}
+        <dl className="readout" data-testid="issue-observations">
+          <dt>Seen</dt>
+          <dd>
+            <span className="figure computed" data-testid="observations-available">
+              {forecast.observationsAvailable}
+            </span>
+          </dd>
+          <dt>Not yet</dt>
+          <dd>
+            <span className="figure computed" data-testid="observations-withheld">
+              {forecast.observationsWithheld}
+            </span>
+          </dd>
+        </dl>
       </div>
 
       {/* FR-031, FR-032 and FR-034: what the reader did, the way back, and the two
@@ -605,28 +624,44 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
           of them, and §7 owes the observation footprint a named explanation. */}
       <div className="control-group" data-testid="footprint-panel">
         <PanelHead panel="controls/observation-footprint" />
-        <p className="aside" data-testid="footprint-summary">
-          Drawn over every panel:{' '}
-          <span className="computed" data-testid="footprint-track-count">
-            {footprint.track.length}
-          </span>{' '}
-          surface measurements,{' '}
-          <span className="computed" data-testid="footprint-drop-count">
-            {footprint.needles.filter((needle) => needle.kind === 'drop').length}
-          </span>{' '}
-          XBT drops and{' '}
-          <span className="computed" data-testid="footprint-external-count">
-            {footprint.needles.filter((needle) => needle.kind === 'external').length}
-          </span>{' '}
-          Argo profiles, of which{' '}
-          <span className="computed" data-testid="footprint-flagged-count">
-            {marks.filter((mark) => mark.flagged).length}
-          </span>{' '}
-          carry a flag &mdash; drawn as flagged, never omitted.{' '}
-          {footprint.qualityControlEnabled
-            ? 'Quality control was on.'
-            : 'Quality control was off for this run.'}
-        </p>
+        {/*
+          Beat 018. Five figures that had been joined into a sentence, drawn as five figures.
+          FR-24's point -- that a flagged observation is drawn as flagged and never omitted --
+          is a property of the surface rather than a caption on it, and the sentence saying so
+          is now this panel's own help.
+        */}
+        <dl className="readout" data-testid="footprint-summary">
+          <dt>Surface</dt>
+          <dd>
+            <span className="figure computed" data-testid="footprint-track-count">
+              {footprint.track.length}
+            </span>
+          </dd>
+          <dt>XBT drops</dt>
+          <dd>
+            <span className="figure computed" data-testid="footprint-drop-count">
+              {footprint.needles.filter((needle) => needle.kind === 'drop').length}
+            </span>
+          </dd>
+          <dt>Argo</dt>
+          <dd>
+            <span className="figure computed" data-testid="footprint-external-count">
+              {footprint.needles.filter((needle) => needle.kind === 'external').length}
+            </span>
+          </dd>
+          <dt>Flagged</dt>
+          <dd>
+            <span className="figure computed" data-testid="footprint-flagged-count">
+              {marks.filter((mark) => mark.flagged).length}
+            </span>
+          </dd>
+          <dt>Quality control</dt>
+          <dd data-testid="footprint-quality-control">
+            <span className="figure declared">
+              {footprint.qualityControlEnabled ? 'on' : 'off'}
+            </span>
+          </dd>
+        </dl>
       </div>
     </>
   );
@@ -640,6 +675,12 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
     <Panel
       key={leadHours}
       {...(legend === undefined ? {} : { legend })}
+      /* FR-046, realised. The panel's skill figures are drawn inside the panel, beneath its
+         own picture, so a score is read as one object with the thing it scores without two
+         containers having to agree about geometry. Beat 013 aligned them with CSS `subgrid`
+         across two regions; independent panes cannot share tracks, and should not have to. */
+      score={scores?.get(leadHours) ?? null}
+      briefScore={briefScores?.get(leadHours) ?? null}
       leadHours={leadHours}
       validInstant={new Date(
         forecast.byHorizon.get(leadHours)?.validInstantMs ??
@@ -724,19 +765,18 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
       </span>
       <span>
         <span className="dot hatched" /> hatched where observations lead the{' '}
-        <strong>background</strong> and the <strong>climatology</strong> &mdash; a second
-        channel, so the field reads without colour
+        <strong>background</strong> and <strong>climatology</strong>
       </span>
       {/* The spec's third acceptance scenario for the breakdown expects attribution to
           differ between horizons. It cannot yet, and the surface says so rather than
-          letting six identical fields imply six analyses. The recorded case runs one
-          analysis, at the issue instant; beat 009 cycles at each issue time and this
-          becomes one field per panel. */}
-      <span data-testid="attribution-scope">
-        the same field on every panel: this run analyses once, at{' '}
-        <span className="computed">{issued}</span>. Attribution becomes per horizon when
-        the forecast cycles.
-      </span>
+          letting six identical fields imply six analyses.
+
+          Beat 018, FR-007: what is left here is the **label** -- what a reader is looking
+          at, in six words. Why it is the same field, and what would change it, is the
+          attribution panel's own help (`docs/narrative-disposition.json`,
+          `attribution-scope`); it was a two-sentence explanation in the legend, which is a
+          legend explaining rather than labelling. */}
+      <span data-testid="attribution-scope">the same field on every panel</span>
     </>
   ) : (
     <>
@@ -747,21 +787,18 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
         <span className="dot warm" /> deeper interface
       </span>
       <span>
-        <span className="dot drop" /> XBT drop &mdash; the glyph&rsquo;s length is the
-        depth it reached
+        <span className="dot drop" /> XBT drop &mdash; length is the depth reached
       </span>
       <span>
         <span className="dot external" /> Argo (external)
       </span>
       <span data-testid="track-legend">
-        <span className="dot track" /> surface measurement, dark for warm, over{' '}
+        <span className="dot track" /> surface measurement, dark for warm:{' '}
         <span className="computed">{trackRange.low.toFixed(1)}</span> to{' '}
-        <span className="computed">{trackRange.high.toFixed(1)} &deg;C</span> &mdash; the
-        track&rsquo;s own range
+        <span className="computed">{trackRange.high.toFixed(1)} &deg;C</span>
       </span>
       <span data-testid="after-initialisation-legend">
-        <span className="dot dashed" /> dashed: measured after the forecast was
-        initialised, so it did not inform it
+        <span className="dot dashed" /> dashed: measured after the forecast was initialised
       </span>
     </>
   );
@@ -811,12 +848,14 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
 
           <p className="legend full" data-testid="row-legend">
             {legendContent}
-            {/* FR-051. The row draws the field and where each measurement was; it says so,
-                because the attribution layer and each probe at the depth it actually reached
-                are drawn in the enlarged panel and nowhere else. */}
+            {/* FR-051 requires the row to state that it is showing the field alone, and spec
+                018 FR-007 requires the surface to carry no explanation. Both hold, because
+                they ask for different things: this is the **label** FR-051 asks for, in eight
+                words, and the account of what the enlarged panel adds and why the row cannot
+                draw it is `centre/horizon-row`'s own help
+                (`docs/narrative-disposition.json`, `row-fidelity`). */}
             <span data-testid="row-fidelity">
-              the row shows the field alone at this size: the attribution layer and each
-              measurement at the depth it reached are drawn in the enlarged panel
+              field only &mdash; depths in the enlarged panel
             </span>
           </p>
         </>
@@ -825,45 +864,24 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
   );
 
   /*
-   * Every declared horizon's figures, in every state (FR-046, spec 015 FR-001).
+   * The skill curve, beneath the row (FR-046's aid rather than its requirement).
    *
-   * Not only the enlarged one. The scores region may not move when the centre's contents are
-   * replaced -- that is the whole of AT-13 -- and a region carrying six cells beside the row
-   * and one beside an enlargement would change height on a click, which is the reshaping
-   * FR-047 forbids for the same reason. The strip carries the same figures compactly, above
-   * the panel; these are the full statements, in their own columns.
+   * Beat 013 put this behind a disclosure and said why: drawn open across the scores region it
+   * was 360 by 140 in a band of paper six panels wide, and stretched to those tracks it would
+   * have been six hundred pixels tall. Both of those were consequences of the region it was
+   * in. In the horizons pane it has the width of the row and the height the row does not use,
+   * which is the room the fixed grid was leaving empty -- so it is drawn, not disclosed.
+   *
+   * It draws only the curves somebody has actually scored, labelled by issue instant. It never
+   * draws a curve for an issue time nobody has asked about.
    */
-  const scoresSlot = (
-    <>
-      {horizons.map((leadHours) => (
-        <PanelScore
-          key={leadHours}
-          leadHours={leadHours}
-          score={scores?.get(leadHours) ?? null}
-          briefScore={briefScores?.get(leadHours) ?? null}
-          refusal={forecast.byHorizon.get(leadHours)?.refusal ?? null}
-        />
-      ))}
-      {/*
-        The curve spans the same tracks as the figures above it, because it is about all of
-        them and not about any one column -- but it is behind a disclosure, and that is a
-        measured decision rather than a preference. Drawn open across the tracks it is 360 by
-        140, and at the width six panels take it would either sit in a corner of a band of
-        empty paper or, stretched to the tracks, be six hundred pixels tall. Either way it
-        takes the height the figures need, and the figures are the requirement (FR-046) while
-        the curve is an aid to reading them.
-      */}
-      <details className="full skill-disclosure" data-testid="skill-disclosure">
-        <summary>Skill against persistence, by lead time</summary>
-        <SkillInset
-          curves={curves}
-          currentIssueInstantMs={forecast.issueInstantMs}
-          widthPx={360}
-          heightPx={140}
-        />
-      </details>
-    </>
-  );
+  const skillSlot =
+    curves.length === 0 ? null : (
+      <div className="skill-curve" data-testid="skill-curve">
+        <PanelHead panel="horizons/skill-curve" />
+        <SkillPane curves={curves} currentIssueInstantMs={forecast.issueInstantMs} />
+      </div>
+    );
 
   const detail =
     shown === null || props.shownMark === null ? null : (
@@ -884,5 +902,5 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
       />
     );
 
-  return { controls, centre, scores: scoresSlot, detail };
+  return { controls, centre, skill: skillSlot, detail };
 }

@@ -98,30 +98,48 @@ const domainSchema = z
   .refine((d) => d.east > d.west, { error: 'east must be greater than west' })
   .refine((d) => d.north > d.south, { error: 'north must be greater than south' });
 
-/** The declared widths the four regions of beat 013 are built out of. */
-export interface RegionWidths {
+/** The declared widths the workspace's three columns of panes are built out of. */
+export interface PaneWidths {
+  /**
+   * What the workspace costs beyond its panes: the horizons pane's own padding, and the
+   * chrome the layout manager puts between columns that is not a sash. Beat 013 called this
+   * the page gutter, when the surface was a page with a margin; the workspace is full bleed,
+   * and the figure is now what the panes do not get rather than what the window keeps clear.
+   */
   readonly pageGutterPx: number;
   readonly controlsWidthPx: number;
   readonly detailWidthPx: number;
   readonly panelGapPx: number;
   readonly minimumPanelWidthPx: number;
+  readonly workspace: {
+    readonly sashWidthPx: number;
+    readonly paneMinimumWidthPx: number;
+  };
 }
 
 /**
- * The window width those regions need to hold every declared horizon at the declared minimum
- * panel width: the page gutter, the two fixed columns, the two gaps that separate them from
- * the centre, and the panels with their own gaps between them.
+ * The window width the workspace needs to hold every declared horizon at the declared minimum
+ * panel width: the two flanking panes **at their minimum**, the sashes between them, whatever
+ * the horizons pane costs beyond its panels, and the panels with their own gaps between them.
+ *
+ * **At their minimum, and this is the correction beat 018 makes.** Beat 013 built this sum out
+ * of `controlsWidthPx` and `detailWidthPx`, because in a grid of fixed tracks those were what
+ * the flanking columns were, always. The floor that came out was 2 038 px, and an ordinary
+ * 2 000 px monitor therefore got the below-the-floor answer -- with 828 px of that floor being
+ * chrome that had been declared unshrinkable rather than measured. In a workspace the panes
+ * flex: a control surface reads at `workspace.paneMinimumWidthPx`, and the reader who wants it
+ * wider drags the sash. So the floor is what the panes cannot go below, and the declared widths
+ * are what they open at.
  *
  * One function rather than the sum written out wherever it is wanted. Two copies of an
  * arithmetic can each agree with configuration and still disagree with each other, which is
  * how a declared figure quietly stops describing the layout it names.
  */
-export function fourRegionWidthPx(widths: RegionWidths, horizonCount: number): number {
+export function workspaceWidthPx(widths: PaneWidths, horizonCount: number): number {
   return (
     widths.pageGutterPx +
-    widths.controlsWidthPx +
-    widths.detailWidthPx +
-    2 * widths.panelGapPx +
+    2 * widths.workspace.paneMinimumWidthPx +
+    2 * widths.workspace.sashWidthPx +
     horizonCount * widths.minimumPanelWidthPx +
     (horizonCount - 1) * widths.panelGapPx
   );
@@ -189,6 +207,14 @@ export const configurationSchema = z
        * this, the row's own container scrolls and the page still does not.
        */
       referenceViewportWidthPx: z.number().int().positive(),
+      /**
+       * Beat 018, FR-011. The window the workspace is designed for and photographed at, on
+       * both axes now rather than on width alone: the author's stated floor is "at least 2k
+       * wide", and a reference width with no height beside it cannot say whether the panes
+       * fill the screen. Measured from the built workspace by
+       * `tests/shell/viewport-floor.spec.ts`, which also measures the dead space at it.
+       */
+      referenceViewportHeightPx: z.number().int().positive(),
       /** Below this a panel stops being legible, so the row stops shrinking panels. */
       minimumPanelWidthPx: z.number().int().positive(),
       /**
@@ -223,8 +249,51 @@ export const configurationSchema = z
       /** The detail column's width. 390 px, for the reason above. */
       detailWidthPx: z.number().int().positive(),
       panelGapPx: z.number().int().nonnegative(),
-      /** What the page keeps clear of the window edge, on both sides together. */
+      /**
+       * What the workspace costs beyond its panes, across the window: the horizons pane's own
+       * padding and any chrome between columns that is not a sash. Zero page margin, because
+       * beat 018's surface is full bleed -- an instrument does not keep a margin clear.
+       */
       pageGutterPx: z.number().int().nonnegative(),
+      /**
+       * Beat 018, ADR-0014. The workspace's declared geometry: what the panes are laid out to
+       * before a reader moves anything, and where their arrangement is kept.
+       *
+       * Every figure here is furniture. None of it is a forecast input, which is the whole of
+       * why the arrangement may persist at all (constitution Principle IX, amendment of
+       * 8 September 2026): a persisted run would be a second way to bring a forecast back with
+       * none of the manifest's checks, and a persisted pane width is a preference.
+       */
+      workspace: z.object({
+        /** The status strip, which is not a pane: it never tabs and never closes (FR-58). */
+        statusHeightPx: z.number().int().positive(),
+        /** How much of the selection column the provenance tabs take by default. */
+        provenanceFraction: z.number().gt(0).lt(1),
+        /**
+         * The most of the horizons pane's height the skill curve may take (SRD-v2 FR-45).
+         *
+         * FR-45 makes the row the payload and gives it the dominant space, and the curve is
+         * an aid to reading the figures the panels already carry. Left to fill what the row
+         * does not use it took **694 px of a 1 359 px pane** at the reference viewport --
+         * more than the row itself, for six points -- so the share it may take is declared
+         * rather than left to be whatever is going spare. A chart takes what it needs; the
+         * payload takes the room.
+         */
+        skillCurveFraction: z.number().gt(0).lt(1),
+        /** Below this a pane cannot be read, so the layout manager stops shrinking it. */
+        paneMinimumWidthPx: z.number().int().positive(),
+        paneMinimumHeightPx: z.number().int().positive(),
+        /** The draggable divider between two panes, as the layout manager draws it. */
+        sashWidthPx: z.number().int().nonnegative(),
+        /** Where the arrangement is kept. Geometry and pane identity only; see workspace.ts. */
+        storageKey: z.string().min(1),
+        /**
+         * The shape of what is stored. A stored arrangement written against another version
+         * is not applied: it is reported and the default is restored (FR-005), because a
+         * layout that half-applies is worse than one that did not.
+         */
+        layoutVersion: z.number().int().positive(),
+      }),
       /**
        * Beat 015, FR-049. The strip's geometry, declared beside the row's.
        *
@@ -571,18 +640,60 @@ export const configurationSchema = z
   .superRefine((c, ctx) => {
     const p = c.presentation;
     const n = c.horizons.leadHours.length;
-    const needed = fourRegionWidthPx(p, n);
+    const needed = workspaceWidthPx(p, n);
     if (p.minimumViewportWidthPx >= needed) return;
     ctx.addIssue({
       code: 'custom',
       message:
         `presentation.minimumViewportWidthPx (${String(p.minimumViewportWidthPx)}) cannot hold ` +
         `${String(n)} declared horizons at presentation.minimumPanelWidthPx: ` +
-        `${String(p.pageGutterPx)} gutter + ${String(p.controlsWidthPx)} controls + ` +
-        `${String(p.detailWidthPx)} detail + 2 x ${String(p.panelGapPx)} column gaps + ` +
+        `${String(p.pageGutterPx)} workspace chrome + 2 x ` +
+        `${String(p.workspace.paneMinimumWidthPx)} flanking panes at their minimum + 2 x ` +
+        `${String(p.workspace.sashWidthPx)} sashes + ` +
         `${String(n)} x ${String(p.minimumPanelWidthPx)} panels + ` +
         `${String(n - 1)} x ${String(p.panelGapPx)} panel gaps = ${String(needed)} px`,
       path: ['presentation', 'minimumViewportWidthPx'],
+    });
+  })
+  /**
+   * Beat 018. A pane opens at its declared width and may be dragged down to the declared pane
+   * minimum. A default narrower than the minimum is a width the layout manager would correct
+   * the moment it laid out, which is a declared figure that does not describe the layout.
+   */
+  .refine(
+    (c) =>
+      c.presentation.controlsWidthPx >= c.presentation.workspace.paneMinimumWidthPx &&
+      c.presentation.detailWidthPx >= c.presentation.workspace.paneMinimumWidthPx,
+    {
+      error:
+        'presentation.controlsWidthPx or detailWidthPx is below presentation.workspace.paneMinimumWidthPx, ' +
+        'so a pane would open narrower than the layout manager will let it be',
+      path: ['presentation', 'workspace', 'paneMinimumWidthPx'],
+    },
+  )
+  /**
+   * Beat 018, FR-011. The reference viewport is the window the workspace is designed for, so
+   * it cannot be smaller than the window the workspace refuses to lay out in. Declaring a
+   * reference below the floor would mean every figure in the documentation was taken in the
+   * fallback presentation.
+   */
+  .superRefine((c, ctx) => {
+    const p = c.presentation;
+    if (
+      p.referenceViewportWidthPx >= p.minimumViewportWidthPx &&
+      p.referenceViewportHeightPx >= p.minimumViewportHeightPx
+    ) {
+      return;
+    }
+    ctx.addIssue({
+      code: 'custom',
+      message:
+        `presentation.referenceViewportWidthPx x referenceViewportHeightPx ` +
+        `(${String(p.referenceViewportWidthPx)} x ${String(p.referenceViewportHeightPx)}) is ` +
+        `below the declared floor of ${String(p.minimumViewportWidthPx)} x ` +
+        `${String(p.minimumViewportHeightPx)}, so the reference window is one the workspace ` +
+        'declines to lay out in',
+      path: ['presentation', 'referenceViewportHeightPx'],
     });
   })
   /**

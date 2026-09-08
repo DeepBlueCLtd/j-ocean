@@ -26,7 +26,16 @@ export const SITE_PAGE_PATH = 'docs/site/disposition.md';
 export const BEGIN = '<!-- generated from docs/narrative-disposition.json by scripts/docs/build-disposition.ts -->';
 export const END = '<!-- end generated -->';
 
-export type Kind = 'stays' | 'site' | 'help' | 'dropped';
+/**
+ * Where a piece of matter went.
+ *
+ * `walkthrough` is beat 018's, and it is the one direction beat 016 had no way to record.
+ * Matter *returned*: a workspace of docked panes raises "what am I looking at", which panel
+ * help cannot answer, and two of the retired tour's steps belong to the walkthrough that
+ * answers it. A record that could only say where matter went once would be a record that
+ * quietly stopped describing the tree the second time it moved.
+ */
+export type Kind = 'stays' | 'site' | 'help' | 'dropped' | 'walkthrough';
 
 export interface Entry {
   readonly id: string;
@@ -43,6 +52,10 @@ export interface Entry {
   readonly restatedAs?: string;
   /** Which beat built the help entry that carries it. */
   readonly builtIn?: string;
+  /** Where this was before it moved again, for matter that has moved twice. */
+  readonly previously?: string;
+  /** The beat that reclaimed it, for matter that came back. */
+  readonly reclaimedIn?: string;
   /** Why it is carried nowhere, for a `dropped` destination. Required for one. */
   readonly reason?: string;
   readonly note?: string;
@@ -55,6 +68,8 @@ export interface DispositionRecord {
   readonly regions: readonly string[];
   /** The beat that built the help entries. Beat 014 owed them; beat 016 paid them. */
   readonly helpBuiltIn: string;
+  /** The beat that reclaimed matter for the walkthrough. Beat 016 retired it; beat 018 asked. */
+  readonly walkthroughReclaimedIn: string;
   readonly entries: readonly Entry[];
 }
 
@@ -90,12 +105,14 @@ export function srdSection(record: DispositionRecord): string {
   const rows = record.entries.map((entry) => {
     const where =
       entry.kind === 'stays'
-        ? `Stays, in the **${entry.destination}** region`
+        ? `Stays, in the **${entry.destination}** pane`
         : entry.kind === 'site'
           ? `${entry.arrived === true ? 'Site, and was already there' : 'Site'}: \`${entry.destination}\``
           : entry.kind === 'dropped'
             ? `**Dropped**, with a reason: ${entry.reason ?? ''}`
-            : `Help, at the panel: \`${entry.destination}\`${entry.feature === undefined ? '' : `, under *${entry.feature}*`}`;
+            : entry.kind === 'walkthrough'
+              ? `Walkthrough: \`${entry.destination}\`${entry.previously === undefined ? '' : ` (reclaimed from ${entry.previously})`}`
+              : `Help, at the panel: \`${entry.destination}\`${entry.feature === undefined ? '' : `, under *${entry.feature}*`}`;
     return `| ${cell(entry.wasAt)} | ${cell(entry.matter)} | ${where} |`;
   });
 
@@ -105,9 +122,11 @@ export function srdSection(record: DispositionRecord): string {
     `Generated from \`${RECORD_PATH}\`, which is held by \`tests/docs/disposition.test.ts\`.`,
     `${String(record.entries.length)} pieces of matter: ${String(of(record, 'stays').length)} stay in a region,`,
     `${String(of(record, 'site').length)} went to the site, ${String(of(record, 'help').length)} are a panel's own`,
-    `help, built in beat ${record.helpBuiltIn}, and ${String(of(record, 'dropped').length)} were **dropped with a`,
-    'recorded reason** rather than carried anywhere. Every destination is resolved by the test:',
-    'a site section that contains the words, a help entry that renders them, or a reason.',
+    `help, built in beat ${record.helpBuiltIn}, ${String(of(record, 'walkthrough').length)} are the`,
+    `walkthrough's, reclaimed in beat ${record.walkthroughReclaimedIn}, and ${String(of(record, 'dropped').length)}`,
+    'were **dropped with a recorded reason** rather than carried anywhere. Every destination is',
+    'resolved by the test: a site section that contains the words, a help entry or a walkthrough',
+    'step that renders them, or a reason.',
     '',
     '| Was on the application page | The matter | Now |',
     '|---|---|---|',
@@ -154,6 +173,11 @@ export function sitePage(record: DispositionRecord): string {
     "of the tour's steps has a row here too: a help entry, a section of this site, or a reason",
     'for being dropped.',
     '',
+    'Beat 018 made the application a docked workspace, and two things followed. Eleven readouts',
+    'that had been written as sentences became readouts. And the walkthrough returned, to answer',
+    'the question a workspace of panes raises and panel help cannot — *what am I looking at* —',
+    'so some matter that had gone to the site came back to it. Those rows say where they were.',
+    '',
     'The record itself is',
     `[\`${RECORD_PATH}\`](https://github.com/DeepBlueCLtd/j-ocean/blob/main/${RECORD_PATH}),`,
     'and `tests/docs/disposition.test.ts` holds it: every destination on this page has to',
@@ -177,6 +201,17 @@ export function sitePage(record: DispositionRecord): string {
         `\`${cell(entry.destination)}\`${entry.feature === undefined ? '' : `, under **${cell(entry.feature)}**`}`,
     ),
     table(
+      'walkthrough',
+      'It came back, to the walkthrough',
+      'Beat 016 retired the walkthrough and sent these elsewhere, on the reasoning that a ' +
+        "workspace-level explanation had nowhere to live once the tour was gone. Beat 018's " +
+        'docked workspace raises the question panel help cannot answer — *what am I looking ' +
+        'at* — so the walkthrough returned and these came back with it. The test renders each ' +
+        'step and holds these words against what it renders.',
+      (entry) =>
+        `\`${cell(entry.destination)}\`${entry.previously === undefined ? '' : ` — reclaimed from ${cell(entry.previously)}`}`,
+    ),
+    table(
       'dropped',
       'It was dropped, and here is why',
       'The surface now says it better, or says it for itself. Nothing is carried; the reason is ' +
@@ -187,8 +222,8 @@ export function sitePage(record: DispositionRecord): string {
     table(
       'stays',
       'It stayed on the application',
-      'A reader drives it, or reads a live figure from it, so it stays — compacted — in the region that owns it.',
-      (entry) => `The **${cell(entry.destination)}** region`,
+      'A reader drives it, or reads a live figure from it, so it stays — as a readout — in the pane that owns it.',
+      (entry) => `The **${cell(entry.destination)}** pane`,
     ),
     END,
     '',

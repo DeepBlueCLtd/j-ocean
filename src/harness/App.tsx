@@ -18,7 +18,7 @@ import { FieldView, type Marker } from './FieldView.js';
 import { footprintOf, markersFrom, marksOf, type Footprint } from './footprint.js';
 import type { Edit } from '../instruments/edits.js';
 import { useHorizonRow } from './HorizonRow.js';
-import { BelowFloor, Regions, useAboveFloor } from './Regions.js';
+import { BelowFloor, Workspace, useAboveFloor, type PaneDefinition, type PanePlacement } from './Workspace.js';
 import { departureBrief, runForecast, type DepartureBrief, type ForecastResult } from '../run/forecast.js';
 import { climatologyReferenceOver } from '../instruments/climatology-reference.js';
 import { interfaceFieldFromContainer } from '../instruments/interface-field.js';
@@ -42,7 +42,8 @@ import type { FieldContainer } from '../truth/container.js';
 import { drawRootSeed } from './seed-provisioning.js';
 import { measure, overBudget } from './timing.js';
 import { Computed, Declared, HostTime } from './figures.js';
-import { HelpProvider, PanelCorner, PanelHead, PanelSummary } from './Help.js';
+import { Walkthrough } from './Walkthrough.js';
+import { HelpProvider, PanelCorner, PanelHead } from './Help.js';
 import { THE_ROW, type CentreContent } from './CentreContent.js';
 import {
   addressHref,
@@ -213,6 +214,20 @@ export function App() {
    * cannot live where the address cannot see it.
    */
   const [requestedCentre, setRequestedCentre] = useState<CentreContent>(THE_ROW);
+
+  /**
+   * What the workspace could not do with a stored arrangement, and how to put it back
+   * (spec 018 FR-005, US2 scenarios 3 and 4).
+   *
+   * Both live here rather than in `Workspace.tsx` because both belong beside the statement in
+   * the status strip: a reader who has been told their arrangement was not usable is owed the
+   * control that restores the default in the same place, not two panes away.
+   */
+  const [workspaceRefusal, setWorkspaceRefusal] = useState<string | null>(null);
+  const resetWorkspace = useRef<(() => void) | null>(null);
+  const onWorkspaceReady = useCallback((reset: () => void) => {
+    resetWorkspace.current = reset;
+  }, []);
 
   /**
    * The address, and the rules it lives by (FR-056, SC-002, SC-003).
@@ -816,6 +831,12 @@ export function App() {
    * dismiss control because there is nothing about it that stops being true, and it sits
    * above the controls column's own scroller, so no amount of scrolling takes it off screen.
    */
+  /*
+   * FR-58, and it is on the surface without interaction rather than a footnote. It has no
+   * dismiss control because there is nothing about it that stops being true, and it lives in
+   * the status strip, which is not a pane: there is no arrangement a reader can reach in which
+   * it has been tabbed behind something, dragged into a corner or closed.
+   */
   const statement = (
     <>
       <section className="not-operational" data-testid="not-operational" role="note">
@@ -855,9 +876,9 @@ export function App() {
   );
 
   /*
-   * Before a run exists there is nothing to divide into regions, so the surface is the
+   * Before a run exists there is nothing to divide into panes, so the surface is the
    * statement and, where the configuration refused to validate, the refusal. The refusal is
-   * bounded and scrolls within itself: a stack trace that lengthens the page would break the
+   * bounded and scrolls within itself: a stack trace that lengthened the page would break the
    * one property this beat exists to establish.
    */
   if (loaded === null || view === null) {
@@ -866,7 +887,12 @@ export function App() {
         <div className="boot-view">
           {statement}
           {failure !== null && (
-            <section className="failure" data-testid="configuration-failure" data-scrolls="true">
+            <section
+              className="failure"
+              data-testid="configuration-failure"
+              data-scrolls="list"
+              data-list="the validator's complaints, one per line"
+            >
               <h2>The configuration did not validate, so no run was provisioned.</h2>
               <pre>{failure}</pre>
             </section>
@@ -878,13 +904,25 @@ export function App() {
 
   const config = loaded.config;
 
+  /*
+   * The controls (SRD-v1 FR-11, FR-25, FR-31, FR-32, FR-33; spec 018 US3, FR-006).
+   *
+   * A control surface, grouped by what each control acts on, and nothing here explains
+   * anything: every input carries its accessible name, its unit and the bounds configuration
+   * declares for it, and the sentence that used to introduce it is in this panel's own help or
+   * in the walkthrough, with a row in docs/narrative-disposition.json saying which.
+   *
+   * The run's provenance is no longer beneath these controls. It was six stacked disclosures
+   * in a column that scrolled 1,344 px in a 1,440 px window, which is the six-screen page of
+   * SRD-v2 §1.1 folded sideways; it is now four tabs of a pane of its own.
+   */
   const controls = (
     <>
       {/*
         SRD-v1 FR-11. The contrast between the eventful domain and the bland one is called a
-        requirement rather than a bonus, and until this beat nothing on the surface offered
-        it. Choosing a domain loads that domain's three committed artefacts and rebuilds the
-        run from the declared seed; the recorded case is the default domain, unmoved.
+        requirement rather than a bonus, and until beat 017 nothing on the surface offered it.
+        Choosing a domain loads that domain's three committed artefacts and rebuilds the run
+        from the declared seed; the recorded case is the default domain, unmoved.
       */}
       <div className="control-group" data-testid="domain-control">
         <PanelHead panel="controls/domain" />
@@ -918,16 +956,6 @@ export function App() {
 
       <div className="control-group" data-testid="run-controls">
         <PanelHead panel="controls/run" />
-        <p data-testid="recorded-case">
-          {view.recordedCase ? (
-            <>
-              This is <Declared>{config.run.recordedCaseLabel}</Declared>: the declared seed,
-              unchanged.
-            </>
-          ) : (
-            'This is not the recorded case. A seed was drawn for this visit and nothing about it persists.'
-          )}
-        </p>
         <div className="row-controls">
           <button
             type="button"
@@ -947,28 +975,6 @@ export function App() {
           )}
         </div>
 
-        <p data-testid="step-time">
-          {view.lastStepMs === null ? (
-            <span className="unmeasured">not yet measured</span>
-          ) : (
-            <>
-              <HostTime>{view.lastStepMs.toFixed(3)} ms/step</HostTime>{' '}
-              {overBudget(view.lastStepMs, config.budget.frameBudgetMs) ? (
-                <em>
-                  over the declared budget of{' '}
-                  <Declared>{config.budget.frameBudgetMs} ms</Declared>, and said so rather
-                  than freezing the page
-                </em>
-              ) : (
-                <span className="within-budget">
-                  within the declared budget of{' '}
-                  <Declared>{config.budget.frameBudgetMs} ms</Declared>
-                </span>
-              )}
-            </>
-          )}
-        </p>
-
         {overBudgetNotice !== null && (
           <div className="banner warn" data-testid="over-budget">
             <p>
@@ -985,329 +991,364 @@ export function App() {
           </div>
         )}
       </div>
-
-      {/*
-        The run's provenance, behind disclosures (FR-044). Beat 014 opened each of these and
-        asked the spec's question of it: does a reader drive this, or read a live figure from
-        it, or is it an explanation? What is left is the figures and their labels. Every
-        sentence that explained rather than stated has a row in docs/narrative-disposition.json
-        saying where it went, and tests/docs/disposition.test.ts holds it there.
-      */}
-      <div className="disclosures">
-        <details data-testid="run-panel">
-          <PanelSummary panel="controls/run-provenance" />
-          <dl>
-            <dt>Root seed</dt>
-            <dd>
-              <Declared>
-                <span data-testid="root-seed">{view.run.rng.rootSeed}</span>
-              </Declared>
-            </dd>
-
-            <dt>Domain</dt>
-            <dd>
-              <Declared>{view.run.domainId}</Declared>,{' '}
-              <Declared>
-                {config.grid.nx} &times; {config.grid.ny}
-              </Declared>{' '}
-              cells laid over{' '}
-              <Computed>
-                {view.results.grid.cellSizeXMetres.toFixed(0)} &times;{' '}
-                {view.results.grid.cellSizeYMetres.toFixed(0)} m
-              </Computed>
-              .
-            </dd>
-
-            <dt>Timestep</dt>
-            <dd data-testid="stability">
-              <Declared>{view.run.stability.declaredTimestepSeconds} s</Declared> from{' '}
-              <Declared>{config.clock.epoch}</Declared>, inside the{' '}
-              <Computed>{view.run.stability.largestStableTimestepSeconds.toFixed(1)} s</Computed>{' '}
-              the declared criterion admits (the scheme&rsquo;s linear boundary is{' '}
-              <Computed>{view.run.stability.linearStabilityBoundarySeconds.toFixed(1)} s</Computed>
-              ). Gravity-wave speed{' '}
-              <Computed>
-                {view.run.stability.gravityWaveSpeedMetresPerSecond.toFixed(3)} m/s
-              </Computed>
-              .
-            </dd>
-
-            <dt>Steps taken</dt>
-            <dd>
-              <Computed>
-                <span data-testid="steps">{view.steps}</span>
-              </Computed>{' '}
-              {view.integrating && <span className="unmeasured">integrating&hellip;</span>}
-            </dd>
-
-            <dt>Valid at</dt>
-            <dd>
-              <Computed>
-                <span data-testid="instant">{view.instant}</span>
-              </Computed>
-            </dd>
-
-            {/* Beat 013: the field panel is gone -- its field is the row's panels and the
-                centre's analysed field -- and these are the figures that were beneath it. */}
-            <dt>Initialised from</dt>
-            <dd data-testid="initialisation">
-              the truth record at{' '}
-              <Computed>{new Date(view.initialisation.instantMs).toISOString()}</Computed>;
-              layer thickness{' '}
-              <Computed>
-                {view.initialisation.thicknessRangeMetres[0].toFixed(0)}&ndash;
-                {view.initialisation.thicknessRangeMetres[1].toFixed(0)} m
-              </Computed>{' '}
-              about a declared mean of{' '}
-              <Declared>{config.model.meanUpperLayerThicknessMetres} m</Declared>.
-            </dd>
-
-            <dt>Excluded margin</dt>
-            <dd>
-              <Declared>{view.results.spongeWidthCells} cells</Declared> of sponge at each
-              edge, relaxed toward the initial state. Scoring will exclude it.
-            </dd>
-
-            <dt>Outcrop clamps</dt>
-            <dd data-testid="outcrops">
-              <Computed>{view.results.outcrops}</Computed>. The layer is clamped at a declared
-              minimum of{' '}
-              <Declared>{config.model.minimumLayerThicknessMetres} m</Declared> where it would
-              otherwise outcrop, and every clamp is counted rather than swallowed.
-            </dd>
-          </dl>
-        </details>
-
-        <details data-testid="instruments-panel">
-          <PanelSummary panel="controls/instruments" />
-          <dl>
-            <dt>Ownship surface</dt>
-            <dd data-testid="surface-count">
-              <Computed>{view.surface.length}</Computed> measurements along the declared track,
-              at <Declared>{config.instruments.track.sampleIntervalHours} h</Declared>{' '}
-              intervals. Declared error{' '}
-              <Declared>{config.instruments.surface.noiseStandardDeviationDegC} degC</Declared>{' '}
-              instrument and{' '}
-              <Declared>
-                {config.instruments.surface.representativenessStandardDeviationDegC} degC
-              </Declared>{' '}
-              representativeness.
-            </dd>
-
-            <dt>XBT drops</dt>
-            <dd data-testid="drop-count">
-              <Computed>{view.drops.length}</Computed> drops of{' '}
-              <Declared>{config.instruments.xbt.depthsMetres.length}</Declared> levels each.
-            </dd>
-
-            <dt>What a drop told us</dt>
-            <dd data-testid="interface-estimates">
-              {view.drops.map(({ interface: inferred }) => (
-                <span key={inferred.id} className="estimate">
-                  {isUsable(inferred) ? (
-                    <>
-                      <Computed>{inferred.value.toFixed(0)} m</Computed>
-                      <span className="host-time"> &plusmn;{inferred.error.totalSd.toFixed(0)} m</span>
-                    </>
-                  ) : (
-                    <em>unresolved</em>
-                  )}
-                </span>
-              ))}
-            </dd>
-
-            <dt>Argo</dt>
-            <dd data-testid="argo-state">
-              {config.instruments.argo.assimilate ? (
-                <>
-                  <Computed>{view.argo.length}</Computed> profiles admitted, marked{' '}
-                  <em>external</em>.
-                </>
-              ) : (
-                <>Drawn, not assimilated. The toggle is off.</>
-              )}
-            </dd>
-
-            <dt>Flags</dt>
-            <dd data-testid="flag-summary">
-              {flagSummary(view).length === 0 ? (
-                <>
-                  No check fired. Quality control is{' '}
-                  <Declared>{config.instruments.qualityControl.enabled ? 'on' : 'off'}</Declared>
-                  .
-                </>
-              ) : (
-                flagSummary(view).map(([code, count]) => (
-                  <span key={code} className="estimate">
-                    <Computed>{count}</Computed> {code}
-                  </span>
-                ))
-              )}
-            </dd>
-          </dl>
-        </details>
-
-        {record !== null && (
-          <details data-testid="truth-panel">
-            <PanelSummary panel="controls/truth" />
-            <dl>
-              <dt>Domain</dt>
-              <dd data-testid="truth-domain">
-                <Declared>{record.domainId}</Declared>
-              </dd>
-
-              <dt>Truth source</dt>
-              <dd data-testid="truth-source">
-                {String((record.truth.provenance()['sourceLabel'] as string | undefined) ?? '')}
-              </dd>
-
-              <dt>Native resolution</dt>
-              <dd>
-                <Declared>{record.truth.nativeResolutionDegrees}&deg;</Declared>, which is{' '}
-                <Declared>
-                  {config.domains.list.find((d) => d.id === record.domainId)
-                    ?.truthToModelResolutionRatio}
-                  &times;
-                </Declared>{' '}
-                coarser than the model grid.
-              </dd>
-
-              <dt>Instants</dt>
-              <dd data-testid="truth-instants">
-                <Computed>{record.truth.instantsMs().length}</Computed>, spaced{' '}
-                <Computed>
-                  {(record.truth.provenance()['instantSpacingHours'] as number[] | undefined)?.join(
-                    ' and ',
-                  )}
-                </Computed>{' '}
-                hours apart.
-              </dd>
-
-              <dt>Depth levels</dt>
-              <dd>
-                <Declared>{record.truth.depthLevelsMetres().join(', ')} m</Declared>
-              </dd>
-
-              <dt>Argo profiles</dt>
-              <dd data-testid="observation-count">
-                <Computed>{record.observations.profiles.length}</Computed> profiles,{' '}
-                <Computed>{levelCount(record.observations)}</Computed> levels, of which{' '}
-                <Computed>{flaggedLevelCount(record.observations)}</Computed> carry a flag the
-                analysis will not treat as usable.
-              </dd>
-
-              <dt>Climatology</dt>
-              <dd data-testid="climatology-overlap">
-                Averaged over{' '}
-                <Declared>
-                  {String(
-                    (record.climatology.header.provenance['window'] as { start: string })?.start,
-                  )}
-                </Declared>{' '}
-                to{' '}
-                <Declared>
-                  {String((record.climatology.header.provenance['window'] as { end: string })?.end)}
-                </Declared>
-                , which overlaps this run&rsquo;s period by{' '}
-                <Computed>
-                  {String(record.climatology.header.provenance['overlapWithRunPeriodDays'])}
-                </Computed>{' '}
-                days.
-              </dd>
-            </dl>
-          </details>
-        )}
-
-        <details data-testid="manifest-panel">
-          <PanelSummary panel="controls/manifest" />
-
-          <dl>
-            <dt>This build</dt>
-            <dd className="computed" data-testid="code-version">{CODE_VERSION}</dd>
-            <dt>Fields and analysis</dt>
-            {/* AT-04, as something a reader can check: two visits showing this digest have
-                the same fields. */}
-            <dd className="computed" data-testid="results-digest">{resultsDigest}</dd>
-          </dl>
-
-          <div className="row-controls">
-            <button
-              type="button"
-              data-testid="download-manifest"
-              onClick={() => {
-                const url = URL.createObjectURL(
-                  new Blob([manifest ?? ''], { type: 'application/json' }),
-                );
-                const anchor = document.createElement('a');
-                anchor.href = url;
-                anchor.download = `j-ocean-${view.run.rng.rootSeed}.json`;
-                anchor.click();
-                URL.revokeObjectURL(url);
-              }}
-            >
-              Download this manifest
-            </button>
-          </div>
-
-          <pre data-testid="manifest">{manifest}</pre>
-
-          <h3>Import a manifest</h3>
-          <textarea
-            data-testid="manifest-input"
-            rows={4}
-            value={pasted}
-            onChange={(event) => { setPasted(event.target.value); }}
-            placeholder="Paste a manifest"
-          />
-          <div className="row-controls">
-            <button
-              type="button"
-              data-testid="import-manifest"
-              onClick={() => { importManifest(pasted); }}
-              disabled={pasted.trim() === ''}
-            >
-              Import this manifest
-            </button>
-            <input
-              type="file"
-              accept="application/json,.json"
-              data-testid="manifest-file"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file === undefined) return;
-                void file.text().then((text) => {
-                  setPasted(text);
-                  importManifest(text);
-                });
-              }}
-            />
-          </div>
-
-          {importFailure !== null && (
-            <p className="banner warn" data-testid="import-failure">
-              {importFailure}
-            </p>
-          )}
-          {importWarning !== null && (
-            <p className="banner warn" data-testid="import-warning">
-              {importWarning}
-            </p>
-          )}
-        </details>
-
-      </div>
     </>
   );
 
   /*
-   * FR-045: the row, and nothing else competing with it for this region's space. Before it is
-   * built the row is not there, so FR-048 applies instead: the region says what the row will
-   * show and what building it costs, and carries the run's analysed field at full size --
-   * which is where a cell is selected while there are no panels to select one on.
+   * The run's provenance, as tabs (spec 018 T012).
+   *
+   * Beat 014 opened each of these and asked the spec's question of it: does a reader drive
+   * this, or read a live figure from it, or is it an explanation? What was left was the
+   * figures and their labels -- and, beat 018 found, a good deal of connective prose between
+   * them that was doing a label's job in a sentence's clothes. What is left now is a term list:
+   * a name, a figure, and its unit. Every sentence that went has a row in
+   * docs/narrative-disposition.json saying where, and tests/docs/disposition.test.ts holds it.
    */
-  const centre =
+  const runProvenance = (
+    <section className="provenance-pane" data-testid="run-panel">
+      <PanelHead panel="controls/run-provenance" />
+      {/* FR-002. A term list of the run's own figures is an enumeration a reader scans, so it
+          may scroll where the pane is short, and it says which list it is. What may never
+          scroll here is an explanation, and there is none: every line is a label and a
+          figure. */}
+      <dl data-scrolls="list" data-list="the run's own figures, one to a line">
+        <dt>Root seed</dt>
+        <dd>
+          <Declared>
+            <span data-testid="root-seed">{view.run.rng.rootSeed}</span>
+          </Declared>
+        </dd>
+
+        <dt>Domain</dt>
+        <dd>
+          <Declared>{view.run.domainId}</Declared>
+        </dd>
+
+        <dt>Grid</dt>
+        <dd>
+          <Declared>
+            {config.grid.nx} &times; {config.grid.ny}
+          </Declared>{' '}
+          cells,{' '}
+          <Computed>
+            {view.results.grid.cellSizeXMetres.toFixed(0)} &times;{' '}
+            {view.results.grid.cellSizeYMetres.toFixed(0)} m
+          </Computed>
+        </dd>
+
+        <dt>Timestep</dt>
+        <dd data-testid="stability">
+          <Declared>{view.run.stability.declaredTimestepSeconds} s</Declared>
+        </dd>
+
+        <dt>Epoch</dt>
+        <dd>
+          <Declared>{config.clock.epoch}</Declared>
+        </dd>
+
+        <dt>Largest stable step</dt>
+        <dd>
+          <Computed>{view.run.stability.largestStableTimestepSeconds.toFixed(1)} s</Computed>
+        </dd>
+
+        <dt>Linear boundary</dt>
+        <dd>
+          <Computed>{view.run.stability.linearStabilityBoundarySeconds.toFixed(1)} s</Computed>
+        </dd>
+
+        <dt>Gravity-wave speed</dt>
+        <dd>
+          <Computed>
+            {view.run.stability.gravityWaveSpeedMetresPerSecond.toFixed(3)} m/s
+          </Computed>
+        </dd>
+
+        <dt>Steps taken</dt>
+        <dd>
+          <Computed>
+            <span data-testid="steps">{view.steps}</span>
+          </Computed>{' '}
+          {view.integrating && <span className="unmeasured">integrating&hellip;</span>}
+        </dd>
+
+        <dt>Valid at</dt>
+        <dd>
+          <Computed>
+            <span data-testid="instant">{view.instant}</span>
+          </Computed>
+        </dd>
+
+        <dt>Initialised from</dt>
+        <dd data-testid="initialisation">
+          <Computed>{new Date(view.initialisation.instantMs).toISOString()}</Computed>
+        </dd>
+
+        <dt>Layer thickness</dt>
+        <dd>
+          <Computed>
+            {view.initialisation.thicknessRangeMetres[0].toFixed(0)}&ndash;
+            {view.initialisation.thicknessRangeMetres[1].toFixed(0)} m
+          </Computed>{' '}
+          about <Declared>{config.model.meanUpperLayerThicknessMetres} m</Declared>
+        </dd>
+
+        <dt>Excluded margin</dt>
+        <dd>
+          <Declared>{view.results.spongeWidthCells} cells</Declared> of sponge, unscored
+        </dd>
+
+        <dt>Outcrop clamps</dt>
+        <dd data-testid="outcrops">
+          <Computed>{view.results.outcrops}</Computed> at{' '}
+          <Declared>{config.model.minimumLayerThicknessMetres} m</Declared>
+        </dd>
+      </dl>
+    </section>
+  );
+
+  const instruments = (
+    <section className="provenance-pane" data-testid="instruments-panel">
+      <PanelHead panel="controls/instruments" />
+      <dl data-scrolls="list" data-list="what each instrument produced, one to a line">
+        <dt>Ownship surface</dt>
+        <dd data-testid="surface-count">
+          <Computed>{view.surface.length}</Computed> at{' '}
+          <Declared>{config.instruments.track.sampleIntervalHours} h</Declared>
+        </dd>
+
+        <dt>Surface error</dt>
+        <dd>
+          <Declared>{config.instruments.surface.noiseStandardDeviationDegC} degC</Declared>{' '}
+          instrument,{' '}
+          <Declared>
+            {config.instruments.surface.representativenessStandardDeviationDegC} degC
+          </Declared>{' '}
+          representativeness
+        </dd>
+
+        <dt>XBT drops</dt>
+        <dd data-testid="drop-count">
+          <Computed>{view.drops.length}</Computed> &times;{' '}
+          <Declared>{config.instruments.xbt.depthsMetres.length}</Declared> levels
+        </dd>
+
+        <dt>What a drop told us</dt>
+        <dd data-testid="interface-estimates">
+          {view.drops.map(({ interface: inferred }) => (
+            <span key={inferred.id} className="estimate">
+              {isUsable(inferred) ? (
+                <>
+                  <Computed>{inferred.value.toFixed(0)} m</Computed>
+                  {/* The kind is unchanged (NFR-05): beat 008 drew a drop's error in the
+                      host-time face and it stays there. What is added is the `figure` class,
+                      so that the surface's own vocabulary says this is a figure -- which is
+                      what lets tests/shell/prose.spec.ts tell a readout from a sentence. */}
+                  <span className="figure host-time">
+                    &plusmn;{inferred.error.totalSd.toFixed(0)} m
+                  </span>
+                </>
+              ) : (
+                <em>unresolved</em>
+              )}
+            </span>
+          ))}
+        </dd>
+
+        <dt>Argo</dt>
+        <dd data-testid="argo-state">
+          <Computed>{view.argo.length}</Computed>{' '}
+          {config.instruments.argo.assimilate ? 'assimilated' : 'drawn, not assimilated'}
+        </dd>
+
+        <dt>Flags</dt>
+        <dd data-testid="flag-summary">
+          {flagSummary(view).length === 0 ? (
+            <>
+              none fired; control{' '}
+              <Declared>{config.instruments.qualityControl.enabled ? 'on' : 'off'}</Declared>
+            </>
+          ) : (
+            flagSummary(view).map(([code, count]) => (
+              <span key={code} className="estimate">
+                <Computed>{count}</Computed> {code}
+              </span>
+            ))
+          )}
+        </dd>
+      </dl>
+    </section>
+  );
+
+  const truthRecord =
+    record === null ? null : (
+      <section className="provenance-pane" data-testid="truth-panel">
+        <PanelHead panel="controls/truth" />
+        <dl data-scrolls="list" data-list="the truth record's own figures, one to a line">
+          <dt>Domain</dt>
+          <dd data-testid="truth-domain">
+            <Declared>{record.domainId}</Declared>
+          </dd>
+
+          <dt>Truth source</dt>
+          <dd data-testid="truth-source">
+            {String((record.truth.provenance()['sourceLabel'] as string | undefined) ?? '')}
+          </dd>
+
+          <dt>Native resolution</dt>
+          <dd>
+            <Declared>{record.truth.nativeResolutionDegrees}&deg;</Declared>,{' '}
+            <Declared>
+              {config.domains.list.find((d) => d.id === record.domainId)
+                ?.truthToModelResolutionRatio}
+              &times;
+            </Declared>{' '}
+            the model grid
+          </dd>
+
+          <dt>Instants</dt>
+          <dd data-testid="truth-instants">
+            <Computed>{record.truth.instantsMs().length}</Computed>,{' '}
+            <Computed>
+              {(record.truth.provenance()['instantSpacingHours'] as number[] | undefined)?.join(
+                ' and ',
+              )}
+            </Computed>{' '}
+            h apart
+          </dd>
+
+          <dt>Depth levels</dt>
+          <dd>
+            <Declared>{record.truth.depthLevelsMetres().join(', ')} m</Declared>
+          </dd>
+
+          <dt>Argo profiles</dt>
+          <dd data-testid="observation-count">
+            <Computed>{record.observations.profiles.length}</Computed> profiles,{' '}
+            <Computed>{levelCount(record.observations)}</Computed> levels,{' '}
+            <Computed>{flaggedLevelCount(record.observations)}</Computed> flagged
+          </dd>
+
+          <dt>Climatology window</dt>
+          <dd data-testid="climatology-overlap">
+            <Declared>
+              {String(
+                (record.climatology.header.provenance['window'] as { start: string })?.start,
+              )}
+            </Declared>{' '}
+            to{' '}
+            <Declared>
+              {String((record.climatology.header.provenance['window'] as { end: string })?.end)}
+            </Declared>
+            ; overlap{' '}
+            <Computed>
+              {String(record.climatology.header.provenance['overlapWithRunPeriodDays'])}
+            </Computed>{' '}
+            days
+          </dd>
+        </dl>
+      </section>
+    );
+
+  /*
+   * The manifest tab, and the one pane on this surface that may scroll (spec 018 FR-002).
+   *
+   * It scrolls a **list**: a manifest is a document a reader copies, line by line, and an
+   * enumeration a reader scans is exactly what the list/prose distinction admits. Beat 013's
+   * doctrine would have let the controls column scroll six paragraphs on the same declaration,
+   * which is why the declaration now names the kind of content rather than only the fact.
+   */
+  const manifestPane = (
+    <section className="provenance-pane" data-testid="manifest-panel">
+      <PanelHead panel="controls/manifest" />
+      <dl>
+        <dt>This build</dt>
+        <dd className="computed" data-testid="code-version">{CODE_VERSION}</dd>
+        {/* AT-04, as something a reader can check: two visits showing this digest have the
+            same fields. */}
+        <dt>Fields and analysis</dt>
+        <dd className="computed" data-testid="results-digest">{resultsDigest}</dd>
+      </dl>
+
+      <div className="row-controls">
+        <button
+          type="button"
+          data-testid="download-manifest"
+          onClick={() => {
+            const url = URL.createObjectURL(
+              new Blob([manifest ?? ''], { type: 'application/json' }),
+            );
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = `j-ocean-${view.run.rng.rootSeed}.json`;
+            anchor.click();
+            URL.revokeObjectURL(url);
+          }}
+        >
+          Download this manifest
+        </button>
+      </div>
+
+      <pre data-testid="manifest" data-scrolls="list" data-list="the manifest, as a reader copies it">
+        {manifest}
+      </pre>
+
+      <label htmlFor="manifest-input">Paste a manifest to import</label>
+      <textarea
+        id="manifest-input"
+        data-testid="manifest-input"
+        rows={3}
+        value={pasted}
+        onChange={(event) => { setPasted(event.target.value); }}
+        placeholder="Paste a manifest"
+      />
+      <div className="row-controls">
+        <button
+          type="button"
+          data-testid="import-manifest"
+          onClick={() => { importManifest(pasted); }}
+          disabled={pasted.trim() === ''}
+        >
+          Import this manifest
+        </button>
+        <input
+          type="file"
+          accept="application/json,.json"
+          aria-label="Import a manifest from a file"
+          data-testid="manifest-file"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file === undefined) return;
+            void file.text().then((text) => {
+              setPasted(text);
+              importManifest(text);
+            });
+          }}
+        />
+      </div>
+
+      {importFailure !== null && (
+        <p className="banner warn" data-testid="import-failure">
+          {importFailure}
+        </p>
+      )}
+      {importWarning !== null && (
+        <p className="banner warn" data-testid="import-warning">
+          {importWarning}
+        </p>
+      )}
+    </section>
+  );
+
+  /*
+   * FR-045, as a pane: the row, and nothing else competing with it for the space. Before it is
+   * built the row is not there, so FR-048 applies instead -- narrowed by §8.1 to as few words
+   * as will say what would appear -- and the pane carries the run's analysed field at the size
+   * the pane gives it, which is where a cell is selected while there are no panels to select
+   * one on.
+   */
+  const horizons =
     view.forecast === null ? (
-      <div className="full row-invitation" data-testid="row-invitation">
+      <div className="row-invitation" data-testid="row-invitation">
         {/* Two panels rather than one heading over both: the picture on the left is the
             analysis's own gain and the column on the right is what the row will show, and each
             is a thing a reader can be confused by on its own (FR-052). */}
@@ -1326,8 +1367,7 @@ export function App() {
             onSelect={selectCell}
           />
           <figcaption className="figure-label">
-            The weight observations carried in each cell &mdash; the analysis&rsquo;s own gain,
-            drawn as a field.
+            Weight carried by observations, per cell
           </figcaption>
         </figure>
         <div className="row-invitation-prose">
@@ -1335,9 +1375,9 @@ export function App() {
           {/*
             FR-048 and spec 017 T023. A link may name a panel, or a measurement drawn on one,
             before the row that holds it has been built. The selection is **held** rather than
-            honoured early or thrown away, and the region says what building the row costs --
-            because a reader who followed a link to a panel and found the row unbuilt is owed
-            the reason and the price, not a blank centre. Nothing has been computed to say it.
+            honoured early or thrown away, and the surface says so -- because a reader who
+            followed a link to a panel and found the row unbuilt is owed the reason, not a
+            blank pane. Nothing has been computed to say it.
           */}
           {(requestedCentre.kind === 'enlarged' || mark !== null) && (
             <p className="banner" data-testid="address-held">
@@ -1356,60 +1396,44 @@ export function App() {
             </p>
           )}
           <p className="region-empty" data-testid="row-invitation-statement">
-            Six panels at the declared horizons &mdash;{' '}
+            Panels at{' '}
             <Declared>
               <span data-testid="horizons">{config.horizons.leadHours.join(', ')} h</span>
-            </Declared>{' '}
-            &mdash; each stating what it is valid for, what it was initialised from, and what it
-            was worth against two references.
+            </Declared>
+            , once the row is built.
           </p>
           <dl>
             <dt>Influence radius</dt>
             <dd data-testid="influence-radius">
-              A property of the{' '}
-              <Declared>{config.analysis.correlationLengthScaleKilometres} km</Declared> declared
-              correlation length scale, not of the ocean.
+              <Declared>{config.analysis.correlationLengthScaleKilometres} km</Declared>
             </dd>
             <dt>Observations used</dt>
             <dd data-testid="analysis-counts">
-              <Computed>{view.analysis.used.length}</Computed> entered the analysis;{' '}
-              <Computed>{view.analysis.excluded.length}</Computed> were excluded and are still
-              drawn. <Computed>{view.analysis.attribution.clampedCells}</Computed> cells had a
-              weight clamped and renormalised.
+              <Computed>{view.analysis.used.length}</Computed>
+            </dd>
+            <dt>Excluded, still drawn</dt>
+            <dd data-testid="analysis-excluded">
+              <Computed>{view.analysis.excluded.length}</Computed>
+            </dd>
+            <dt>Cells clamped</dt>
+            <dd data-testid="analysis-clamped">
+              <Computed>{view.analysis.attribution.clampedCells}</Computed>
             </dd>
           </dl>
         </div>
       </div>
     ) : (
-      row.centre
+      <>
+        {row.centre}
+        {row.skill}
+      </>
     );
 
-  /* FR-046, and FR-048 where there is nothing to report yet. */
-  const scores = (
-    <>
-      {/*
-        FR-046 gives this region no heading of its own -- each column is headed by the panel
-        above it -- so the help control is placed in the region's top-right corner by the
-        stylesheet rather than in the flow. A head line added here would change the region's
-        height, and the scores not moving is AT-13.
-      */}
-      <PanelCorner panel="scores" />
-      {view.forecast === null ? (
-        <p className="region-empty full" data-testid="scores-empty">
-          Each panel&rsquo;s skill against persistence and against climatology appears here, in
-          that panel&rsquo;s own column, once the row has been built and scored.
-        </p>
-      ) : (
-        row.scores
-      )}
-    </>
-  );
-
   /*
-   * FR-047 and FR-048. Whatever was last selected, and -- when nothing has been -- the two
-   * things that can appear here and how to put one of them there.
+   * FR-047 and FR-048. Whatever was last selected, and -- when nothing has been -- what can
+   * appear here, in as few words as will say it.
    */
-  const detail = (
+  const selectionPane = (
     <>
       <PanelHead panel="detail/attribution-breakdown" level={2} />
       {/*
@@ -1434,10 +1458,11 @@ export function App() {
             const breakdown = view.analysis.breakdownAt(view.selectedCell);
             return (
               <>
-                <p>
-                  Cell <Computed>{view.selectedCell}</Computed>, as the analysis weighted it.
-                </p>
-                <dl>
+                <dl className="panel-labels">
+                  <dt>Cell</dt>
+                  <dd>
+                    <Computed>{view.selectedCell}</Computed>
+                  </dd>
                   <dt>observations</dt>
                   <dd>
                     <Computed>{(breakdown.observations * 100).toFixed(1)}%</Computed>
@@ -1456,7 +1481,6 @@ export function App() {
                      in the computed kind rather than joined into a sentence. Beat 014 found
                      these four figures had been printed as plain text since beat 005. */
                   <p data-testid="cell-shares">
-                    of which{' '}
                     {breakdown.shares.slice(0, 3).map((share, at) => (
                       <span key={share.id} className="estimate">
                         {at === 0 ? '' : ', '}
@@ -1471,52 +1495,176 @@ export function App() {
         </div>
       ) : (
         <p className="region-empty" data-testid="detail-empty">
-          Nothing is selected. Two things can appear here: a cell&rsquo;s attribution
-          breakdown, from clicking a cell on any field; and a measurement&rsquo;s own profile
-          beside the model&rsquo;s derived one, with the measured levels kept as a ghost, from
-          hovering or clicking its mark.
+          Nothing selected. Click a cell, or a measurement&rsquo;s mark.
         </p>
       )}
     </>
   );
 
   /*
-   * FR-009 and FR-043. The size the application needs, said as what it is: a declared figure,
-   * in the kind every declared figure on this surface is drawn in. It is not an apology and
-   * it is not a deferral -- the window is told what it is short of, and offered the
-   * presentation that fits it.
+   * The status strip (FR-58, SRD-v1 FR-02, FR-34, NFR-04).
+   *
+   * Not a pane: it cannot be closed, tabbed behind anything or dragged into a corner, because
+   * a statement that could be is not one the surface is making. Beside the statement are the
+   * three figures a reader wants at a glance and no longer has to open a disclosure for --
+   * which run this is, what a step cost against the declared budget, and the digest two visits
+   * can be compared on -- each as a figure with its kind on it rather than as a sentence.
+   */
+  const status = (
+    <>
+      {/* G-08: the strip is a panel of the surface like any other, and it declares that it has
+          nothing to explain rather than being left off the list. The corner draws no control,
+          because FR-053 says a panel with nothing to explain shows none. */}
+      <PanelCorner panel="status" />
+      {statement}
+      <dl className="status-figures" data-testid="status-figures">
+        <dt>Run</dt>
+        <dd data-testid="recorded-case">
+          {view.recordedCase ? (
+            <Declared>{config.run.recordedCaseLabel}</Declared>
+          ) : (
+            <>
+              <Computed>{view.run.rng.rootSeed}</Computed>{' '}
+              <span className="unmeasured">drawn for this visit</span>
+            </>
+          )}
+        </dd>
+        <dt>Step</dt>
+        <dd data-testid="step-time">
+          {view.lastStepMs === null ? (
+            <span className="unmeasured">not yet measured</span>
+          ) : (
+            <>
+              <HostTime>{view.lastStepMs.toFixed(3)} ms/step</HostTime>{' '}
+              <span
+                className={
+                  overBudget(view.lastStepMs, config.budget.frameBudgetMs)
+                    ? 'over-budget'
+                    : 'within-budget'
+                }
+              >
+                {overBudget(view.lastStepMs, config.budget.frameBudgetMs) ? 'over' : 'within'}{' '}
+                <Declared>{config.budget.frameBudgetMs} ms</Declared>
+              </span>
+            </>
+          )}
+        </dd>
+        <dt>Fields and analysis</dt>
+        <dd className="computed" data-testid="status-digest">{resultsDigest}</dd>
+      </dl>
+      <div className="status-actions">
+        {/* FR-009 of this beat: offered, and it starts when a reader presses it and at no
+            other time. There is no first-visit flag here and nothing that could become one. */}
+        <Walkthrough config={config} />
+        {/* FR-005: one control puts the arrangement back. */}
+        <button
+          type="button"
+          data-testid="reset-workspace"
+          onClick={() => { resetWorkspace.current?.(); }}
+        >
+          Default arrangement
+        </button>
+      </div>
+      {workspaceRefusal !== null && (
+        <p className="banner warn" data-testid="workspace-refusal">
+          {workspaceRefusal}
+        </p>
+      )}
+    </>
+  );
+
+  /*
+   * FR-043, said in one line (spec 018 FR-007).
+   *
+   * Beat 013 wrote this as two paragraphs: what the row needs and why, and what is being
+   * offered instead and why the strip survives. Both were true and both were an explanation on
+   * the surface, which is the fault this beat exists to remove -- and they were the first thing
+   * a reader at a small window met, which made the fallback read as an apology.
+   *
+   * So the surface states the size, as the declared figure it is, and says what it is doing.
+   * The two paragraphs are in the walkthrough, which is offered here as it is everywhere else,
+   * and docs/narrative-disposition.json records where each went.
    *
    * The window's own size is deliberately not printed beside it. It is neither declared nor
-   * computed by anything this project runs, and a fourth kind of figure invented for a
-   * banner would be worth less than the sentence it saved.
+   * computed by anything this project runs, and a fourth kind of figure invented for a banner
+   * would be worth less than the sentence it saved.
    */
   const floorNotice = (
-    <section className="banner floor-notice" data-testid="viewport-floor-notice" role="note">
-      <h2>This window is smaller than j-ocean&rsquo;s horizon row needs.</h2>
-      <p>
-        All{' '}
-        <Declared>{config.horizons.leadHours.length}</Declared> declared horizons side by
-        side, each at the declared minimum of{' '}
-        <Declared>{config.presentation.minimumPanelWidthPx} px</Declared>, want a viewport of
-        at least{' '}
-        <Declared>
-          {config.presentation.minimumViewportWidthPx} &times;{' '}
-          {config.presentation.minimumViewportHeightPx} px
-        </Declared>{' '}
-        once the controls column (<Declared>{config.presentation.controlsWidthPx} px</Declared>
-        ), the detail column (<Declared>{config.presentation.detailWidthPx} px</Declared>) and
-        the page gutter (<Declared>{config.presentation.pageGutterPx} px</Declared>) have
-        taken theirs. That figure was measured from the built layout, not chosen.
-      </p>
-      <p>
-        So this is one horizon at a time instead. The strip carries all{' '}
-        <Declared>{config.horizons.leadHours.length}</Declared> and what each was worth,
-        because comparison across horizons is the lesson; choosing one in the strip swaps the
-        panel beneath it. Widen the window past the figure above and the full row returns
-        without a reload.
-      </p>
-    </section>
+    <p className="banner floor-notice" data-testid="viewport-floor-notice" role="note">
+      Needs{' '}
+      <Declared>
+        {config.presentation.minimumViewportWidthPx} &times;{' '}
+        {config.presentation.minimumViewportHeightPx} px
+      </Declared>
+      ; showing one horizon at a time.
+    </p>
   );
+
+  /*
+   * The panes, and where each goes before a reader moves it (FR-001, Principle X).
+   *
+   * The provenance tabs share a group, which is what makes them tabs; everything else is its
+   * own group. The sizes are declared figures, and the horizons pane takes whatever is left --
+   * which is the whole point of a layout manager over a grid of fixed tracks.
+   */
+  const panes: readonly PaneDefinition[] = [
+    { id: 'controls', pane: 'controls', title: 'Controls', content: controls },
+    { id: 'horizons', pane: 'horizons', title: 'Horizons', content: horizons },
+    {
+      id: 'selection',
+      pane: 'selection',
+      title: 'Selection',
+      announces: true,
+      content: selectionPane,
+    },
+    { id: 'provenance/run', pane: 'provenance', title: 'The run', content: runProvenance },
+    {
+      id: 'provenance/instruments',
+      pane: 'provenance',
+      title: 'Instruments',
+      content: instruments,
+    },
+    { id: 'provenance/truth', pane: 'provenance', title: 'Truth record', content: truthRecord },
+    { id: 'provenance/manifest', pane: 'provenance', title: 'Manifest', content: manifestPane },
+  ];
+
+  const rowMinimumWidthPx =
+    config.horizons.leadHours.length * config.presentation.minimumPanelWidthPx +
+    (config.horizons.leadHours.length - 1) * config.presentation.panelGapPx +
+    config.presentation.pageGutterPx;
+
+  const placements: readonly PanePlacement[] = [
+    {
+      id: 'controls',
+      initialWidth: config.presentation.controlsWidthPx,
+      minimumWidth: config.presentation.workspace.paneMinimumWidthPx,
+    },
+    {
+      id: 'horizons',
+      referencePanel: 'controls',
+      direction: 'right',
+      /* The one pane with no declared width: it takes what the flanking panes leave, and its
+         minimum is the row's own -- every declared horizon at the declared minimum panel
+         width, plus what the pane costs around them. That figure is the floor. */
+      minimumWidth: rowMinimumWidthPx,
+    },
+    {
+      id: 'selection',
+      referencePanel: 'horizons',
+      direction: 'right',
+      initialWidth: config.presentation.detailWidthPx,
+      minimumWidth: config.presentation.workspace.paneMinimumWidthPx,
+    },
+    {
+      id: 'provenance/run',
+      referencePanel: 'selection',
+      direction: 'below',
+      heightFraction: config.presentation.workspace.provenanceFraction,
+    },
+    { id: 'provenance/instruments', referencePanel: 'provenance/run', direction: 'within' },
+    { id: 'provenance/truth', referencePanel: 'provenance/run', direction: 'within' },
+    { id: 'provenance/manifest', referencePanel: 'provenance/run', direction: 'within' },
+  ];
 
   /*
    * FR-052. Every panel's help is opened from that panel's own control, and one piece of state
@@ -1527,23 +1675,30 @@ export function App() {
   return (
     <HelpProvider config={config}>
       {aboveFloor ? (
-        <Regions
+        <Workspace
           config={config}
-          statement={statement}
-          controls={controls}
-          centre={centre}
-          scores={scores}
-          detail={detail}
+          panes={panes}
+          placements={placements}
+          status={status}
+          onRefusal={setWorkspaceRefusal}
+          onReady={onWorkspaceReady}
         />
       ) : (
         <BelowFloor
           config={config}
-          statement={statement}
+          status={status}
           notice={floorNotice}
           controls={controls}
-          centre={centre}
-          scores={scores}
-          detail={detail}
+          horizons={horizons}
+          selection={selectionPane}
+          provenance={
+            <>
+              {runProvenance}
+              {instruments}
+              {truthRecord}
+              {manifestPane}
+            </>
+          }
         />
       )}
     </HelpProvider>

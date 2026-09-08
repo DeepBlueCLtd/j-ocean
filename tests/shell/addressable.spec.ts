@@ -55,7 +55,10 @@ const writes = async (page: Page): Promise<string[]> =>
 /** Loaded far enough that the address has been resolved against a run that exists. */
 async function loaded(page: Page): Promise<void> {
   await expect(page.getByTestId('run-panel')).toBeVisible();
-  await expect(page.getByTestId('results-digest')).not.toBeEmpty();
+  /* The digest as the status strip publishes it. Beat 018 put a copy in the manifest tab and
+     one in the strip, and the strip's is the one on screen without a reader going anywhere --
+     which is what "loaded" means here. */
+  await expect(page.getByTestId('status-digest')).not.toBeEmpty();
 }
 
 async function buildRow(page: Page): Promise<void> {
@@ -171,7 +174,7 @@ test.describe('a link opens on the thing being discussed', () => {
     const where = await page.evaluate(() => {
       const active = document.activeElement;
       if (active === null) return 'nothing';
-      const region = active.closest('[data-testid^="region-"]')?.getAttribute('data-testid');
+      const region = active.closest('[data-pane-id]')?.getAttribute('data-pane-id');
       return `${active.tagName.toLowerCase()} in ${region ?? 'no region'}`;
     });
     expect(where, 'opening a link moved the reader into the detail region').toBe(
@@ -189,12 +192,12 @@ test.describe('a link opens on the thing being discussed', () => {
   }) => {
     await page.goto('/');
     await loaded(page);
-    const plain = await page.getByTestId('results-digest').textContent();
+    const plain = await page.getByTestId('status-digest').textContent();
 
     await page.goto(`/?panel=48&cell=2431@${GRID}&seed=6a09e667f3bcc908`);
     await loaded(page);
     expect(
-      await page.getByTestId('results-digest').textContent(),
+      await page.getByTestId('status-digest').textContent(),
       'opening a link changed what the run computed, which is the FR-040 entanglement itself',
     ).toBe(plain);
   });
@@ -334,7 +337,7 @@ test.describe('operable without a mouse', () => {
    * every disclosure open -- because a control that renders only after something has been
    * clicked is still a control.
    */
-  test('reaches every control, in an order that follows the four regions', async ({ page }) => {
+  test('reaches every control, in an order that does not go back on itself', async ({ page }) => {
     test.setTimeout(300_000);
     await page.goto('/');
     await loaded(page);
@@ -390,8 +393,16 @@ test.describe('operable without a mouse', () => {
         const mark = String(at);
         at += 1;
         element.setAttribute('data-kbd', mark);
-        const region =
-          element.closest('[data-testid^="region-"]')?.getAttribute('data-testid') ?? 'no region';
+        const region = (() => {
+          /* A pane's **tab** is its header, and the layout manager draws it outside the
+             pane's own element -- so a tab is a control of the pane whose content is in the
+             same group, and not a control belonging to nothing. Beat 013 had no headers and
+             could ask the element directly. */
+          const direct = element.closest('[data-pane-id]');
+          if (direct !== null) return direct.getAttribute('data-pane-id') ?? 'no pane';
+          const content = element.closest('.dv-groupview')?.querySelector('[data-pane-id]');
+          return content?.getAttribute('data-pane-id') ?? 'no pane';
+        })();
         const label =
           element.getAttribute('data-testid') ??
           element.getAttribute('aria-label') ??
@@ -450,8 +461,12 @@ test.describe('operable without a mouse', () => {
         return {
           mark: active.getAttribute('data-kbd'),
           name: active.getAttribute('data-testid') ?? active.tagName.toLowerCase(),
-          region:
-            active.closest('[data-testid^="region-"]')?.getAttribute('data-testid') ?? 'no region',
+          region: (() => {
+            const direct = active.closest('[data-pane-id]');
+            if (direct !== null) return direct.getAttribute('data-pane-id') ?? 'no pane';
+            const content = active.closest('.dv-groupview')?.querySelector('[data-pane-id]');
+            return content?.getAttribute('data-pane-id') ?? 'no pane';
+          })(),
           ringed: style.outlineStyle !== 'none' && (Number.isNaN(width) || width > 0),
         };
       });
@@ -472,22 +487,30 @@ test.describe('operable without a mouse', () => {
         'see where they are',
     ).toEqual([]);
 
-    // The order follows the four regions: it may stay in one and it may move on, but it may
-    // not go back. A tab order that wandered between columns would be a reader losing their
-    // place on every keystroke.
-    const order = ['region-controls', 'region-centre', 'region-scores', 'region-detail'];
-    const positions = regions.map((region) => order.indexOf(region));
+    /*
+     * The tab order does not go back on itself: it may stay in a pane and it may move on, but
+     * once it has left a pane it does not return to it. A tab order that wandered between
+     * columns would be a reader losing their place on every keystroke.
+     *
+     * Beat 013 asserted this against four fixed regions in a fixed order. A workspace a reader
+     * may rearrange cannot promise a fixed order -- and should not: a reader who moved the
+     * selection pane to the left moved where it comes in the reading order too. So the claim
+     * is stated as what it always was, without the list: each pane is one contiguous run of
+     * tab stops, so no pane is returned to.
+     */
+    const revisited = regions.filter((pane, at) => regions.indexOf(pane) !== at);
     expect(
-      positions.every((where) => where >= 0),
-      `the tab order left the four regions: ${regions.join(' -> ')}`,
-    ).toBe(true);
-    expect(
-      positions.every((where, index) => index === 0 || where >= (positions[index - 1] as number)),
+      revisited,
       `the tab order goes back on itself: ${regions.join(' -> ')}`,
-    ).toBe(true);
+    ).toEqual([]);
+    expect(
+      regions.filter((pane) => pane === 'no pane'),
+      `the tab order reached a control that belongs to no pane: ${regions.join(' -> ')}`,
+    ).toEqual([]);
+
     console.log(
       `    keyboard: ${String(expected.length)} tab stops, all reached, plus ` +
-        `${String(walk.grouped.length)} inside a radio group, in the order ` +
+        `${String(walk.grouped.length)} inside a radio group, in the pane order ` +
         `${regions.join(' -> ')}`,
     );
   });
@@ -541,7 +564,7 @@ test.describe('operable without a mouse', () => {
     await page.goto('/');
     await loaded(page);
 
-    await expect(page.getByTestId('region-detail')).toHaveAttribute('aria-live', 'polite');
+    await expect(page.getByTestId('pane-selection')).toHaveAttribute('aria-live', 'polite');
     await page.getByTestId('attribution-view-cells').focus();
     await expect(page.getByTestId('attribution-view-cells')).toContainText('cell 5050');
 
@@ -646,86 +669,16 @@ test.describe('legible without colour, and still under prefers-reduced-motion', 
     await expect(page.getByTestId('strip-48')).toContainText('enlarged');
   });
 
-  /**
-   * SRD-v1 FR-19 and NFR-05, carried. The four figure kinds are distinguished by something
-   * other than hue: this reads what the browser computed for each and asserts that every pair
-   * differs in a channel that is not colour -- weight, slant, or an underline.
+  /*
+   * Beat 017's test that the four figure kinds are distinguished by something other than hue
+   * moved to `tests/shell/figure-kinds.spec.ts` in beat 018, and grew a second half.
+   *
+   * The claim did not change and the instrument did: beat 017 read what the *stylesheet*
+   * computed for each kind, and the requirement is that a monochrome **print** still says
+   * which kind a figure is. A print is made of pixels, so each kind is now photographed
+   * through the same saturation filter used above and compared on ink, underline and lean.
+   * The stylesheet check is kept beside it, because the two fail on different mistakes.
    */
-  test('distinguishes the four figure kinds by something other than colour', async ({ page }) => {
-    test.setTimeout(240_000);
-    await page.goto('/');
-    await loaded(page);
-    // All four have to be on the surface before they can be compared. Host time arrives with a
-    // measured step; a derived level arrives with a profile beside the model's own.
-    await page.getByTestId('advance').click();
-    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 60_000 });
-    await buildRow(page);
-    await page.getByTestId('enlarge-24').click();
-    await expect(page.getByTestId('enlarged-centre')).toBeVisible();
-    const id = await anObservationId(page);
-    await page.getByTestId(`needle-${id}`).click();
-    await expect(page.getByTestId('profile-comparison')).toBeVisible();
-    await page.evaluate(() => {
-      for (const node of document.querySelectorAll('details')) {
-        (node as HTMLDetailsElement).open = true;
-      }
-    });
-
-    /*
-     * Every instance of every kind, in the channels a monochrome print keeps: weight, slant,
-     * and the underline with its dash pattern. Colour is deliberately not read -- it is the
-     * channel the requirement says may not be the only one.
-     */
-    const kinds = await page.evaluate(() => {
-      const seen: Record<string, string[]> = {};
-      for (const kind of ['declared', 'computed', 'derived', 'host-time']) {
-        for (const element of document.querySelectorAll(`.${kind}`)) {
-          if (element.getClientRects().length === 0) continue;
-          const style = getComputedStyle(element);
-          const signature = [
-            style.fontWeight,
-            style.fontStyle,
-            style.borderBottomStyle,
-            style.textDecorationLine,
-          ].join('|');
-          const already = (seen[kind] ??= []);
-          if (!already.includes(signature)) already.push(signature);
-        }
-      }
-      return seen;
-    });
-
-    expect(
-      Object.keys(kinds).sort(),
-      'not every figure kind was on the surface to be compared',
-    ).toEqual(['computed', 'declared', 'derived', 'host-time']);
-
-    /*
-     * No instance of one kind is drawn like any instance of another. The sets rather than one
-     * signature each, because a figure's own box can add a border of its own -- a cell in the
-     * profile table has one -- and the claim is about every figure a reader might meet, not
-     * about a representative.
-     */
-    for (const one of Object.keys(kinds)) {
-      for (const other of Object.keys(kinds)) {
-        if (one === other) continue;
-        const shared = (kinds[one] ?? []).filter((signature) =>
-          (kinds[other] ?? []).includes(signature),
-        );
-        expect(
-          shared,
-          `a "${one}" figure and an "${other}" figure are drawn identically once the colour is ` +
-            'taken away, so a greyscale reader cannot tell them apart (SRD-v1 FR-19, NFR-05)',
-        ).toEqual([]);
-      }
-    }
-    console.log(
-      '    figure kinds, in weight | slant | underline | decoration: ' +
-        Object.entries(kinds)
-          .map(([kind, signatures]) => `${kind} ${signatures.join(' / ')}`)
-          .join('; '),
-    );
-  });
 
   /**
    * SC-006, once for the whole surface. Nothing animates anywhere: enlarging replaces the
@@ -763,6 +716,9 @@ test.describe('legible without colour, and still under prefers-reduced-motion', 
     await loaded(page);
     still.push(...(await moving('on arrival')));
 
+    // The manifest is a tab of the provenance pane, so its help control is reached by
+    // selecting it -- and selecting a tab is itself a state this test wants measured.
+    await page.locator('.dv-tab', { hasText: 'Manifest' }).first().click();
     await page.getByTestId('help-control-controls/manifest').click();
     await expect(page.getByTestId('help-controls/manifest')).toBeVisible();
     still.push(...(await moving('with help open')));
@@ -842,12 +798,17 @@ test.describe('the disclaimer', () => {
       insideADisclosure: element.closest('details') !== null,
       insideHelp: element.closest('[data-help]') !== null,
       insideAScroller: element.closest('[data-scrolls="true"]') !== null,
-      region: element.closest('[data-testid^="region-"]')?.getAttribute('data-testid') ?? null,
+      region: element.closest('[data-pane-id]')?.getAttribute('data-pane-id') ?? null,
     }));
     expect(placed.insideADisclosure, 'the statement is behind a disclosure').toBe(false);
     expect(placed.insideHelp, 'the statement is behind a help control').toBe(false);
     expect(placed.insideAScroller, 'the statement can be scrolled off screen').toBe(false);
-    expect(placed.region).toBe('region-controls');
+    /* Beat 018 moved it to the status strip, which is not a pane and cannot be closed, tabbed
+       behind anything or dragged into a corner. The claim -- that FR-58's statement is on the
+       surface and not behind anything -- is the same one and is now stronger: on beat 013's
+       surface it was in a region a reader could not remove because there were no controls to
+       remove one with; here it is outside the dock by construction. */
+    expect(placed.region).toBe('status');
 
     // No help control anywhere opens onto it either, which is what makes "not the only place"
     // true rather than merely likely: the sentence is on the surface, and it is not in help.

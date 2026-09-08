@@ -143,7 +143,7 @@ describe('the configuration loader', () => {
       const broken = { ...raw(), horizons: { leadHours: [...horizons.leadHours, 120] } };
       expect(() => validateConfiguration(broken)).toThrow(/cannot hold 7 declared horizons/);
       expect(() => validateConfiguration(broken)).toThrow(
-        /7 x 190 panels \+ 6 x 10 panel gaps = 2238 px/,
+        /7 x 190 panels \+ 6 x 10 panel gaps = 1858 px/,
       );
     });
 
@@ -159,8 +159,8 @@ describe('the configuration loader', () => {
         forecast: { ...forecast, validityWindowHours: 120 },
         presentation: {
           ...presentation,
-          minimumViewportWidthPx: 2238,
-          referenceViewportWidthPx: 2238,
+          minimumViewportWidthPx: 1858,
+          referenceViewportWidthPx: 2560,
         },
       };
       expect(() => validateConfiguration(widened)).not.toThrow();

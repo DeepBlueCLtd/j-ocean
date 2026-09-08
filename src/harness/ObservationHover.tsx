@@ -176,7 +176,18 @@ export function ObservationHover({
         />
       )}
 
+      {/*
+        FR-002 of beat 018: the one thing in the selection pane that may outgrow it is the
+        level list, and a profile's levels are an enumeration a reader scans -- an Argo profile
+        carries five hundred of them. So the list scrolls and says what it is; the pane around
+        it does not.
+      */}
       {isNeedle(mark) && derived !== null && (
+        <div
+          className="level-list"
+          data-scrolls="list"
+          data-list="a profile's levels, measured against the model's derived ones"
+        >
         <table className="profile-comparison" data-testid="profile-comparison">
           <caption>
             Measured against the model&rsquo;s diagnosed profile at this cell. {derived.note}
@@ -212,6 +223,7 @@ export function ObservationHover({
             })}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );

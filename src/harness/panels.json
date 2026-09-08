@@ -1,6 +1,6 @@
 {
-  "record": "What each panel of the surface has, and therefore what it can be asked about (SRD-v2 FR-52 to FR-54; spec 016 FR-004). One entry per headed box in one of the four regions of beat 013: the region it belongs to, the words at its head, and the regions or layers it has. A panel with nothing to explain says why rather than leaving the absence to be read as an oversight (FR-53). This is the list the layout renders from -- src/harness/panels.ts turns it into the components' own declarations, and nothing on the surface carries a heading that is not one of these -- and it is the list gate G-08 holds the help entries against. Two lists would be the staleness this beat exists to prevent, reintroduced by the fix for it.",
-  "beat": "016-panel-help",
+  "record": "What each panel of the surface has, and therefore what it can be asked about (SRD-v2 FR-52 to FR-54; spec 016 FR-004; spec 018 T053). One entry per headed box in one of the panes of the workspace: the pane it belongs to, the words at its head, and the regions or layers it has. A panel with nothing to explain says why rather than leaving the absence to be read as an oversight (FR-53). This is the list the layout renders from -- src/harness/panels.ts turns it into the components' own declarations, and nothing on the surface carries a heading that is not one of these -- and it is the list gate G-08 holds the help entries against. Two lists would be the staleness this beat exists to prevent, reintroduced by the fix for it. Beat 018 moved the panels between panes and changed no id: an id names a panel, and a panel a reader may dock anywhere is not named by where it sits. A pane is a panel for this gate's purposes, so the one list stays one list.",
+  "beat": "018-operational-layout",
   "panels": [
     {
       "id": "controls/domain",
@@ -12,13 +12,13 @@
     {
       "id": "controls/run",
       "region": "controls",
-      "heading": "The run",
+      "heading": "Run",
       "features": [],
-      "nothingToExplain": "Which run this is, how long a step took, and the buttons that advance it. Each says what it is on its own face, and what a run is belongs to the disclosure that publishes its seed."
+      "nothingToExplain": "Four buttons that each say on their own face what they will do, and what each does is drawn on the panes the moment it is pressed. What a run is belongs to the disclosure that publishes its seed."
     },
     {
       "id": "controls/run-provenance",
-      "region": "controls",
+      "region": "provenance",
       "heading": "The run",
       "features": [],
       "nothingToExplain": "Every line of it is a live figure with its provenance beside it, which is where Principle V wants the explanation of a figure: at the figure."
@@ -27,13 +27,18 @@
       "id": "controls/issue-time",
       "region": "controls",
       "heading": "Issue time",
-      "features": ["lead time and issue time"]
+      "features": [
+        "lead time and issue time"
+      ]
     },
     {
       "id": "controls/editing-what-was-measured",
       "region": "controls",
       "heading": "Editing what was measured",
-      "features": ["editing a profile", "redrawing the track"]
+      "features": [
+        "editing a profile",
+        "redrawing the track"
+      ]
     },
     {
       "id": "controls/row-display",
@@ -46,57 +51,92 @@
       "id": "controls/observation-footprint",
       "region": "controls",
       "heading": "What was measured",
-      "features": ["the observation footprint"]
+      "features": [
+        "the observation footprint"
+      ]
     },
     {
       "id": "controls/instruments",
-      "region": "controls",
+      "region": "provenance",
       "heading": "What the instruments measured",
       "features": [],
       "nothingToExplain": "How truth becomes an observation is the one thing this harness is most careful about, and it is too long for a panel: it is a page of the site, linked from the head of this column."
     },
     {
       "id": "controls/truth",
-      "region": "controls",
+      "region": "provenance",
       "heading": "The record this run is scored against",
       "features": [],
       "nothingToExplain": "The record is a derived artefact and its account of itself belongs where it can be read at length. Beat 014 sent it to the site."
     },
     {
       "id": "controls/manifest",
-      "region": "controls",
+      "region": "provenance",
       "heading": "The manifest this run replays from",
-      "features": ["importing a manifest"]
+      "features": [
+        "importing a manifest"
+      ]
     },
     {
       "id": "centre/horizon-row",
-      "region": "centre",
-      "heading": "The row",
-      "features": ["building the row"]
+      "region": "horizons",
+      "heading": "Horizons",
+      "features": [
+        "building the row",
+        "what the row draws, and what it does not"
+      ]
     },
     {
       "id": "centre/attribution",
-      "region": "centre",
+      "region": "horizons",
       "heading": "Where the answer came from",
-      "features": ["the influence radius"]
+      "features": [
+        "the influence radius",
+        "the hatched channel",
+        "the same field on every panel"
+      ]
     },
     {
       "id": "centre/horizon-panel",
-      "region": "centre",
+      "region": "horizons",
       "heading": "A horizon panel",
-      "features": ["what a panel says", "the attribution layer", "enlarging a panel"]
+      "features": [
+        "what a panel says",
+        "the attribution layer",
+        "enlarging a panel"
+      ]
     },
     {
       "id": "scores",
-      "region": "scores",
-      "heading": "What each forecast was worth",
-      "features": ["skill against a reference", "anomalies about their own mean"]
+      "region": "horizons",
+      "heading": "What this forecast was worth",
+      "features": [
+        "skill against a reference",
+        "anomalies about their own mean"
+      ]
     },
     {
       "id": "detail/attribution-breakdown",
-      "region": "detail",
-      "heading": "What is selected",
-      "features": ["a cell's breakdown", "a measurement's own profile"]
+      "region": "selection",
+      "heading": "Selection",
+      "features": [
+        "a cell's breakdown",
+        "a measurement's own profile"
+      ]
+    },
+    {
+      "id": "status",
+      "region": "status",
+      "heading": "Status",
+      "features": [],
+      "nothingToExplain": "The strip carries the one statement the application owes a reader who arrived without context (FR-58), which may not be moved behind a control, and three live figures beside it. A help entry here would be an explanation of a sentence that is already on screen."
+    },
+    {
+      "id": "horizons/skill-curve",
+      "region": "horizons",
+      "heading": "Skill by lead time",
+      "features": [],
+      "nothingToExplain": "The curve plots the figures the panels above it already carry, against the axis the row already is. What skill against a reference means is the scores panel's own explanation, and a second copy of it here would be the duplication FR-055 exists to forbid."
     }
   ]
 }

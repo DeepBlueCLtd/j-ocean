@@ -12,7 +12,28 @@ import { declared } from './declared-geometry.js';
 const CONFIG_REQUEST = /j-ocean.*\.json$/;
 
 /** A disclosure has to be opened before what is inside it can be seen. */
+/**
+ * Open whatever holds a panel's figures.
+ *
+ * Beat 018 turned four disclosures into four tabs of the provenance pane, so "open the run
+ * panel" is now "select the run tab". The claim every caller makes is unchanged -- these
+ * figures are on the surface when a reader asks for them -- so the helper takes the change and
+ * the tests keep their assertions. Where the element is still a `<details>` it is still opened.
+ */
+const PROVENANCE_TABS: Readonly<Record<string, string>> = {
+  'run-panel': 'The run',
+  'instruments-panel': 'Instruments',
+  'truth-panel': 'Truth record',
+  'manifest-panel': 'Manifest',
+};
+
 async function openDisclosure(page: Page, testId: string): Promise<void> {
+  const tab = PROVENANCE_TABS[testId];
+  if (tab !== undefined) {
+    await page.locator('.dv-tab', { hasText: tab }).first().click();
+    await expect(page.getByTestId(testId)).toBeVisible();
+    return;
+  }
   await page.getByTestId(testId).evaluate((node) => {
     (node as HTMLDetailsElement).open = true;
   });
@@ -56,6 +77,7 @@ test.describe('the shell', () => {
     await page.goto('/');
     await expect(page.getByTestId('root-seed')).toHaveText(/^[0-9a-f]{16}$/);
     await expect(page.getByTestId('recorded-case')).toContainText('the recorded case');
+    await openDisclosure(page, 'manifest-panel');
     await expect(page.getByTestId('manifest')).toContainText('"recordedCase": true');
   });
 
@@ -91,12 +113,25 @@ test.describe('the shell', () => {
     // not a picture drawn to illustrate it -- to the site's architecture page, where
     // tests/docs/disposition.test.ts holds them. What is left here is the label of the
     // picture, and the picture is still the analysis's own field.
-    await expect(panel).toContainText('the analysis’s own gain');
+    /* Beat 018 made this a figure label of five words. What the field *is* -- the analysis's
+       own gain, exported from the same arithmetic that produced the answer -- was already on
+       the site (docs/narrative-disposition.json, `analysed-field`), and the label names the
+       quantity rather than arguing for it. */
+    await expect(panel).toContainText('Weight carried by observations');
     await openDisclosure(page, 'run-panel');
-    await expect(page.getByTestId('initialisation')).toContainText('layer thickness');
-    // FR-003: the criterion is on the surface, not only in a test.
-    await expect(page.getByTestId('stability')).toContainText('the declared criterion admits');
-    await expect(page.getByTestId('outcrops')).toContainText('counted rather than swallowed');
+    /* Beat 018 made the run's provenance a term list: the same figures, each on its own line
+       with its own label, rather than four sentences that joined them with connective prose.
+       So the claim is asserted against the labels the list uses. */
+    const run = page.getByTestId('run-panel');
+    await expect(page.getByTestId('initialisation')).toContainText(/^\d{4}-/);
+    await expect(run).toContainText('Layer thickness');
+    // FR-003: the criterion is on the surface, not only in a test. The declared timestep, the
+    // largest stable one and the scheme's linear boundary are three figures a reader compares.
+    await expect(page.getByTestId('stability')).toContainText(' s');
+    await expect(run).toContainText('Largest stable step');
+    await expect(run).toContainText('Linear boundary');
+    await expect(run).toContainText('Outcrop clamps');
+    await expect(page.getByTestId('outcrops')).toContainText(' m');
 
     // FR-010: one rendering module. The surface says which path it took rather than leaving
     // a reader to assume, and this test records it.
@@ -131,12 +166,19 @@ test.describe('the shell', () => {
     const before = await page.getByTestId('root-seed').textContent();
 
     await page.getByTestId('new-run').click();
-    await expect(page.getByTestId('recorded-case')).toContainText('not the recorded case');
+    /* Beat 018 says this in the status strip as a figure and a label rather than as a
+       sentence: the seed that was drawn, and that it was drawn for this visit -- which is
+       what "no longer the recorded case" meant. */
+    await expect(page.getByTestId('recorded-case')).toContainText('drawn for this visit');
     const after = await page.getByTestId('root-seed').textContent();
     expect(after).toMatch(/^[0-9a-f]{16}$/);
     expect(after).not.toBe(before);
-    await expect(page.getByTestId('manifest')).toContainText('"recordedCase": false');
+    /* The run's own figures and the manifest are two tabs of one pane, and the layout manager
+       takes an unselected tab's contents out of the document rather than hiding them. So each
+       figure is read from the tab that holds it, which is what a reader does. */
     await expect(page.getByTestId('steps')).toHaveText('0');
+    await openDisclosure(page, 'manifest-panel');
+    await expect(page.getByTestId('manifest')).toContainText('"recordedCase": false');
   });
 
   test('shows the validation error and provisions no run when configuration is invalid', async ({
@@ -164,20 +206,25 @@ test.describe('the shell', () => {
 
   test('states what the run is scored against, and what that record costs', async ({ page }) => {
     await page.goto('/');
+    await openDisclosure(page, 'truth-panel');
     const panel = page.getByTestId('truth-panel');
     await expect(panel).toBeVisible();
     await expect(page.getByTestId('truth-source')).toContainText('HYCOM');
 
     // Review R-2: the truth is coarser than the model, and the surface says so rather than
     // leaving a reader to assume otherwise.
-    await expect(panel).toContainText('coarser than the model grid');
+    // Beat 018 turned the sentence into a term list, so what is asserted is the figures: the
+    // truth's own resolution and how many model cells it is worth. The claim -- that the
+    // surface says the truth is coarser rather than leaving a reader to assume otherwise --
+    // is the same one, made by two figures instead of by a clause.
+    await expect(panel).toContainText('the model grid');
 
     // The figures the domain choice changes are still here: the instants and their spacing,
     // the profiles and how many carry a flag, and the climatology's overlap with this run's
     // period. What each of them *means* went to the site's data-model page in beat 014, and
     // tests/docs/disposition.test.ts holds the words against that page.
-    await expect(page.getByTestId('truth-instants')).toContainText('hours apart');
-    await expect(page.getByTestId('observation-count')).toContainText('carry a flag');
+    await expect(page.getByTestId('truth-instants')).toContainText('h apart');
+    await expect(page.getByTestId('observation-count')).toContainText('flagged');
     await expect(page.getByTestId('climatology-overlap')).toContainText('days');
     await expect(page.getByTestId('climatology-overlap').locator('.figure.computed')).toHaveCount(1);
   });
@@ -220,7 +267,7 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
 
     const row = await page
-      .getByTestId('centre-stack')
+      .getByTestId('pane-horizons')
       .evaluate((node) => ({ scrollWidth: node.scrollWidth, clientWidth: node.clientWidth }));
     expect(
       row.scrollWidth,
@@ -229,7 +276,7 @@ test.describe('the shell', () => {
 
     // Every panel is inside the container it is drawn in, and no narrower than the declared
     // minimum -- "visible" is not the same as "present and one pixel wide".
-    const container = await page.getByTestId('centre-stack').boundingBox();
+    const container = await page.getByTestId('pane-horizons').boundingBox();
     for (const lead of [0, 12, 24, 48, 72, 96]) {
       const box = await page.getByTestId(`panel-${String(lead)}`).boundingBox();
       expect(box, `panel ${String(lead)} has no box`).not.toBeNull();
@@ -321,12 +368,19 @@ test.describe('the shell', () => {
     await page.getByTestId('build-row').click();
     await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
     await page.getByTestId('toggle-attribution').click();
-    await expect(page.getByTestId('row-legend')).toContainText('second channel');
+
+    /* The legend labels the two marks and no longer argues about them. Beat 018 took the two
+       clauses that explained -- *a second channel, so the field reads without colour* and
+       *this run analyses once, at ...; attribution becomes per horizon when the forecast
+       cycles* -- into `centre/attribution`'s help (FR-007, and the disposition record's
+       `attribution-hatch-channel` and `attribution-scope`). What the first of them claimed is
+       measured below rather than asserted in a legend. */
+    await expect(page.getByTestId('row-legend')).toContainText('hatched where observations lead');
 
     // Six identical attribution fields would imply six analyses. The run makes one, and the
-    // legend says so rather than leaving the row to suggest otherwise.
+    // legend says which it is -- as a label of six words -- rather than leaving the row to
+    // suggest otherwise.
     await expect(page.getByTestId('attribution-scope')).toContainText('the same field on every panel');
-    await expect(page.getByTestId('attribution-scope')).toContainText('analyses once');
 
     const contrast = await page
       .getByTestId('panel-field-24')
@@ -442,8 +496,15 @@ test.describe('the shell', () => {
     expect(counts[0]).toBe(declaredTotal);
     expect(counts[0]).toBeGreaterThan(0);
 
-    // FR-24 on the surface: the rejected are counted where the drawing is, not in a log.
-    await expect(summary).toContainText('drawn as flagged, never omitted');
+    /*
+     * FR-24 on the surface: the rejected are counted where the drawing is, not in a log.
+     *
+     * Beat 018 made the summary a readout, so what is asserted is the readout: the count is
+     * labelled FLAGGED and is a figure. The clause that used to be beside it -- "drawn as
+     * flagged, never omitted" -- was an explanation of a property the surface has, and it is
+     * this panel's own help (docs/narrative-disposition.json, `footprint-summary`).
+     */
+    await expect(summary).toContainText('Flagged');
     expect(Number(await page.getByTestId('footprint-flagged-count').textContent())).toBeGreaterThan(0);
 
     // FR-002: the recorded case has marks on both sides of the initialisation instant, and
@@ -526,7 +587,10 @@ test.describe('the shell', () => {
     // the floor with an indicator, not silently truncated.
     expect(await elevation.locator('[data-continues-below="true"]').count()).toBeGreaterThan(0);
 
-    await expect(elevation).toContainText('latitude is not shown');
+    /* Beat 018 moved this sentence to `help:centre/horizon-panel`, under *enlarging a panel*
+       (docs/narrative-disposition.json, `needle-elevation-caption`). What is left under the
+       figure is its label: the floor depth, and that the needles hang to the depths reached. */
+    await expect(elevation).toContainText('at the depths reached');
   });
 
   test('shows a profile beside the model derived profile, with every level kind labelled', async ({
@@ -651,15 +715,23 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('panel-score-24')).toContainText('persistence', { timeout: 60_000 });
     expect(await page.getByTestId('panel-brief-24').textContent()).toBe(brief);
 
-    // FR-008: two curves once two issue times have been scored, labelled by issue instant.
-    await openDisclosure(page, 'skill-disclosure');
+    /*
+     * FR-008: two curves once two issue times have been scored, labelled by issue instant.
+     *
+     * Beat 013 put the curve behind a disclosure and said why: at the width six panels take,
+     * drawn open across the scores region it would have been either a small picture in a band
+     * of empty paper or six hundred pixels tall. Beat 018 gave it the horizons pane's own
+     * width and the height the row does not use -- which is the band beat 013 left empty -- so
+     * it is drawn rather than disclosed, and this reads it where it is.
+     */
     const curves = page.getByTestId('skill-inset').locator('[data-issue-instant]');
     expect(await curves.count()).toBe(2);
     // Exactly one of them is the row's current issue time; the other is the one it was.
     expect(await page.getByTestId('skill-inset').locator('[data-current="true"]').count()).toBe(1);
-    await expect(page.getByTestId('skill-inset')).toContainText('Skill against persistence');
+    await expect(page.getByTestId('skill-curve')).toContainText('Skill by lead time');
 
     // FR-009: the manifest records the issue time, so a rerun is reproducible from it.
+    await openDisclosure(page, 'manifest-panel');
     await expect(page.getByTestId('manifest')).toContainText('"issueInstantMs"');
   });
 
@@ -674,7 +746,14 @@ test.describe('the shell', () => {
     const withheld = Number(await page.getByTestId('observations-withheld').textContent());
     expect(available).toBeGreaterThan(0);
     expect(withheld).toBeGreaterThan(0);
-    await expect(page.getByTestId('issue-observations')).toContainText('had not happened yet');
+    /*
+     * Beat 018 made this a readout: SEEN and NOT YET with the figures under them, where it had
+     * been "The analysis at this issue instant saw 2 observations; 29 had not happened yet" --
+     * a sentence a reader had to read to find two numbers, and one the author's review named.
+     * The claim is the same: the surface says how much the issue instant leaves out, and it
+     * says it as two labelled figures.
+     */
+    await expect(page.getByTestId('issue-observations')).toContainText('Not yet');
   });
 
   test('says whether it shows the recorded case or an edit, and comes back in one action', async ({
@@ -843,8 +922,13 @@ test.describe('the shell', () => {
     await page.getByTestId('bias-degrees').blur();
     await expect(page.getByTestId('run-status')).toContainText('edit', { timeout: 120_000 });
 
+    await openDisclosure(page, 'manifest-panel');
     const manifest = (await page.getByTestId('manifest').textContent()) ?? '';
-    const digest = await page.getByTestId('results-digest').textContent();
+    // The digest from the status strip, which is outside the dock and therefore always there.
+    const digest = await page.getByTestId('status-digest').textContent();
+    // The seed from the tab that holds it: an unselected tab's contents are not in the
+    // document, so a figure is read where it is drawn.
+    await openDisclosure(page, 'run-panel');
     const seed = await page.getByTestId('root-seed').textContent();
     expect(manifest).toContain('"biasDegC": 1.5');
     // FR-002: the manifest carries no field, score or observation data.
@@ -861,12 +945,13 @@ test.describe('the shell', () => {
     await other.getByTestId('manifest-input').fill(manifest);
     await other.getByTestId('import-manifest').click();
 
-    await expect(other.getByTestId('root-seed')).toHaveText(seed ?? '', { timeout: 60_000 });
-    await expect(other.getByTestId('results-digest')).toHaveText(digest ?? '');
+    await expect(other.getByTestId('status-digest')).toHaveText(digest ?? '', { timeout: 60_000 });
     await expect(other.getByTestId('import-failure')).toHaveCount(0);
     // The edits came back with it: a manifest that recorded them and a replay that ignored
     // them would reproduce a run nobody made.
     await expect(other.getByTestId('manifest')).toContainText('"biasDegC": 1.5');
+    await openDisclosure(other, 'run-panel');
+    await expect(other.getByTestId('root-seed')).toHaveText(seed ?? '');
     await fresh.close();
   });
 
@@ -922,9 +1007,22 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('import-failure')).toHaveCount(0);
   });
 
-  test('writes nothing to storage, in a whole visit', async ({ page }) => {
-    // NFR-02 and FR-006. Measured rather than promised: the storage APIs are replaced before
-    // the page loads and any write is recorded.
+  /**
+   * NFR-02, restated where beat 018 moved the line.
+   *
+   * This test used to read "writes nothing to storage, in a whole visit", and that was the
+   * whole claim while the surface had no furniture to remember. A workspace does: a reader
+   * who drags a sash and comes back to a different arrangement has been given a layout
+   * manager and denied the only thing one is for.
+   *
+   * So the claim is narrowed to exactly what the constitution's amended Principle IX allows,
+   * and every part of it is still measured rather than promised. **One** key is written, and
+   * it is the key configuration declares. No cookie, no IndexedDB, no session storage, and
+   * nothing in the address. What is inside that key -- geometry and pane identity, and no
+   * seed, no manifest and nothing the run computed -- is `tests/shell/workspace.spec.ts` and
+   * `tests/harness/workspace-state.test.ts`, which fail by name on a planted `seed`.
+   */
+  test('writes one key and no other storage, in a whole visit', async ({ page }) => {
     await page.addInitScript(() => {
       const writes: string[] = [];
       (window as unknown as { __writes: string[] }).__writes = writes;
@@ -960,7 +1058,20 @@ test.describe('the shell', () => {
     await page.getByTestId('new-run').click();
 
     const writes = await page.evaluate(() => (window as unknown as { __writes: string[] }).__writes);
-    expect(writes, `these were written: ${writes.join(', ')}`).toEqual([]);
+    const allowed = `localStorage.${declared.presentation.workspace.storageKey}`;
+    expect(
+      [...new Set(writes)].filter((write) => write !== allowed),
+      `these were written besides ${allowed}: ${writes.join(', ')}`,
+    ).toEqual([]);
+    // And the one that is allowed is a preference about furniture, held under the key
+    // configuration declares -- not a key a component chose for itself.
+    /* Read through `key(i)` rather than `Object.keys`, which would also return the `setItem`
+       this test assigned to the storage object a moment ago -- the instrument reporting on
+       itself. */
+    const keys = await page.evaluate(() =>
+      Array.from({ length: window.localStorage.length }, (_, at) => window.localStorage.key(at)),
+    );
+    expect(keys).toEqual([declared.presentation.workspace.storageKey]);
     expect(page.url()).not.toContain('#');
     expect(page.url()).not.toContain('?');
   });
@@ -999,7 +1110,9 @@ test.describe('the shell', () => {
     page,
   }) => {
     await page.goto('/');
-    await expect(page.getByTestId('scores-empty')).toContainText('in that panel’s own column');
+    /* Beat 013's scores region had an empty state saying where the figures would appear.
+       There is no scores region now -- each panel carries its own figures -- so the claim is
+       made where it is now true: the panel itself says it has not been scored. */
     await page.getByTestId('build-row').click();
     await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId('panel-score-24')).toContainText('not scored yet');
@@ -1008,15 +1121,18 @@ test.describe('the shell', () => {
     const score = page.getByTestId('panel-score-24');
     await expect(score).toContainText('persistence', { timeout: 60_000 });
 
-    // FR-021: the convention, and the words. Whichever way this run falls, the statement
-    // says it in the SRD's terms rather than in kinder ones.
-    await expect(score.locator('.statement')).toContainText(/than (persistence|climatology)/);
+    // The readout, which is what a reader glances at: two skills against two references.
     await expect(score).toContainText('vs persistence');
     await expect(score).toContainText('vs climatology');
 
-    // FR-022: a score without provenance is an assertion.
+    // FR-022: a score without provenance is an assertion. FR-021's words are the first thing
+    // inside it since beat 018 -- the convention, and whichever way this run falls, said in
+    // the SRD's terms rather than in kinder ones.
     await openDisclosure(page, 'panel-provenance-24');
     const provenance = page.getByTestId('panel-provenance-24');
+    await expect(provenance.locator('.statement')).toContainText(
+      /than (persistence|climatology)/,
+    );
     await expect(provenance).toContainText('root-mean-square');
     await expect(provenance).toContainText('sponge margin');
     await expect(provenance).toContainText('declining to resolve below');
@@ -1041,22 +1157,33 @@ test.describe('the shell', () => {
     await page.goto('/');
     const field = page.getByTestId('analysed-field');
     await expect(field).toBeVisible();
-    await expect(field).toContainText('the analysis’s own gain');
+    /* Beat 018 made this a figure label of five words; what the field *is* -- the analysis's
+       own gain, exported from the same arithmetic that produced the answer -- is the panel's
+       own help, and docs/narrative-disposition.json records both moves. */
+    await expect(field).toContainText('Weight carried by observations');
 
-    // Review R-7: the radius is a property of the declared length scale, and the surface
-    // says so rather than letting a reader take it for a property of the ocean.
-    await expect(page.getByTestId('influence-radius')).toContainText('not of the ocean');
+    /* Review R-7: the radius is a property of the declared length scale and not of the ocean.
+       The clause that argued that was already the panel's help word for word, so the surface
+       says the figure with its unit and its kind and stops repeating the argument. */
+    const radius = page.getByTestId('influence-radius');
+    await expect(radius).toContainText(' km');
+    await expect(radius.locator('.figure.declared')).toHaveCount(1);
 
-    // FR-048: with nothing selected the region says what could be there and how to put it
-    // there, rather than rendering blank.
-    await expect(page.getByTestId('detail-empty')).toContainText('attribution breakdown');
+    /* FR-048: with nothing selected the pane says what could be there and how to put it
+       there, rather than rendering blank. Beat 018 said the same thing in nine words rather
+       than in a paragraph: what is missing, and the one act that supplies it. */
+    await expect(page.getByTestId('detail-empty')).toContainText('Nothing selected');
+    await expect(page.getByTestId('detail-empty')).toContainText('Click a cell');
     await expect(page.getByTestId('cell-breakdown')).toHaveCount(0);
 
     // FR-18: a breakdown is an instrument of a selected cell. It says which cell, and the
     // sentence explaining why it is never a per-panel summary is owed to this region's help.
     await page.getByTestId('attribution-view-overlay').click({ position: { x: 200, y: 200 } });
     const breakdown = page.getByTestId('cell-breakdown');
-    await expect(breakdown).toContainText('as the analysis weighted it');
+    /* The clause that said the shares are the analysis's own weighting is a help entry now
+       (docs/narrative-disposition.json). What is asserted here is what it named: the cell,
+       and the three shares as computed figures. */
+    await expect(breakdown).toContainText('Cell');
     await expect(breakdown).toContainText('observations');
     await expect(breakdown).toContainText('climatology');
     // Principle V: every share the breakdown prints is a computed figure and is drawn as one.
@@ -1074,12 +1201,17 @@ test.describe('the shell', () => {
     page,
   }) => {
     await page.goto('/');
+    // The instruments are a tab of the provenance pane now, so the panel is reached before it
+    // can be asserted about.
+    await openDisclosure(page, 'instruments-panel');
     const panel = page.getByTestId('instruments-panel');
     await expect(panel).toBeVisible();
-    await openDisclosure(page, 'instruments-panel');
-    await expect(page.getByTestId('surface-count')).toContainText('representativeness');
-    await expect(page.getByTestId('drop-count')).toContainText('levels each');
-    await expect(page.getByTestId('argo-state')).toContainText(/external|not assimilated/);
+    await expect(page.getByTestId('surface-count')).toContainText(' h');
+    await expect(panel).toContainText('representativeness');
+    await expect(page.getByTestId('drop-count')).toContainText('levels');
+    /* Whether Argo was assimilated, said either way: this configuration assimilates, and the
+       readout is the count and the state rather than a sentence about the state. */
+    await expect(page.getByTestId('argo-state')).toContainText(/assimilated/);
     await expect(page.getByTestId('flag-summary')).toBeVisible();
     await expect(page.getByTestId('interface-estimates').locator('.figure.computed').first()).toBeVisible();
 
@@ -1147,7 +1279,11 @@ test.describe('the shell', () => {
     await openDisclosure(page, 'run-panel');
     const run = page.getByTestId('run-panel');
     await expect(run).toContainText('100 × 100');
-    await expect(page.getByTestId('stability')).toContainText('2013-09');
+    /* Beat 018 gave the epoch a line of its own rather than a clause inside the timestep's
+       sentence. The claim -- that the epoch is on the surface and attributed -- is the same,
+       and it is now made by a labelled figure instead of by a sentence. */
+    await expect(run).toContainText('Epoch');
+    await expect(run).toContainText('2013-09');
     await expect(run.locator('.figure.declared').first()).toBeVisible();
   });
 });

@@ -162,7 +162,8 @@ export function HorizonStrip(props: HorizonStripProps) {
       ref={container}
       className="horizon-strip"
       data-testid="horizon-strip"
-      data-scrolls="true"
+      data-scrolls="list"
+      data-list="every declared horizon, as controls"
       role="toolbar"
       aria-label="Every declared horizon, and what each was worth"
       aria-orientation="horizontal"

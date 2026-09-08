@@ -218,10 +218,13 @@ export function NeedleElevation(props: NeedleElevationProps) {
         })}
       </svg>
       </div>
-      <figcaption>
-        Depth to <span className="declared">{floor.toFixed(0)} m</span>, needles at the depths
-        actually reached. A side elevation: longitude is the horizontal axis and latitude is
-        not shown, so position is read from the field this is drawn beside.
+      {/* A label, not an explanation (spec 018 FR-007). What a side elevation is -- that
+          longitude is the horizontal axis, that latitude is not shown, and that position is
+          therefore read from the field beside it -- is this panel's own help, under
+          *enlarging a panel*, and docs/narrative-disposition.json records the move. */}
+      <figcaption className="figure-label">
+        Depth to <span className="figure declared">{floor.toFixed(0)} m</span>, at the depths
+        reached
       </figcaption>
     </figure>
   );

@@ -94,6 +94,13 @@ Everything needed to rebuild this run, and none of its state: replay is re-compu
 restoration of a snapshot. Nothing persists between visits — no storage, no cookie, no run in
 the URL — so this file is the only thing that leaves and the only thing that comes back.
 
+That is a statement about the run. Beat 018 made the surface a workspace, and a workspace
+remembers how a reader arranged it: pane geometry and pane identity, under one declared key,
+and nothing else. The line the constitution draws is that a stored run would be a second way to
+bring a forecast back with none of the manifest's checks, while a stored pane width is a
+preference about furniture. `tests/harness/workspace-state.test.ts` holds that line as a key
+set, and refuses a planted `seed` by name.
+
 The manifest itself, its digests and the controls that export and import one are still in the
 application, because replay is something a reader drives. This paragraph is why they behave as
 they do.

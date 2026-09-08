@@ -72,7 +72,7 @@ a pane of prose.
 Panes have headers, may be resized, re-docked and tabbed together. The arrangement the reader
 leaves is the arrangement they return to.
 
-**Why this priority**: the author's direction, and the reason it is safe: **Principle I forbids
+**Why this priority**: the author's direction, and the reason it is safe: **Principle IX forbids
 persisting forecast inputs and outputs, not workspace chrome.** The two are different, and the
 distinction is now written down rather than inferred.
 

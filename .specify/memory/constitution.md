@@ -406,6 +406,15 @@ it, the constitution wins and the artefact is amended.
 
 **Version**: 1.2.0 | **Ratified**: 2026-09-05 | **Last Amended**: 2026-09-08
 
+*1.2.0 — 2026-09-08, ADR-0014. **Principle IX gains a bounded exception**: the prohibition is on
+forecast inputs and outputs, and where the surface is a layout the reader arranges, that
+arrangement — pane geometry and pane identity, and nothing else — may persist. A persisted run
+would be a second way to bring a forecast back with none of the manifest's checks; a persisted
+pane width is a preference about furniture, and the line is drawn here rather than left to be
+inferred, because a reader of the principle could reasonably have inferred the opposite and one
+did. What is stored is held by a key-set test in the shape of feature 017's address grammar. No
+previously-compliant work is made non-compliant, so MINOR.*
+
 *1.1.0 — 2026-09-21, ADR-0013. Two gates added to the schedule: **G-07 surface invariance**,
 which landed in beat 013 and had been running in CI unlisted ever since, and **G-08 help
 coverage**, which lands in beat 016. Recording G-07 late is the finding, not the fix: a gate

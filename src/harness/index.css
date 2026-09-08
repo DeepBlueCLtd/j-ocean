@@ -24,149 +24,379 @@ body {
   font: 16px/1.5 ui-serif, Georgia, "Times New Roman", serif;
 }
 
-/* Beat 013, ADR-0012. One viewport of four regions, divided by what changes when.
+/* Beat 018, ADR-0014. One viewport, a docked workspace of panes, divided by what changes when.
 
-   Every width here comes from `presentation` in configuration through a custom property that
-   `Regions.tsx` sets; the fallbacks exist only so this file reads on its own. The page itself
-   never scrolls -- a region that can outgrow its box scrolls within itself and says so with
-   `data-scrolls`, and the one-view test fails by name on any element that scrolls without
-   declaring it. */
+   Beat 013's division was right and its realisation was not. It was a grid of fixed tracks:
+   the controls column was 390 px whatever the window was, the centre took what was left, and
+   at 2560 x 1440 that left two fifths of an instrument empty with the horizon panels 200 px
+   wide beside it. Fixed tracks do not take the room they are given.
+
+   So there is no track width here. The layout manager divides the window between the panes and
+   a reader may move the dividers; a horizon panel is whatever a sixth of the horizons pane is,
+   and it is measurably wider at the reference viewport than at the declared floor. The figures
+   that remain are the ones a pane cannot work out for itself -- the pane a reader has not
+   moved yet, and the strip along the foot -- and they come from `presentation` through custom
+   properties `Workspace.tsx` sets. The fallbacks exist only so this file reads on its own. */
 .one-view {
   display: grid;
-  grid-template-columns: var(--controls-width, 390px) minmax(0, 1fr) var(--detail-width, 390px);
-  grid-template-rows: minmax(0, 1fr);
-  gap: var(--panel-gap, 10px);
+  grid-template-rows: minmax(0, 1fr) auto;
   height: 100dvh;
-  padding: calc(var(--page-gutter, 48px) / 2);
   overflow: hidden;
-
-  /* Beat 015, FR-049 and AT-13. The centre's height is worked out from the declared figures
-     rather than fitted to whatever is in it, and that is what makes "enlargement replaces the
-     contents of the centre region only" a property of the geometry: a centre sized by its
-     contents is one height with the row in it and another with an enlarged panel, and the
-     scores region beneath it would move on a click.
-
-     The arithmetic is the row's own. A panel's field is a square at the track width, so the
-     centre is one track wide plus what it costs beyond the field -- the panel's header and
-     labels, the legend, and the strip an enlargement puts above the panel. Nothing here is a
-     literal; the fallbacks exist only so this file reads on its own. */
-  --centre-width: calc(
-    100dvw - var(--page-gutter, 48px) - var(--controls-width, 390px) - var(--detail-width, 390px) -
-      2 * var(--panel-gap, 10px)
-  );
-  --track-width: calc(
-    (var(--centre-width) - (var(--horizon-count, 6) - 1) * var(--panel-gap, 10px)) /
-      var(--horizon-count, 6)
-  );
-  --centre-height: calc(
-    var(--track-width) + var(--centre-chrome-height, 196px) + var(--strip-height, 46px)
-  );
 }
 
-.region {
+.workspace-dock {
   min-width: 0;
   min-height: 0;
+  position: relative;
 }
+
+/* The layout manager's own theme, in this surface's palette rather than in one of its shipped
+   ones: a second palette is a second answer to "what colour is a rule", which is how a figure
+   kind eventually acquires a colour nobody chose. */
+.dockview-theme-j-ocean {
+  --dv-background-color: var(--paper);
+  --dv-group-view-background-color: var(--paper);
+  --dv-tabs-and-actions-container-background-color: var(--paper);
+  --dv-activegroup-visiblepanel-tab-background-color: var(--paper);
+  --dv-activegroup-hiddenpanel-tab-background-color: var(--paper);
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--paper);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--paper);
+  --dv-activegroup-visiblepanel-tab-color: var(--ink);
+  --dv-activegroup-hiddenpanel-tab-color: var(--host);
+  --dv-inactivegroup-visiblepanel-tab-color: var(--ink);
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--host);
+  --dv-tab-divider-color: var(--rule);
+  --dv-separator-border: var(--rule);
+  --dv-paneview-header-border-color: var(--rule);
+  --dv-drag-over-background-color: rgb(31 79 122 / 12%);
+  --dv-drag-over-border-color: var(--declared);
+  --dv-active-sash-color: var(--declared);
+  --dv-tabs-and-actions-container-font-size: 0.72rem;
+  --dv-tabs-and-actions-container-height: 26px;
+  --dv-separator-panel-border: var(--rule);
+  --dv-icon-hover-background-color: rgb(16 23 29 / 8%);
+  font: inherit;
+}
+
+/* Greyscale (FR-057). The active tab is marked by a rule under it and by weight, not by a
+   hue: a tab strip distinguished by colour alone is one a monochrome print cannot be read
+   from, which is the same fault beat 015 fixed in the horizon strip. */
+.dockview-theme-j-ocean .dv-tab {
+  border-bottom: 2px solid transparent;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dockview-theme-j-ocean .dv-tab.dv-active-tab {
+  border-bottom-color: var(--ink);
+  font-weight: 700;
+}
+
+/* And the focused pane, likewise: a heavier rule around the group, so which pane the keyboard
+   is in survives a monochrome rendering. */
+.dockview-theme-j-ocean .dv-groupview.dv-active-group > .dv-tabs-and-actions-container {
+  border-bottom: 1px solid var(--ink);
+}
+
+.pane-content {
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* The layout manager's own element carries the pane's name as a class, so one stylesheet
+   dresses both presentations: a rule written for `.selection` that applied below the floor and
+   not in the workspace would be two surfaces, and the one nobody looks at is the one that
+   breaks. */
+.pane-content.controls,
+.pane-content.horizons,
+.pane-content.selection { height: 100%; }
+
+/* Every pane's own body. `overflow: hidden` and not `auto`: FR-002 says a pane may scroll a
+   list and never a body of text, so a pane that needs a scrollbar has to ask for one on the
+   element that holds the list and say what the list is. A blanket `auto` here is exactly the
+   declared-scroller doctrine this beat withdrew. */
+.pane {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.5rem 0.6rem;
+  overflow: hidden;
+}
+
+.pane-content > .pane,
+.pane-content > * { min-height: 0; }
+
+/* A trailing margin on the last control group is a few pixels of content the pane cannot show
+   and a reader cannot reach, and at the floor those pixels are the difference between "fits"
+   and "does not". */
+.controls > *:last-child, .control-group > *:last-child { margin-bottom: 0; }
 
 .controls {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-}
-
-/* FR-02 stays out of the scroller: a statement a reader has to scroll to is not one that is
-   always visible, and nothing about this one stops being true while the page is open. */
-.controls > .not-operational {
-  flex: 0 0 auto;
-  margin: 0;
+  gap: 0.3rem;
   padding: 0.5rem 0.6rem;
-  font-size: 0.8rem;
-  line-height: 1.35;
+  height: 100%;
+  min-height: 0;
 }
 
-.controls > .not-operational h1 { font-size: 1.1rem; margin: 0 0 0.2rem; }
+/* A control group takes the height it needs and does not shrink. Left to flexbox's default
+   they squeeze each other when the pane is short, so the pane looks as though it fits while
+   the last row of buttons is a few pixels outside it -- which is precisely the "it fits"
+   that beat 013's floor test could not tell from the real thing. Not shrinking makes the
+   overflow honest, and the floor is then measured against it. */
+.controls > * { flex: 0 0 auto; }
 
 /* FR-005. The narrative left this page in beat 014, so the way to it is on the page and not
-   behind anything: two named links, outside the controls column's scroller for the same
-   reason the statement is, and small, because they are the way out rather than the payload. */
+   behind anything: three named links, in the status strip where the statement is, and small,
+   because they are the way out rather than the payload. */
 .site-links {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
-  font-size: 0.78rem;
-  line-height: 1.3;
+  gap: 0.1rem;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  min-width: 0;
 }
 
 .site-links a { color: var(--declared); }
 
 .below-floor .floor-answer > .site-links { margin-top: 0.3rem; }
 
-.controls-scroll {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-right: 0.35rem;
-}
-
-/* FR-045 and FR-046 in one grid. The centre and the scores are `subgrid` of these tracks, so a
-   score is in its panel's column because the browser placed it there and not because somebody
-   arranged two lists to match. The track count is the declared horizon count. */
-.centre-stack {
-  display: grid;
-  grid-template-columns: repeat(var(--horizon-count, 6), minmax(var(--panel-minimum-width, 190px), 1fr));
-  grid-template-rows: auto auto;
-  align-content: start;
+/* The horizons pane (FR-045). The row takes the width the pane has and the panels share it;
+   the skill curve takes the height the row does not, which at the reference viewport is the
+   band beat 013 left empty. */
+.horizons {
+  display: flex;
+  flex-direction: column;
   gap: var(--panel-gap, 10px);
-  min-width: 0;
+  padding: 0.5rem 0.6rem;
+  height: 100%;
   min-height: 0;
-  /* It scrolls **vertically only**. A horizontally scrolling row is beat 007's own finding
-     coming back through a different door -- a row that has to be scrolled is a row whose
-     unseen panels the eye forgets, which is the fault the row exists to prevent (ADR-0003).
-     Where the window is too narrow for six panels the answer is FR-043's, not a scrollbar:
-     the application says the size it needs and shows one panel at a time. */
-  overflow-x: hidden;
-  overflow-y: auto;
 }
 
-.centre,
-.scores,
+.horizons > * { min-width: 0; }
+
+/* The row takes the height its panels need and no more. A row stretched to the pane's full
+   height would be six panels of white paper under six pictures, which is the dead space this
+   beat is measuring. */
 .horizon-row {
-  grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: subgrid;
+  grid-template-columns: repeat(var(--horizon-count, 6), minmax(0, 1fr));
   gap: var(--panel-gap, 10px);
-  align-content: start;
+  align-items: start;
+  flex: 0 0 auto;
+  min-height: 0;
 }
-
-/* The declared height, and the whole of AT-13: with the row in it and with an enlarged panel
-   in it the centre is the same box, so the scores beneath it and the two flanking columns do
-   not move by a pixel when a reader enlarges or swaps. Below the floor the regions are a
-   scrolling column of natural heights and there is nothing to hold still. */
-.one-view:not(.below-floor) .centre { height: var(--centre-height); }
-
-/* Enlarged, the centre's one child takes the whole box: the strip along the top at its
-   declared height, the panel filling what is left. */
-.centre:has(> .enlarged-centre) { grid-template-rows: minmax(0, 1fr); }
 
 .enlarged-centre {
-  grid-column: 1 / -1;
+  flex: 1 1 auto;
   min-height: 0;
   display: grid;
   grid-template-rows: var(--strip-height, 46px) minmax(0, 1fr);
   gap: var(--panel-gap, 10px);
 }
 
-.centre > .full,
-.scores > .full { grid-column: 1 / -1; }
+/* The curve over lead time, drawn rather than disclosed (beat 018). It is about all six panels
+   and belongs to none of them, so it sits beneath the row at the row's own width.
 
-.detail {
+   It takes a **declared share** of the pane and not whatever the row leaves (FR-045, Principle
+   X). Given the leftover it grew to 694 px of a 1 359 px pane at the reference viewport --
+   taller than the row it is an aid to reading, for six points -- and FR-045 makes the row the
+   payload and gives it the dominant space. `presentation.workspace.skillCurveFraction` is the
+   figure; it may shrink below it, which is what keeps the floor where the floor was measured.
+   The band the row cannot use is then the pane simply ending, and it is reported as dead space
+   in the plan's `## Measured` rather than filled by the nearest thing that would stretch. */
+.skill-curve {
+  flex: 1 1 auto;
+  max-height: calc(var(--skill-curve-fraction, 0.3) * 100%);
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  border-top: 1px solid var(--rule);
+  padding-top: 0.3rem;
+}
+
+.skill-curve figure { margin: 0; height: 100%; display: flex; flex-direction: column; min-height: 0; }
+.skill-inset-plot { flex: 1 1 auto; min-height: 0; min-width: 0; }
+.skill-inset-plot svg { display: block; }
+.skill-curve figcaption { flex: 0 0 auto; }
+
+.selection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem 0.6rem;
+  height: 100%;
+  min-height: 0;
+}
+
+/* A share names an observation -- `xbt/0001/interface` -- and an id is not a word a browser
+   will break. In a pane a reader may drag narrower, an unbreakable line is content the pane
+   cannot show, which is the clipping the one-view test now fails on. */
+.selection .estimate { white-space: normal; overflow-wrap: anywhere; }
+.selection .panel-labels dd { white-space: normal; overflow-wrap: anywhere; }
+.selection [data-testid="cell-breakdown"] { min-width: 0; overflow-wrap: anywhere; }
+
+.selection > .observation-hover { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.selection > .observation-hover > .level-list { flex: 1 1 auto; max-height: none; min-height: 0; }
+
+/* A provenance tab: a term list of figures, and nothing between them that is not a label. */
+.provenance-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.5rem 0.6rem;
+  height: 100%;
+  min-height: 0;
+}
+
+.provenance-pane dl {
+  flex: 0 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  border-left: 1px solid var(--rule);
-  padding-left: 0.6rem;
+  display: grid;
+  grid-template-columns: minmax(7.5rem, auto) 1fr;
+  gap: 0.1rem 0.6rem;
+  margin: 0;
+  font-size: 0.8rem;
 }
+
+.provenance-pane dt { font-size: 0.7rem; color: var(--host); }
+.provenance-pane dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+
+/* The one pane content on this surface that scrolls, and it scrolls a list: a manifest is a
+   document a reader copies line by line. It says so on the element (`data-scrolls="list"`,
+   `data-list`), and tests/shell/one-view.spec.ts reads both and fails by name on anything that
+   scrolls a body of text. */
+.provenance-pane pre[data-testid="manifest"] {
+  flex: 1 1 auto;
+  min-height: 4rem;
+  overflow: auto;
+  margin: 0;
+  font-size: 0.68rem;
+  background: #fff;
+  border: 1px solid var(--rule);
+  padding: 0.4rem;
+}
+
+.provenance-pane textarea { width: 100%; font-size: 0.72rem; }
+.provenance-pane label { font-size: 0.7rem; color: var(--host); }
+
+/* The status strip (FR-58). Not a pane: it is outside the dock, it cannot be closed, tabbed or
+   dragged, and there is no arrangement a reader can reach in which the statement is not on
+   screen. Its height is declared so that what the dock gets is a figure and not a leftover. */
+.pane.status {
+  flex-direction: row;
+  align-items: center;
+  gap: 1rem;
+  min-height: var(--status-height, 46px);
+  padding: 0.25rem 0.6rem;
+  border-top: 1px solid var(--rule);
+  background: var(--paper);
+  overflow: hidden;
+  flex-wrap: wrap;
+}
+
+.status .not-operational {
+  flex: 1 1 22rem;
+  margin: 0;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.7rem;
+  line-height: 1.25;
+  min-width: 0;
+}
+
+.status .not-operational h1 { font-size: 0.95rem; margin: 0; display: inline; margin-right: 0.4rem; }
+.status .not-operational p { display: inline; }
+
+.status-figures {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: auto auto;
+  gap: 0 1rem;
+  margin: 0;
+  font-size: 0.72rem;
+  align-items: baseline;
+}
+
+.status-figures dt { color: var(--host); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.status-figures dd { margin: 0; max-width: 22rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.status-actions { display: flex; gap: 0.4rem; align-items: center; }
+.status .banner { margin: 0; flex: 1 1 100%; font-size: 0.75rem; }
+
+/* A readout: a label and a figure, in a grid of pairs. Beat 018 replaced eleven sentences
+   with these -- a sentence that carries two figures asks a reader to read a line to find
+   them, and an instrument shows them. */
+.readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.1rem 0.5rem;
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+}
+
+.readout dt {
+  font-size: 0.62rem;
+  color: var(--host);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.readout dd { margin: 0 0.5rem 0 0; }
+
+/* The walkthrough (spec 018 FR-009). Placed rather than laid out, like panel help: opening it
+   changes no pane's rectangle, and nothing behind it is covered by a scrim -- a reader may
+   drag the issue time with it open and what it says will still be true. */
+.walkthrough-card {
+  position: fixed;
+  right: 1rem;
+  bottom: calc(var(--status-height, 46px) + 1rem);
+  width: min(30rem, calc(100vw - 2rem));
+  max-height: 60dvh;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid var(--ink);
+  box-shadow: 0 6px 24px rgb(16 23 29 / 18%);
+  padding: 0.7rem 0.9rem;
+  z-index: 40;
+  font-size: 0.85rem;
+}
+
+.walkthrough-card h4 {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+.walkthrough-pane {
+  font-size: 0.68rem;
+  color: var(--host);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.walkthrough-card p { margin: 0 0 0.5rem; }
+.walkthrough-controls { display: flex; align-items: center; gap: 0.4rem; }
+.walkthrough-progress { color: var(--host); font-size: 0.72rem; margin-right: auto; }
+.pane-offers { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 
 .region-empty {
   color: var(--host);
@@ -185,6 +415,7 @@ body {
 .one-view.below-floor {
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
+  padding: 0.4rem;
 }
 
 .below-floor .floor-answer {
@@ -222,19 +453,23 @@ body {
    regions share the shortfall by shrinking, and a region shorter than its content spills over
    the region beneath it -- which is not a cosmetic fault: the analysed field's overlay is
    positioned, so it painted over the controls and swallowed their clicks. */
-.below-floor-body > .region { flex: 0 0 auto; }
+.below-floor-body > .pane { flex: 0 0 auto; }
 
 /* The regions here are blocks in a column, not tracks of the centre's grid: there is one
    panel, so there is nothing for `subgrid` to align it to. */
-.below-floor .centre,
-.below-floor .scores,
-.below-floor .detail,
+.below-floor .horizons,
+.below-floor .selection,
+.below-floor .provenance,
 .below-floor .controls {
   display: block;
+  height: auto;
   border-left: none;
   padding-left: 0;
   overflow: visible;
 }
+
+.below-floor .horizon-row { display: block; }
+.below-floor .horizon-row > .panel + .panel { margin-top: 0.6rem; }
 
 .below-floor .controls { border-top: 1px solid var(--rule); padding-top: 0.5rem; }
 
@@ -256,7 +491,23 @@ body {
 .below-floor .panel.enlarged .field { height: auto; }
 .below-floor .panel.enlarged .field-stack { height: auto; max-width: 100%; aspect-ratio: auto; }
 .below-floor .panel.enlarged .field-stack canvas { width: 100%; height: auto; }
-.below-floor .enlarged-aside { overflow: visible; }
+.below-floor .enlarged-aside {
+  justify-content: flex-start; overflow: visible; }
+
+/* The arrival state below the floor, for the same reason as the enlarged one: there is no box
+   to keep here, so the picture is sized by the width of the column rather than by a height the
+   column does not have. Left on the workspace's rule it drew at 116 px. */
+.below-floor .row-invitation { flex-direction: column; row-gap: 0.8rem; overflow: visible; }
+.below-floor .row-invitation > .analysed-field { flex: 0 0 auto; }
+.below-floor .row-invitation > .row-invitation-prose { flex: 0 0 auto; min-width: 0; overflow: visible; }
+.below-floor .analysed-field .field { flex: 0 0 auto; }
+.below-floor .analysed-field .field-stack {
+  flex: 0 0 auto;
+  height: auto;
+  width: min(100%, 52dvh);
+  max-height: none;
+}
+.below-floor .analysed-field .field-stack canvas { height: auto; }
 
 /* FR-049's strip, and FR-050's reason for keeping it: the enlargement is a selection, and the
    other five horizons stay on screen with what each was worth. There is one of these at every
@@ -369,13 +620,24 @@ body {
 /* What a reader opens the panel for, and more of it than the box always has: a declared
    scroller rather than a column that spills over the scores (one-view.spec fails by name on
    an undeclared one). */
+/* Beat 018. It used to scroll, and what it scrolled was labels, a depth axis and a legend --
+   which is not a list, so FR-002 no longer admits it. It takes the height the panel has
+   instead, and the depth elevation takes what the labels and the legend leave: the author's
+   screenshot of beat 017 showed that elevation as a band of empty white, which is the same
+   dead space this beat is measuring, one pane further in. */
 .enlarged-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
 }
+
+.enlarged-aside > .elevation { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.enlarged-aside > .elevation svg { flex: 1 1 auto; width: 100%; height: auto; min-height: 0; }
+.enlarged-aside > .panel-labels { flex: 0 0 auto; }
 
 .enlarged-aside .panel-labels { margin-top: 0; }
 .enlarged-aside .legend { font-size: 0.76rem; margin: 0.5rem 0 0; }
@@ -450,20 +712,19 @@ body {
    the keyboard is on is already marked, by the same thicker stroke a pointer gives it. */
 .elevation-stack:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
 
-.region h2 {
+.pane h2 {
   margin: 0 0 0.4rem;
   font-size: 0.82rem;
 }
 
-.controls .disclosures { margin-top: 0.75rem; }
 
-.controls details {
+.provenance-pane details {
   border-top: 1px solid var(--rule);
   padding: 0.3rem 0;
   font-size: 0.82rem;
 }
 
-.controls details > summary {
+.provenance-pane details > summary {
   cursor: pointer;
   color: var(--host);
   text-transform: uppercase;
@@ -471,16 +732,21 @@ body {
   font-size: 0.72rem;
 }
 
-.controls details dl { grid-template-columns: 1fr; gap: 0.1rem; }
-.controls details dt { font-size: 0.68rem; }
-.controls details dd { font-size: 0.78rem; margin-bottom: 0.35rem; }
+.provenance-pane details dl { grid-template-columns: 1fr; gap: 0.1rem; }
+.provenance-pane details dt { font-size: 0.68rem; }
+.provenance-pane details dd { font-size: 0.78rem; margin-bottom: 0.35rem; }
 
+/* Beat 018 tightened this, and the reason is the floor. Every pixel a control group spends on
+   space it does not need is a pixel added to the smallest window the workspace lays out in,
+   and the floor is a promise to a reader with a laptop. The rule and the space above it are
+   what separate one group from the next; the rest was margin nobody had measured. */
 .control-group {
   border-top: 1px solid var(--rule);
-  padding-top: 0.4rem;
-  margin-top: 0.4rem;
+  padding-top: 0.3rem;
+  margin-top: 0;
 }
 
+.control-group > .panel-head { margin-bottom: 0.15rem; }
 .control-group > h3 {
   margin: 0 0 0.3rem;
   font-size: 0.7rem;
@@ -517,27 +783,61 @@ body {
    rather than across the track, and the two lines it gains have to come from somewhere. It is checked rather than trusted --
    `tests/shell/enlargement.spec.ts` fails if the centre's content outgrows the centre in any
    of the three things it can hold. */
+/* FR-048, before the row is built. The analysed field is a square, and the pane's height is
+   whatever the reader left it -- so the field is bounded by the *height* the pane has as well
+   as by the width, and the two columns sit beside it. Beat 013 sized this from a declared
+   centre height, which the workspace does not have and should not: the pane's height is the
+   reader's. */
+/* A row rather than a grid of tracks, and the difference is the whole of beat 018 in one
+   rule: a track is sized before the row's height is known, so an `auto` column holding a
+   square picture cannot ask how tall it is and collapses. The figure is a flex item that takes
+   the height the pane gives it and the width its own aspect ratio makes of that height; the
+   prose takes what is left. Measured: 102 px square as a track, 747 px square as a flex item,
+   in the same 808 px pane. */
 .row-invitation {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(16rem, 24rem);
+  display: flex;
+  flex-direction: row;
   column-gap: 1.4rem;
-  align-content: start;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
- /* The figure takes the width of the picture it holds rather than the width of the track, so
+ /* The figure takes the width of the picture it holds rather than the width of the pane, so
     that its head is the picture's own head line and the help control at that head's right is at
     the top right of the thing it explains. */
 .row-invitation > .analysed-field {
-  grid-column: 1;
-  grid-row: 1;
-  width: min(100%, calc(var(--centre-height) - 9.5rem));
+  flex: 0 0 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
-.row-invitation > .row-invitation-prose { grid-column: 2; grid-row: 1; min-width: 0; }
-.row-invitation-prose > .aside { margin-top: 0.5rem; }
+.row-invitation > .row-invitation-prose {
+  flex: 1 1 16rem;
+  min-width: 16rem;
+  min-height: 0;
+  overflow: hidden;
+}
 
+/* The field takes the height the pane gives it and its width follows, because it is square.
+   Beat 015 sized it from a declared centre height; the pane has no declared height, and left
+   to size itself from its own content the picture collapsed to 102 px in a pane 808 px tall
+   -- the arrival state, and the largest piece of dead space on the surface. Height first,
+   width from the aspect ratio, is what fills it. */
 .analysed-field { margin: 0; min-width: 0; }
 .analysed-field .field { margin: 0; }
-.analysed-field .field-stack { max-width: min(100%, calc(var(--centre-height) - 9.5rem)); }
+.analysed-field .field { min-height: 0; display: flex; flex: 1 1 auto; }
+.analysed-field .field-stack {
+  flex: 0 0 auto;
+  height: 100%;
+  width: auto;
+  max-width: none;
+  max-height: 100%;
+  aspect-ratio: 1 / 1;
+}
+.analysed-field .field-stack canvas { width: 100%; height: 100%; object-fit: contain; }
 
 /* Written against `.field canvas`, which is later in this file and would otherwise win: the
    28rem cap is for a field in a column of prose, and this one has a region. */
@@ -787,8 +1087,26 @@ button[disabled]:hover { background: #fff; color: var(--ink); }
 .panel-labels dd.instant span { display: block; font-size: 0.74rem; line-height: 1.25; }
 .panel-labels { grid-template-columns: minmax(3.6rem, auto) 1fr; }
 
-.panel-score { margin-top: 0.5rem; border-top: 1px solid var(--rule); padding-top: 0.4rem; }
-.panel-score .statement { font-size: 0.76rem; margin: 0 0 0.3rem; border-left-width: 2px; padding-left: 0.5rem; }
+/* The score's own box, and the containing block for its help control. Beat 016 hung that
+   control off `.scores`, the region; the region is gone and six panels each draw the same
+   declaration now, so without a containing block of its own every one of the six corners
+   resolved to the same rectangle and five panels' controls stacked on the sixth's. A control
+   belongs to the box it explains. */
+.panel-score { position: relative; margin-top: 0.5rem; border-top: 1px solid var(--rule); padding-top: 0.4rem; }
+.panel-score > .panel-corner { top: 0.35rem; }
+/* Room for the corner, so the panel's first line is never under it. */
+.panel-score .unmeasured { padding-right: 1.4rem; }
+/* The scorer's statement, now the first thing inside *Where this figure came from* rather than
+   a sentence over the figures that say the same thing (beat 018, FR-008). It keeps the rule
+   down its left edge, because that mark is how a reader tells the scorer's words from the
+   surface's account of them. */
+.panel-score .provenance .statement {
+  font-size: 0.78rem;
+  margin: 0 0 0.35rem;
+  border-left-width: 2px;
+  padding-left: 0.5rem;
+  color: var(--ink);
+}
 .panel-score details { font-size: 0.75rem; color: var(--host); margin-top: 0.4rem; }
 .panel-score summary { cursor: pointer; }
 .panel-score .caveat { color: var(--alarm); }
@@ -798,7 +1116,7 @@ button[disabled]:hover { background: #fff; color: var(--ink); }
 .panel .computed, .panel-labels .computed { color: var(--computed); font-weight: 600; font-family: ui-monospace, Menlo, Consolas, monospace; }
 .panel .derived, .panel-labels .derived { color: var(--derived); font-style: italic; border-bottom: 1px dashed var(--derived); }
 
-.row-controls { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.row-controls { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.35rem; }
 
 .dot.ink { background: rgb(31, 51, 71); }
 .dot.cool { background: rgb(28, 71, 153); }
@@ -846,6 +1164,8 @@ button[disabled]:hover { background: #fff; color: var(--ink); }
 }
 
 .observation-hover p { margin: 0.35rem 0 0; }
+
+.level-list { max-height: 22rem; overflow-y: auto; overflow-x: hidden; }
 
 .profile-comparison {
   width: 100%;

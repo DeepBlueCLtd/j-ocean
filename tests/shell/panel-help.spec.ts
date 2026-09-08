@@ -47,10 +47,9 @@ async function regionBoxes(page: Page): Promise<Record<string, Rect | null>> {
       return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
     };
     return {
-      controls: box('region-controls'),
-      centre: box('region-centre'),
-      scores: box('region-scores'),
-      detail: box('region-detail'),
+      controls: box('pane-controls'),
+      centre: box('pane-horizons'),
+      detail: box('pane-selection'),
     };
   });
 }
@@ -68,12 +67,40 @@ async function panelsOnScreen(page: Page): Promise<{ id: string; controls: numbe
   });
 }
 
+/**
+ * Everything a panel could be behind, opened.
+ *
+ * Beat 016 wrote this as "open every `<details>`", because the run's provenance was four
+ * stacked disclosures. Beat 018 made them four tabs of a pane, so a panel is now behind a tab
+ * as well as behind a disclosure, and both have to be visited before "every panel on the page"
+ * means every panel. The claim is unchanged; what a panel can be behind is not.
+ */
 async function openEverything(page: Page): Promise<void> {
   await page.evaluate(() => {
     for (const node of document.querySelectorAll('details')) {
       (node as HTMLDetailsElement).open = true;
     }
   });
+}
+
+/** The panels each provenance tab carries, so a walk can visit all of them. */
+const PROVENANCE_TABS = ['The run', 'Instruments', 'Truth record', 'Manifest'];
+
+async function everyPanelSeen(page: Page): Promise<{ id: string; controls: number }[]> {
+  const found = new Map<string, number>();
+  const record = (seen: { id: string; controls: number }[]): void => {
+    for (const one of seen) found.set(one.id, Math.max(found.get(one.id) ?? 0, one.controls));
+  };
+  await openEverything(page);
+  record(await panelsOnScreen(page));
+  for (const tab of PROVENANCE_TABS) {
+    const control = page.locator('.dv-tab', { hasText: tab }).first();
+    if ((await control.count()) === 0) continue;
+    await control.click();
+    await openEverything(page);
+    record(await panelsOnScreen(page));
+  }
+  return [...found].map(([id, controls]) => ({ id, controls }));
 }
 
 test.beforeEach(async ({ page }) => {
@@ -94,9 +121,8 @@ test.describe('a control exactly where there is something to explain', () => {
   }) => {
     await page.goto('/');
     await expect(page.getByTestId('run-panel')).toBeVisible();
-    await openEverything(page);
 
-    const seen = await panelsOnScreen(page);
+    const seen = await everyPanelSeen(page);
     expect(seen.length, 'no panel declared itself on the page').toBeGreaterThan(0);
 
     for (const panel of seen) {
@@ -134,9 +160,15 @@ test.describe('a control exactly where there is something to explain', () => {
         /* The box a reader would call "the panel": the control-group, the horizon panel, the
            disclosure, the figure, or -- for a panel that is a whole region -- the region. Not
            the wrapper the control itself sits in, which would make the question trivial. */
-        const owner = element.closest(
-          '.control-group, .panel, details, figure, .row-invitation-prose, .region',
-        ) as HTMLElement;
+        /* The box a reader would call "the panel": a control group, a horizon panel, a
+           disclosure, a figure, a provenance tab's own section, or -- for a panel that is a
+           whole pane -- the pane. Beat 018 replaced `.region` with `[data-pane-id]` and added
+           `.provenance-pane`, because the regions became panes and four disclosures became
+           tabs; without the fallback the closest match is null and the measurement throws. */
+        const owner = (element.closest(
+          '.control-group, .panel, .score-cell, details, figure, .row-invitation-prose, ' +
+            '.provenance-pane, .skill-curve, [data-pane-id]',
+        ) ?? element.parentElement) as HTMLElement;
         const control = element.getBoundingClientRect();
         const panel = owner.getBoundingClientRect();
         return {
@@ -181,6 +213,9 @@ test.describe('opening in place', () => {
       height: document.documentElement.scrollHeight,
     }));
 
+    await page.locator('.dv-tab', { hasText: 'Manifest' }).first().click();
+    const before2 = await regionBoxes(page);
+    expect(before2, 'selecting a tab moved a pane').toEqual(before);
     await page.getByTestId('help-control-controls/manifest').click();
     await expect(page.getByTestId('help-controls/manifest')).toBeVisible();
 
@@ -236,6 +271,8 @@ test.describe('opening in place', () => {
   test('offers no next, no previous and no step count', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByTestId('run-panel')).toBeVisible();
+    // The manifest is a tab of the provenance pane now, so its panel is reached by selecting it.
+    await page.locator('.dv-tab', { hasText: 'Manifest' }).first().click();
     await page.getByTestId('help-control-controls/manifest').click();
     const card = page.getByTestId('help-controls/manifest');
     await expect(card).toBeVisible();
@@ -254,6 +291,7 @@ test.describe('opening in place', () => {
   test('closes on the control and on Escape, with focus returned', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByTestId('run-panel')).toBeVisible();
+    await page.locator('.dv-tab', { hasText: 'Manifest' }).first().click();
     const control = page.getByTestId('help-control-controls/manifest');
     const card = page.getByTestId('help-controls/manifest');
 
@@ -261,7 +299,10 @@ test.describe('opening in place', () => {
     await expect(card).toBeVisible();
     await expect(control).toHaveAttribute('aria-expanded', 'true');
     // Opening help is not a request to open the disclosure it is on.
-    await expect(page.getByTestId('manifest-panel')).not.toHaveAttribute('open', '');
+    /* Beat 016 asserted that opening help did not open the disclosure the control sat on. The
+       disclosure is a tab now, so the same claim is that opening help does not change which
+       tab is showing -- pressing a help control is not a request to go somewhere. */
+    await expect(page.getByTestId('manifest-panel')).toBeVisible();
     await control.click();
     await expect(card).toHaveCount(0);
     await expect(control).toBeFocused();
@@ -322,10 +363,22 @@ test.describe('help belongs to a panel, and dies with it', () => {
  * on disk; this is a reader pressing each one and finding words there.
  */
 test.describe('the four §7 destinations', () => {
-  const OWED: readonly { subject: string; panel: string; says: RegExp }[] = [
+  const OWED: readonly {
+    subject: string;
+    panel: string;
+    instance?: string;
+    says: RegExp;
+  }[] = [
     { subject: 'attribution', panel: 'centre/attribution', says: /influences the far side/ },
     { subject: 'lead and issue time', panel: 'controls/issue-time', says: /Two axes, not one/ },
-    { subject: 'the references and skill', panel: 'scores', says: /no better than the reference/ },
+    {
+      subject: 'the references and skill',
+      /* Six panels draw this declaration now -- each carries its own figures -- so the control
+         names the panel it is on, as a horizon panel's own control does. */
+      panel: 'scores',
+      instance: '24',
+      says: /no better than the reference/,
+    },
     {
       subject: 'the observation footprint',
       panel: 'controls/observation-footprint',
@@ -353,14 +406,15 @@ test.describe('the four §7 destinations', () => {
 
 async function openOwed(
   page: Page,
-  owedList: readonly { subject: string; panel: string; says: RegExp }[],
+  owedList: readonly { subject: string; panel: string; instance?: string; says: RegExp }[],
 ): Promise<void> {
   {
     for (const owed of owedList) {
-      const control = page.getByTestId(`help-control-${owed.panel}`);
+      const key = owed.instance === undefined ? owed.panel : `${owed.panel}#${owed.instance}`;
+      const control = page.getByTestId(`help-control-${key}`);
       await expect(control, `§7 owes ${owed.subject} an explanation`).toBeVisible();
       await control.click();
-      const card = page.getByTestId(`help-${owed.panel}`);
+      const card = page.getByTestId(`help-${key}`);
       await expect(card).toBeVisible();
       await expect(card, `${owed.subject} says nothing`).toContainText(owed.says);
       await page.keyboard.press('Escape');
@@ -368,22 +422,39 @@ async function openOwed(
   }
 }
 
-/** SC-004: no tour, no overlay, no step counter, and nothing left of the button that opened one. */
-test('the walkthrough is gone from the surface', async ({ page }) => {
+/**
+ * Beat 016's claim, asserted where it is still true (spec 018 US5).
+ *
+ * That beat wrote "the walkthrough is gone from the surface" and listed the test ids a tour
+ * would have left behind. Its subject came back: beat 018's docked workspace raises *what am I
+ * looking at*, which panel help cannot answer, so a walkthrough answers it and
+ * `tests/shell/walkthrough.spec.ts` holds it to being offered and never imposed.
+ *
+ * What beat 016 was really holding is FR-052: **panel help does not sequence.** That is
+ * asserted here, in the same words and against the thing it was always about -- a help card
+ * carries nothing to press, and it does not accumulate. The walkthrough may sequence, because
+ * a walkthrough is a sequence; help may not, because a reader confused by attribution wants
+ * attribution explained rather than a tour that begins three panels away.
+ */
+test('leaves panel help with nothing that sequences a reader', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('run-panel')).toBeVisible();
-  for (const testId of [
-    'help-button',
-    'walkthrough-card',
-    'walkthrough-spotlight',
-    'walkthrough-progress',
-    'walkthrough-next',
-    'walkthrough-back',
-    'walkthrough-done',
-  ]) {
-    await expect(page.getByTestId(testId), `${testId} is still on the page`).toHaveCount(0);
-  }
-  // And the legend it carried is reachable, on the site, from the application.
+
+  await page.locator('.dv-tab', { hasText: 'Manifest' }).first().click();
+  await page.getByTestId('help-control-controls/manifest').click();
+  const card = page.getByTestId('help-controls/manifest');
+  await expect(card).toBeVisible();
+  expect(await card.locator('button, a').count(), 'a help card offers something to press').toBe(0);
+  await expect(card).not.toContainText(/\bstep\b/i);
+  await expect(card).not.toContainText(/\bnext\b/i);
+  await expect(card).not.toContainText(/\bprevious\b/i);
+
+  // And the walkthrough is not panel help wearing a different name: it is one card, opened
+  // from one control, and no help control opens it.
+  await expect(page.getByTestId('walkthrough-card')).toHaveCount(0);
+  await expect(page.locator('[data-help]')).toHaveCount(1);
+
+  // The legend the retired tour carried is still reachable, on the site, from the application.
   await expect(page.getByTestId('figure-kinds-link')).toHaveAttribute(
     'href',
     '../data-model.html#the-figure-kinds',

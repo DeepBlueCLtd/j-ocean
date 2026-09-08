@@ -326,10 +326,17 @@ export function PanelSummary({ panel }: { readonly panel: string }) {
  * that a region which had no head before this beat does not acquire one and change its height
  * -- which would move the regions beneath it, which is what FR-049 forbids.
  */
-export function PanelCorner({ panel }: { readonly panel: string }) {
+export function PanelCorner({
+  panel,
+  instance,
+}: {
+  readonly panel: string;
+  /** Which of several panels drawn from one declaration this is. See `PanelHelp`. */
+  readonly instance?: string;
+}) {
   return (
     <div className="panel-corner" data-panel={panel}>
-      <PanelHelp panel={panel} />
+      <PanelHelp panel={panel} {...(instance === undefined ? {} : { instance })} />
     </div>
   );
 }

@@ -36,15 +36,20 @@ export function Counterfactuals(props: CounterfactualsProps) {
 
   return (
     <div className="counterfactuals" data-testid="counterfactuals">
+      {/*
+        SRD-v1 FR-34, as a readout rather than a sentence (beat 018). The surface always says
+        whether what is shown is the recorded run or an edit of it; what it no longer does is
+        say it in a sentence with a button embedded in the middle of it. The label, the state
+        and the way back, in that order.
+      */}
       <p className="run-status" data-testid="run-status">
+        <span className="run-status-label">Showing</span>{' '}
         {edits.length === 0 ? (
-          <>
-            Showing the <strong>recorded case</strong>.
-          </>
+          <span className="figure declared">the recorded case</span>
         ) : (
           <>
-            Showing an <strong>edit</strong> of the recorded case:{' '}
-            <span data-testid="edit-list">{edits.map(describeEdit).join('; ')}</span>.
+            <span className="figure computed">an edit</span>:{' '}
+            <span data-testid="edit-list">{edits.map(describeEdit).join('; ')}</span>
           </>
         )}
         <button
