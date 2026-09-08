@@ -26,17 +26,25 @@ export const SITE_PAGE_PATH = 'docs/site/disposition.md';
 export const BEGIN = '<!-- generated from docs/narrative-disposition.json by scripts/docs/build-disposition.ts -->';
 export const END = '<!-- end generated -->';
 
-export type Kind = 'stays' | 'site' | 'help';
+export type Kind = 'stays' | 'site' | 'help' | 'dropped';
 
 export interface Entry {
   readonly id: string;
   readonly wasAt: string;
   readonly fromBeat: string;
+  /** Which of the retired walkthrough's steps this was, where it was one (spec 016 FR-007). */
+  readonly step?: number;
   readonly kind: Kind;
   readonly destination: string;
+  /** Which of the panel's declared features carries it, for a `help` destination. */
+  readonly feature?: string;
   readonly matter: string;
   readonly arrived?: boolean;
   readonly restatedAs?: string;
+  /** Which beat built the help entry that carries it. */
+  readonly builtIn?: string;
+  /** Why it is carried nowhere, for a `dropped` destination. Required for one. */
+  readonly reason?: string;
   readonly note?: string;
 }
 
@@ -45,7 +53,8 @@ export interface DispositionRecord {
   readonly beat: string;
   readonly kinds: Readonly<Record<Kind, string>>;
   readonly regions: readonly string[];
-  readonly owedTo: string;
+  /** The beat that built the help entries. Beat 014 owed them; beat 016 paid them. */
+  readonly helpBuiltIn: string;
   readonly entries: readonly Entry[];
 }
 
@@ -78,14 +87,15 @@ const siteHref = (destination: string): string => {
  * and where it is now -- one row per piece of matter, in the record's order.
  */
 export function srdSection(record: DispositionRecord): string {
-  const owed = of(record, 'help');
   const rows = record.entries.map((entry) => {
     const where =
       entry.kind === 'stays'
         ? `Stays, in the **${entry.destination}** region`
         : entry.kind === 'site'
           ? `${entry.arrived === true ? 'Site, and was already there' : 'Site'}: \`${entry.destination}\``
-          : `Help, owed to beat ${record.owedTo}: \`${entry.destination}\``;
+          : entry.kind === 'dropped'
+            ? `**Dropped**, with a reason: ${entry.reason ?? ''}`
+            : `Help, at the panel: \`${entry.destination}\`${entry.feature === undefined ? '' : `, under *${entry.feature}*`}`;
     return `| ${cell(entry.wasAt)} | ${cell(entry.matter)} | ${where} |`;
   });
 
@@ -94,8 +104,10 @@ export function srdSection(record: DispositionRecord): string {
     '',
     `Generated from \`${RECORD_PATH}\`, which is held by \`tests/docs/disposition.test.ts\`.`,
     `${String(record.entries.length)} pieces of matter: ${String(of(record, 'stays').length)} stay in a region,`,
-    `${String(of(record, 'site').length)} went to the site, and ${String(owed.length)} are **owed to beat`,
-    `${record.owedTo}** — a known hole with a beat number on it, which is not the same as a pass.`,
+    `${String(of(record, 'site').length)} went to the site, ${String(of(record, 'help').length)} are a panel's own`,
+    `help, built in beat ${record.helpBuiltIn}, and ${String(of(record, 'dropped').length)} were **dropped with a`,
+    'recorded reason** rather than carried anywhere. Every destination is resolved by the test:',
+    'a site section that contains the words, a help entry that renders them, or a reason.',
     '',
     '| Was on the application page | The matter | Now |',
     '|---|---|---|',
@@ -138,11 +150,15 @@ export function sitePage(record: DispositionRecord): string {
     'diagrams and the controls that drive them; nothing was deleted, and this page is the',
     'record of where each piece of it went.',
     '',
+    'Beat 016 retired the walkthrough and built the panel help beat 014 was owed, so every one',
+    "of the tour's steps has a row here too: a help entry, a section of this site, or a reason",
+    'for being dropped.',
+    '',
     'The record itself is',
     `[\`${RECORD_PATH}\`](https://github.com/DeepBlueCLtd/j-ocean/blob/main/${RECORD_PATH}),`,
     'and `tests/docs/disposition.test.ts` holds it: every destination on this page has to',
-    'exist and has to contain the words, and the help entries that do not exist yet are',
-    'counted so that the holes cannot quietly grow.',
+    'exist and has to contain the words — a site section that contains them, or a help entry',
+    'that renders them.',
     '',
     table(
       'site',
@@ -153,11 +169,20 @@ export function sitePage(record: DispositionRecord): string {
     ),
     table(
       'help',
-      `Owed to beat ${record.owedTo}`,
-      `It explains a panel that stays, so it belongs in that panel's help, which beat ${record.owedTo} builds. ` +
-        'Until then the words live in the record and the test reports the destination as owed. ' +
-        'That is a known hole with a beat number on it, and not a pass.',
-      (entry) => `\`${cell(entry.destination)}\``,
+      "It went to the panel's own help",
+      'It explains a panel that stays, so it is behind that panel\'s help control, opening where ' +
+        'the reader is looking. The test renders each entry and holds these words against what it ' +
+        'renders, so a panel whose explanation is edited away fails the build.',
+      (entry) =>
+        `\`${cell(entry.destination)}\`${entry.feature === undefined ? '' : `, under **${cell(entry.feature)}**`}`,
+    ),
+    table(
+      'dropped',
+      'It was dropped, and here is why',
+      'The surface now says it better, or says it for itself. Nothing is carried; the reason is ' +
+        'written down, because a paragraph that vanished without one is indistinguishable from a ' +
+        'paragraph somebody lost.',
+      (entry) => cell(entry.reason ?? '— no reason recorded, which is itself a failure'),
     ),
     table(
       'stays',
@@ -187,10 +212,10 @@ export function build(root = ROOT): void {
   writeFileSync(srd, spliced(readFileSync(srd, 'utf8'), srdSection(record)));
   writeFileSync(join(root, SITE_PAGE_PATH), sitePage(record));
 
-  const owed = of(record, 'help').length;
   process.stdout.write(
     `disposition: ${String(record.entries.length)} entries -> ${SRD_PATH} §7 and ${SITE_PAGE_PATH}` +
-      ` (${String(owed)} owed to beat ${record.owedTo})\n`,
+      ` (${String(of(record, 'help').length)} in panel help, ${String(of(record, 'dropped').length)} dropped` +
+      ` with a reason)\n`,
   );
 }
 

@@ -1,0 +1,102 @@
+{
+  "record": "What each panel of the surface has, and therefore what it can be asked about (SRD-v2 FR-52 to FR-54; spec 016 FR-004). One entry per headed box in one of the four regions of beat 013: the region it belongs to, the words at its head, and the regions or layers it has. A panel with nothing to explain says why rather than leaving the absence to be read as an oversight (FR-53). This is the list the layout renders from -- src/harness/panels.ts turns it into the components' own declarations, and nothing on the surface carries a heading that is not one of these -- and it is the list gate G-08 holds the help entries against. Two lists would be the staleness this beat exists to prevent, reintroduced by the fix for it.",
+  "beat": "016-panel-help",
+  "panels": [
+    {
+      "id": "controls/domain",
+      "region": "controls",
+      "heading": "Domain",
+      "features": [],
+      "nothingToExplain": "The control names both domains and what each is like. Why there are two is an argument about the harness rather than about this control, and beat 014 sent it to the site."
+    },
+    {
+      "id": "controls/run",
+      "region": "controls",
+      "heading": "The run",
+      "features": [],
+      "nothingToExplain": "Which run this is, how long a step took, and the buttons that advance it. Each says what it is on its own face, and what a run is belongs to the disclosure that publishes its seed."
+    },
+    {
+      "id": "controls/run-provenance",
+      "region": "controls",
+      "heading": "The run",
+      "features": [],
+      "nothingToExplain": "Every line of it is a live figure with its provenance beside it, which is where Principle V wants the explanation of a figure: at the figure."
+    },
+    {
+      "id": "controls/issue-time",
+      "region": "controls",
+      "heading": "Issue time",
+      "features": ["lead time and issue time"]
+    },
+    {
+      "id": "controls/editing-what-was-measured",
+      "region": "controls",
+      "heading": "Editing what was measured",
+      "features": ["editing a profile", "redrawing the track"]
+    },
+    {
+      "id": "controls/row-display",
+      "region": "controls",
+      "heading": "The row",
+      "features": [],
+      "nothingToExplain": "Three buttons that each say on their own face what they will do, and what they do is drawn on the six panels the moment they are pressed. What the drawing means is the legend's business, beneath the row."
+    },
+    {
+      "id": "controls/observation-footprint",
+      "region": "controls",
+      "heading": "What was measured",
+      "features": ["the observation footprint"]
+    },
+    {
+      "id": "controls/instruments",
+      "region": "controls",
+      "heading": "What the instruments measured",
+      "features": [],
+      "nothingToExplain": "How truth becomes an observation is the one thing this harness is most careful about, and it is too long for a panel: it is a page of the site, linked from the head of this column."
+    },
+    {
+      "id": "controls/truth",
+      "region": "controls",
+      "heading": "The record this run is scored against",
+      "features": [],
+      "nothingToExplain": "The record is a derived artefact and its account of itself belongs where it can be read at length. Beat 014 sent it to the site."
+    },
+    {
+      "id": "controls/manifest",
+      "region": "controls",
+      "heading": "The manifest this run replays from",
+      "features": ["importing a manifest"]
+    },
+    {
+      "id": "centre/horizon-row",
+      "region": "centre",
+      "heading": "The row",
+      "features": ["building the row"]
+    },
+    {
+      "id": "centre/attribution",
+      "region": "centre",
+      "heading": "Where the answer came from",
+      "features": ["the influence radius"]
+    },
+    {
+      "id": "centre/horizon-panel",
+      "region": "centre",
+      "heading": "A horizon panel",
+      "features": ["what a panel says", "the attribution layer", "enlarging a panel"]
+    },
+    {
+      "id": "scores",
+      "region": "scores",
+      "heading": "What each forecast was worth",
+      "features": ["skill against a reference", "anomalies about their own mean"]
+    },
+    {
+      "id": "detail/attribution-breakdown",
+      "region": "detail",
+      "heading": "What is selected",
+      "features": ["a cell's breakdown", "a measurement's own profile"]
+    }
+  ]
+}

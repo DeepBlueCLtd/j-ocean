@@ -1,0 +1,29 @@
+{
+  "record": "Planted: a panel that declares a region nothing explains (spec 016 T012, AT-14).",
+  "panels": [
+    {
+      "id": "centre/attribution",
+      "region": "centre",
+      "heading": "Where the answer came from",
+      "features": ["the influence radius", "the hatched channel"]
+    },
+    {
+      "id": "controls/issue-time",
+      "region": "controls",
+      "heading": "Issue time",
+      "features": ["lead time and issue time"]
+    },
+    {
+      "id": "scores",
+      "region": "scores",
+      "heading": "What each forecast was worth",
+      "features": ["skill against a reference"]
+    },
+    {
+      "id": "controls/observation-footprint",
+      "region": "controls",
+      "heading": "What was measured",
+      "features": ["the observation footprint"]
+    }
+  ]
+}

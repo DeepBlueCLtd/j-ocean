@@ -1,6 +1,7 @@
 import { checkArtefactDrift } from './check-artefact-drift.js';
 import { checkAttributionSource } from './check-attribution-source.js';
 import { checkDeclaredHorizons } from './check-declared-horizons.js';
+import { checkHelpCoverage } from './check-help-coverage.js';
 import { checkHostTime } from './check-host-time.js';
 import { checkModelImports } from './check-model-imports.js';
 import { checkSurfaceInvariance } from './check-surface-invariance.js';
@@ -38,6 +39,7 @@ const GATES: readonly (Landed | NotYetLanded)[] = [
   { run: checkAttributionSource },
   { run: checkVocabulary },
   { run: checkSurfaceInvariance },
+  { run: checkHelpCoverage },
 ];
 
 const isLanded = (gate: Landed | NotYetLanded): gate is Landed => 'run' in gate;

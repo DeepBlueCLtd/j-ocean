@@ -1,6 +1,10 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { HELP_ENTRIES } from '../../src/harness/help/index.js';
+import { REGIONS } from '../../src/harness/panels.js';
+import { declaredConfiguration } from '../support/config.js';
 import {
   build,
   readRecord,
@@ -24,16 +28,19 @@ import {
  *
  * 1. every **site** entry resolves to a heading that exists in a page under `docs/site/`, and
  *    that section contains the matter;
- * 2. every **help** entry is reported as owed to the beat that will build it, and the count is
- *    asserted, so the holes cannot quietly grow;
- * 3. every **stays** entry names one of the four regions of beat 013.
+ * 2. every **help** entry resolves to a panel whose help entry, **rendered**, contains the
+ *    matter -- which is what beat 014 wrote this test forward to. Until beat 016 these were
+ *    reported as owed and counted; they are paid now, and the same eight paragraphs are held
+ *    against the sentences a reader actually opens;
+ * 3. every **stays** entry names one of the four regions of beat 013;
+ * 4. every **dropped** entry carries a reason, because a paragraph that vanished without one is
+ *    indistinguishable from a paragraph somebody lost.
  *
  * It was watched failing on a planted entry whose destination does not exist, which is the
  * standing half of PR-04 and is kept standing by the planted cases below.
  */
 
 const ROOT = new URL('../../', import.meta.url).pathname;
-const REGIONS = ['controls', 'centre', 'scores', 'detail'] as const;
 
 /**
  * Prose is compared for what it says, not for how it is punctuated on the day. Markdown
@@ -75,11 +82,34 @@ export function sectionUnder(markdown: string, heading: string): string | null {
 }
 
 /**
+ * What every panel's help says, once rendered: the words a reader actually opens.
+ *
+ * Rendered rather than read from the source, because the requirement is about what the surface
+ * says. A source that mentioned the words in a comment would satisfy a text search and teach a
+ * reader nothing.
+ */
+export function renderedHelp(): ReadonlyMap<string, string> {
+  const { config } = declaredConfiguration();
+  return new Map(
+    HELP_ENTRIES.map((entry) => [
+      entry.panel,
+      entry.explains
+        .map((one) => renderToStaticMarkup(one.body(config) as never))
+        .join(' '),
+    ]),
+  );
+}
+
+/**
  * What the record claims, checked against the tree. A list of failures rather than an
  * assertion, so that a planted entry can be watched producing one without the check itself
  * having to be duplicated for the planted case.
  */
-export function failuresOf(record: DispositionRecord, root: string): string[] {
+export function failuresOf(
+  record: DispositionRecord,
+  root: string,
+  help: ReadonlyMap<string, string> = renderedHelp(),
+): string[] {
   const failures: string[] = [];
   const say = (entry: Entry, what: string): void => {
     failures.push(`${entry.id}: ${what} (destination ${entry.destination})`);
@@ -93,9 +123,27 @@ export function failuresOf(record: DispositionRecord, root: string): string[] {
       continue;
     }
 
+    if (entry.kind === 'dropped') {
+      if ((entry.reason ?? '').trim() === '') {
+        say(entry, 'was dropped and does not say why');
+      }
+      continue;
+    }
+
     if (entry.kind === 'help') {
       if (!entry.destination.startsWith('help:')) {
         say(entry, 'goes to help, but its destination does not name a help entry');
+        continue;
+      }
+      const panel = entry.destination.slice('help:'.length);
+      const rendered = help.get(panel);
+      if (rendered === undefined) {
+        say(entry, `goes to a panel with no help entry: ${panel}`);
+        continue;
+      }
+      const wanted = entry.restatedAs ?? entry.matter;
+      if (!normalise(rendered).includes(normalise(wanted))) {
+        say(entry, `the help at ${panel} does not say it`);
       }
       continue;
     }
@@ -122,7 +170,7 @@ export function failuresOf(record: DispositionRecord, root: string): string[] {
     // An entry marked as arrived was already at its destination before this beat, in the
     // destination's own words: the record keeps the application's wording and names the words
     // that are actually there, and both have to be true.
-    const wanted = entry.arrived === true ? entry.restatedAs : entry.matter;
+    const wanted = entry.restatedAs ?? (entry.arrived === true ? undefined : entry.matter);
     if (wanted === undefined) {
       say(entry, 'is marked as arrived but does not say in what words');
       continue;
@@ -143,8 +191,17 @@ describe('the disposition record', () => {
     expect(new Set(ids).size, 'two entries share an id').toBe(ids.length);
     for (const entry of record.entries) {
       expect(entry.matter.trim(), `${entry.id} carries no matter`).not.toBe('');
-      expect(['stays', 'site', 'help']).toContain(entry.kind);
+      expect(['stays', 'site', 'help', 'dropped']).toContain(entry.kind);
     }
+  });
+
+  /**
+   * One list of regions, not two. `REGIONS` is what `Regions.tsx` lays the surface out from and
+   * what every panel declaration names; the record's own list has to be that list, or the
+   * record is describing a surface that has moved on without it.
+   */
+  it('names the regions the layout draws, and not a copy of them', () => {
+    expect(record.regions).toEqual([...REGIONS]);
   });
 
   it('resolves every site destination to a section that contains the matter', () => {
@@ -160,25 +217,71 @@ describe('the disposition record', () => {
   });
 
   /**
-   * The holes, counted. Beat 016 builds the help entries; until it does, this is what is
-   * owed, and the number is asserted rather than reported so that a later beat cannot quietly
-   * send a ninth paragraph into a destination that does not exist yet.
+   * The eight beat 014 owed to beat 016, paid.
+   *
+   * This test was written two beats before the thing it tests, which is the point of having
+   * written it: the count was asserted so a ninth paragraph could not arrive quietly, and the
+   * destinations were named so that building them was a checkable act rather than a claim.
+   * The count is still asserted, and each one now has to be *in* the help a reader opens --
+   * `failuresOf` renders the entry and looks for the words.
    */
-  it('reports the help entries as owed to the beat that will build them, and counts them', () => {
-    const owed = record.entries.filter((entry) => entry.kind === 'help');
-    expect(record.owedTo).toBe('016-panel-help');
+  it('has paid the eight explanations beat 014 owed, at the panels it named', () => {
+    const owed = record.entries.filter(
+      (entry) => entry.kind === 'help' && entry.step === undefined,
+    );
+    expect(record.helpBuiltIn).toBe('016-panel-help');
     expect(
       owed.length,
-      'the number of paragraphs owed to beat 016 has changed; if that is deliberate, ' +
-        'change the number here and say so in the commit',
+      'the number of paragraphs beat 014 sent to panel help has changed; if that is ' +
+        'deliberate, change the number here and say so in the commit',
     ).toBe(8);
+    const help = renderedHelp();
     for (const entry of owed) {
-      expect(entry.destination, `${entry.id} is owed to no named panel`).toMatch(/^help:[a-z-]+/);
+      expect(entry.destination, `${entry.id} names no panel`).toMatch(/^help:[a-z-]+/);
+      expect(entry.builtIn, `${entry.id} does not say which beat built it`).toBe('016-panel-help');
+      expect(
+        help.has(entry.destination.slice('help:'.length)),
+        `${entry.id} names a panel with no help: ${entry.destination}`,
+      ).toBe(true);
     }
     console.log(
-      `    ${String(owed.length)} explanations are owed to beat ${record.owedTo}: ` +
-        owed.map((entry) => entry.destination).join(', '),
+      `    ${String(owed.length)} explanations beat 014 owed are built in beat ` +
+        `${record.helpBuiltIn}: ${owed.map((entry) => entry.destination).join(', ')}`,
     );
+  });
+
+  /**
+   * The walkthrough's steps, all of them (spec 016 FR-007, US5, SC-004).
+   *
+   * Eleven steps, and every one has a destination here: a panel's help, a section of the site,
+   * or `dropped` with a reason. The count is asserted for the same reason beat 014 asserted
+   * its own: a step that quietly stopped being accounted for would look exactly like a step
+   * that never existed.
+   */
+  it('gives every one of the retired walkthrough\'s steps a destination', () => {
+    const steps = record.entries.filter((entry) => entry.step !== undefined);
+    const numbers = [...new Set(steps.map((entry) => entry.step))].sort((a, b) =>
+      (a ?? 0) - (b ?? 0),
+    );
+    expect(numbers, 'the walkthrough declared eleven steps').toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+    ]);
+    for (const entry of steps) {
+      expect(['site', 'help', 'dropped'], `${entry.id} went nowhere nameable`).toContain(entry.kind);
+    }
+    console.log(
+      `    ${String(steps.length)} pieces of the walkthrough, across ${String(numbers.length)} ` +
+        `steps: ${String(steps.filter((e) => e.kind === 'help').length)} to panel help, ` +
+        `${String(steps.filter((e) => e.kind === 'site').length)} to the site, ` +
+        `${String(steps.filter((e) => e.kind === 'dropped').length)} dropped with a reason`,
+    );
+  });
+
+  it('does not leave the walkthrough on the surface it retired', () => {
+    expect(
+      existsSync(join(ROOT, 'src/harness/Walkthrough.tsx')),
+      'the walkthrough component is still in the tree; FR-052 says panel-level and not a tour',
+    ).toBe(false);
   });
 });
 
@@ -228,6 +331,25 @@ describe('a planted entry, so that the check is watched failing', () => {
     const failures = failuresOf(plant({ kind: 'stays', destination: 'sidebar' }), ROOT);
     expect(failures).toHaveLength(1);
     expect(failures[0]).toContain('not one of the four regions');
+  });
+
+  /** Beat 016's own three, so that the help and dropped branches are watched failing too. */
+  it('fails when a help destination names a panel with no help', () => {
+    const failures = failuresOf(plant({ kind: 'help', destination: 'help:centre/nowhere' }), ROOT);
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toContain('goes to a panel with no help entry');
+  });
+
+  it('fails when the panel has help and the help does not say it', () => {
+    const failures = failuresOf(plant({ kind: 'help', destination: 'help:scores' }), ROOT);
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toContain('the help at scores does not say it');
+  });
+
+  it('fails when something is dropped and does not say why', () => {
+    const failures = failuresOf(plant({ kind: 'dropped', destination: 'dropped' }), ROOT);
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toContain('does not say why');
   });
 });
 

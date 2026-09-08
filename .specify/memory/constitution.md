@@ -351,8 +351,15 @@ Every change must pass, in CI:
 7. **G-05** declared horizons rendered, in Playwright (Principle X).
 8. **G-06** attribution source (Principle IV).
 9. The forbidden-vocabulary gate (Principle VII).
+10. **G-07** surface invariance (SRD-v2 FR-40): for the recorded case, every computed field,
+    score and derived quantity is compared against a committed record of its digest, so a
+    beat that claims to move no number is held to it rather than believed.
+11. **G-08** help coverage (SRD-v2 FR-53, FR-54, AT-14): every region or layer a panel
+    declares has an explanation, every explanation names a panel and a feature that exist,
+    and every panel the layout draws is declared — so a surface that declared nothing would
+    fail rather than pass trivially.
 
-Gates 3 to 9 live in `scripts/gates/` and run locally with one command.
+Gates 3 to 11 live in `scripts/gates/` and run locally with one command.
 
 ### Gates are watched failing
 
@@ -389,7 +396,13 @@ it, the constitution wins and the artefact is amended.
   added, or guidance materially expanded, including a new bounded exemption. **PATCH**:
   clarification, wording, or a non-semantic refinement.
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-05 | **Last Amended**: 2026-09-05
+**Version**: 1.1.0 | **Ratified**: 2026-09-05 | **Last Amended**: 2026-09-21
+
+*1.1.0 — 2026-09-21, ADR-0013. Two gates added to the schedule: **G-07 surface invariance**,
+which landed in beat 013 and had been running in CI unlisted ever since, and **G-08 help
+coverage**, which lands in beat 016. Recording G-07 late is the finding, not the fix: a gate
+that runs and is not on the schedule is a gate nobody would notice the absence of. No principle
+changed, so previously-compliant work remains compliant.*
 
 *1.0.0 — ratified against SRD v1 (draft of 5 September 2026). Ten principles: five
 non-negotiable (I, II, III, IV, VII), five binding but arguable (V, VI, VIII, IX, X). Principle I opens with two bounded exemptions rather

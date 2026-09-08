@@ -41,7 +41,8 @@ import type { ArtefactTruthSource } from '../truth/artefact-truth-source.js';
 import type { FieldContainer } from '../truth/container.js';
 import { drawRootSeed } from './seed-provisioning.js';
 import { measure, overBudget } from './timing.js';
-import { Walkthrough } from './Walkthrough.js';
+import { Computed, Declared, HostTime } from './figures.js';
+import { HelpProvider, PanelCorner, PanelHead, PanelSummary } from './Help.js';
 
 /**
  * The shell (FR-002, FR-013, NFR-02, constitution Principle V and VI).
@@ -62,26 +63,12 @@ const ADVANCE_HOURS = 12;
 /**
  * Principle V: declared, computed and derived are typographically distinct, always.
  *
- * `Declared` is exported because the three kinds are the surface's vocabulary rather than
- * this file's private business: a module that has a figure from configuration to draw should
- * reach for this one instead of inventing a second. FR-009's required viewport size is such a
- * figure -- it comes from configuration, so it is drawn as configuration.
+ * The three kinds are the surface's vocabulary rather than this file's private business, so
+ * beat 016 moved them to `figures.tsx`: a module with a figure to draw reaches for those
+ * instead of inventing a second set. Panel help reaches for `Declared` and for nothing else
+ * there, because FR-055 says help teaches and does not report.
  */
-export function Declared({ children }: { children: React.ReactNode }) {
-  return <span className="figure declared" title="declared in configuration">{children}</span>;
-}
-
-function Computed({ children }: { children: React.ReactNode }) {
-  return <span className="figure computed" title="computed by the model">{children}</span>;
-}
-
-function HostTime({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="figure host-time" title="host time: how long the machinery took, not simulation time">
-      {children}
-    </span>
-  );
-}
+export { Declared } from './figures.js';
 
 interface RunView {
   readonly run: Run;
@@ -703,6 +690,14 @@ export function App() {
         <a href="../deferred.html" data-testid="deferrals-link">
           What this does not do, and what would change that
         </a>
+        {/*
+          Spec 016 US5 scenario 3. The walkthrough carried the legend of the four figure kinds
+          in its first step. It explains the whole surface rather than one panel, so it is not
+          a panel's help: it is on the site, and this is the way to it.
+        */}
+        <a href="../data-model.html#the-figure-kinds" data-testid="figure-kinds-link">
+          How a figure says where it came from: declared, computed, derived, host time
+        </a>
       </nav>
     </>
   );
@@ -716,7 +711,6 @@ export function App() {
   if (loaded === null || view === null) {
     return (
       <>
-        <Walkthrough />
         <div className="boot-view">
           {statement}
           {failure !== null && (
@@ -741,7 +735,7 @@ export function App() {
         run from the declared seed; the recorded case is the default domain, unmoved.
       */}
       <div className="control-group" data-testid="domain-control">
-        <h3>Domain</h3>
+        <PanelHead panel="controls/domain" />
         {config.domains.list.map((domain) => (
           <label key={domain.id} className="choice">
             <input
@@ -771,7 +765,7 @@ export function App() {
       {row.controls}
 
       <div className="control-group" data-testid="run-controls">
-        <h3>The run</h3>
+        <PanelHead panel="controls/run" />
         <p data-testid="recorded-case">
           {view.recordedCase ? (
             <>
@@ -849,7 +843,7 @@ export function App() {
       */}
       <div className="disclosures">
         <details data-testid="run-panel">
-          <summary>The run</summary>
+          <PanelSummary panel="controls/run-provenance" />
           <dl>
             <dt>Root seed</dt>
             <dd>
@@ -933,7 +927,7 @@ export function App() {
         </details>
 
         <details data-testid="instruments-panel">
-          <summary>What the instruments measured</summary>
+          <PanelSummary panel="controls/instruments" />
           <dl>
             <dt>Ownship surface</dt>
             <dd data-testid="surface-count">
@@ -1003,7 +997,7 @@ export function App() {
 
         {record !== null && (
           <details data-testid="truth-panel">
-            <summary>The record this run is scored against</summary>
+            <PanelSummary panel="controls/truth" />
             <dl>
               <dt>Domain</dt>
               <dd data-testid="truth-domain">
@@ -1073,7 +1067,7 @@ export function App() {
         )}
 
         <details data-testid="manifest-panel">
-          <summary>The manifest this run replays from</summary>
+          <PanelSummary panel="controls/manifest" />
 
           <dl>
             <dt>This build</dt>
@@ -1162,8 +1156,11 @@ export function App() {
   const centre =
     view.forecast === null ? (
       <div className="full row-invitation" data-testid="row-invitation">
-        <h2>The row</h2>
+        {/* Two panels rather than one heading over both: the picture on the left is the
+            analysis's own gain and the column on the right is what the row will show, and each
+            is a thing a reader can be confused by on its own (FR-052). */}
         <figure className="analysed-field" data-testid="analysed-field">
+          <PanelHead panel="centre/attribution" level={2} />
           <FieldView
             values={view.analysis.attribution.observationWeight}
             nx={view.results.grid.nx}
@@ -1182,6 +1179,7 @@ export function App() {
           </figcaption>
         </figure>
         <div className="row-invitation-prose">
+          <PanelHead panel="centre/horizon-row" level={2} />
           <p className="region-empty" data-testid="row-invitation-statement">
             Six panels at the declared horizons &mdash;{' '}
             <Declared>
@@ -1212,15 +1210,25 @@ export function App() {
     );
 
   /* FR-046, and FR-048 where there is nothing to report yet. */
-  const scores =
-    view.forecast === null ? (
-      <p className="region-empty full" data-testid="scores-empty">
-        Each panel&rsquo;s skill against persistence and against climatology appears here, in
-        that panel&rsquo;s own column, once the row has been built and scored.
-      </p>
-    ) : (
-      row.scores
-    );
+  const scores = (
+    <>
+      {/*
+        FR-046 gives this region no heading of its own -- each column is headed by the panel
+        above it -- so the help control is placed in the region's top-right corner by the
+        stylesheet rather than in the flow. A head line added here would change the region's
+        height, and the scores not moving is AT-13.
+      */}
+      <PanelCorner panel="scores" />
+      {view.forecast === null ? (
+        <p className="region-empty full" data-testid="scores-empty">
+          Each panel&rsquo;s skill against persistence and against climatology appears here, in
+          that panel&rsquo;s own column, once the row has been built and scored.
+        </p>
+      ) : (
+        row.scores
+      )}
+    </>
+  );
 
   /*
    * FR-047 and FR-048. Whatever was last selected, and -- when nothing has been -- the two
@@ -1228,7 +1236,7 @@ export function App() {
    */
   const detail = (
     <>
-      <h2>What is selected</h2>
+      <PanelHead panel="detail/attribution-breakdown" level={2} />
       {row.detail !== null ? (
         row.detail
       ) : view.selectedCell !== null ? (
@@ -1321,12 +1329,14 @@ export function App() {
     </section>
   );
 
+  /*
+   * FR-052. Every panel's help is opened from that panel's own control, and one piece of state
+   * decides which is open, so opening one closes another and nothing sequences. The provider
+   * hands the help entries the validated configuration and nothing else: a number a help entry
+   * teaches with is a declared one, read from the file that declares it (Principle X, FR-006).
+   */
   return (
-    <>
-      {/* The walkthrough sits outside every region because it is about all of them, and
-          before them in the document so that a reader tabbing in reaches the explanation of
-          the surface before the surface itself. */}
-      <Walkthrough />
+    <HelpProvider config={config}>
       {aboveFloor ? (
         <Regions
           config={config}
@@ -1347,6 +1357,6 @@ export function App() {
           detail={detail}
         />
       )}
-    </>
+    </HelpProvider>
   );
 }

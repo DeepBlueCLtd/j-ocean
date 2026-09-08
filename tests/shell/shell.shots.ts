@@ -286,41 +286,42 @@ test('enlargement is a selection', async ({ page }) => {
   await page.getByTestId('horizon-strip').screenshot({ path: `${IMAGES}015-strip.png` });
 });
 
-test('the walkthrough', async ({ page }) => {
-  // Captured at the declared reference width, which is where the four regions are tightest
-  // and where the card has the least room to place itself.
+test('panel help, where the reader asks for it', async ({ page }) => {
+  test.setTimeout(180_000);
+  // Captured at the declared reference width, which is where the four regions are tightest and
+  // where an explanation has the least room to place itself.
   await inOneView(page, REFERENCE_WIDTH);
   await page.goto('/');
   await expect(page.getByTestId('region-controls')).toBeVisible();
 
-  // The button on its own, in the corner it lives in.
-  await page.screenshot({
-    path: `${IMAGES}013-help-button.png`,
-    clip: { x: REFERENCE_WIDTH - 320, y: 0, width: 320, height: 200 },
-  });
+  // The control at a panel's top right, and nothing at all on the panels that have nothing to
+  // explain, which is FR-053 as a picture: the absence is what a reader is meant to read.
+  await page.getByTestId('region-controls').screenshot({ path: `${IMAGES}016-help-controls.png` });
 
-  await page.getByTestId('help-button').click();
-  await expect(page.getByTestId('walkthrough-card')).toBeVisible();
-  await page.screenshot({ path: `${IMAGES}013-walkthrough-first-step.png` });
+  // Opening one, over a surface that has not moved by a pixel to make room for it.
+  await page.getByTestId('help-control-controls/manifest').click();
+  await expect(page.getByTestId('help-controls/manifest')).toBeVisible();
+  await page.screenshot({ path: `${IMAGES}016-help-manifest.png` });
+  await page.keyboard.press('Escape');
 
-  // A step whose anchor is a region rather than a paragraph: the ring is around the centre,
-  // and the card has moved to sit beside it.
-  await page.getByTestId('walkthrough-next').click();
-  await page.getByTestId('walkthrough-next').click();
-  await expect(page.getByTestId('walkthrough-title')).toContainText(
-    'The forecast, at every horizon at once',
-  );
-  // Waited on the card: it is placed from the anchor's rectangle and its own measured height,
-  // which arrive a frame apart, and a figure taken between the two shows it part-way to where
-  // it settles.
-  await expect
-    .poll(async () => {
-      const ring = await page.getByTestId('walkthrough-spotlight').boundingBox();
-      const card = await page.getByTestId('walkthrough-card').boundingBox();
-      const size = page.viewportSize();
-      if (ring === null || card === null || size === null) return null;
-      return ring.y >= 0 && card.y + card.height <= size.height;
-    })
-    .toBe(true);
-  await page.screenshot({ path: `${IMAGES}013-walkthrough-field-step.png` });
+  // The issue-time axis, whose control arrives with the row it is an axis of; and the scores
+  // region, which has no heading line to hang a control on and gets its own corner.
+  await page.getByTestId('build-row').click();
+  await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId('help-control-controls/issue-time').click();
+  await expect(page.getByTestId('help-controls/issue-time')).toBeVisible();
+  await page.screenshot({ path: `${IMAGES}016-help-issue-time.png` });
+  await page.keyboard.press('Escape');
+
+  await page.getByTestId('help-control-scores').click();
+  await expect(page.getByTestId('help-scores')).toBeVisible();
+  await page.screenshot({ path: `${IMAGES}016-help-scores.png` });
+  await page.keyboard.press('Escape');
+
+  // And a horizon panel's own help, enlarged: the same entry at more room.
+  await page.getByTestId('enlarge-48').click();
+  await expect(page.getByTestId('enlarged-centre')).toBeVisible();
+  await page.getByTestId('help-control-centre/horizon-panel#48').click();
+  await expect(page.getByTestId('help-centre/horizon-panel#48')).toBeVisible();
+  await page.screenshot({ path: `${IMAGES}016-help-horizon-panel.png` });
 });

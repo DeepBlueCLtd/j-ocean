@@ -24,7 +24,7 @@ attribution that is its own gain, skill against two references with provenance o
 figure, the horizon row that is the primary surface, the observation footprint drawn over it, and the
 shore forecast on two axes, the counterfactuals, and export and replay of a run from its
 manifest.
-**All seven gates now run**, each watched failing against a planted violation.
+**All nine gates now run**, each watched failing against a planted violation.
 
 Three things the tree reports rather than hides. Beat 009 found that the analysis had been
 reading observations from **after** its own issue instant, so three beats of skill figures
@@ -109,6 +109,8 @@ while a gate that is present but did not run is a hole that looks like a pass.
 | G-04 | no host clock, no unseeded randomness | **001** |
 | G-05 | every declared horizon rendered, and no other | **007** (in a real browser) |
 | G-06 | attribution read from the analysis own weights | **005** |
+| G-07 | the recorded case's every computed quantity, against a committed record of its digests | **013** |
+| G-08 | every region or layer a panel declares has an explanation, and every explanation a panel | **016** |
 | vocabulary | no tracked entities, no customer material | **001** |
 
 Each gate has a directory of planted violations under

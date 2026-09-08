@@ -7,7 +7,7 @@
   --derived: #6b5a2e;
   --host: #6d6a63;
   --alarm: #8a1f1f;
-  /* The one bright colour on the page, reserved for the walkthrough. Nothing that
+  /* The one bright colour on the page, reserved for the help controls. Nothing that
      carries a figure uses it, so it cannot be mistaken for a kind of number. */
   --help: #ffd54a;
   color-scheme: light;
@@ -167,10 +167,6 @@ body {
   border-left: 1px solid var(--rule);
   padding-left: 0.6rem;
 }
-
-/* The help button is fixed in this corner, so the heading keeps clear of it rather than
-   running underneath it. */
-.detail > h2 { padding-right: 3.2rem; }
 
 .region-empty {
   color: var(--host);
@@ -455,7 +451,9 @@ body {
 
    Beat 015 gave the centre a declared height, so the cap is a subtraction from that rather
    than from the window: the invitation has the region the row would have had, less what its
-   heading and the field's caption take. It is checked rather than trusted --
+   heading and the field's caption take. Beat 016 widened the subtraction from 7.5rem to
+   9.5rem: the figure is now the width of its own picture, so the caption wraps in that width
+   rather than across the track, and the two lines it gains have to come from somewhere. It is checked rather than trusted --
    `tests/shell/enlargement.spec.ts` fails if the centre's content outgrows the centre in any
    of the three things it can hold. */
 .row-invitation {
@@ -465,18 +463,25 @@ body {
   align-content: start;
 }
 
-.row-invitation > h2 { grid-column: 1 / -1; }
-.row-invitation > .analysed-field { grid-column: 1; grid-row: 2; }
-.row-invitation > .row-invitation-prose { grid-column: 2; grid-row: 2; min-width: 0; }
+ /* The figure takes the width of the picture it holds rather than the width of the track, so
+    that its head is the picture's own head line and the help control at that head's right is at
+    the top right of the thing it explains. */
+.row-invitation > .analysed-field {
+  grid-column: 1;
+  grid-row: 1;
+  width: min(100%, calc(var(--centre-height) - 9.5rem));
+}
+.row-invitation > .row-invitation-prose { grid-column: 2; grid-row: 1; min-width: 0; }
 .row-invitation-prose > .aside { margin-top: 0.5rem; }
 
-.analysed-field { margin: 0.5rem 0 0; min-width: 0; }
+.analysed-field { margin: 0; min-width: 0; }
 .analysed-field .field { margin: 0; }
-.analysed-field .field-stack { max-width: min(100%, calc(var(--centre-height) - 7.5rem)); }
+.analysed-field .field-stack { max-width: min(100%, calc(var(--centre-height) - 9.5rem)); }
+
 /* Written against `.field canvas`, which is later in this file and would otherwise win: the
    28rem cap is for a field in a column of prose, and this one has a region. */
 .analysed-field .field canvas { max-width: none; }
-.analysed-field figcaption { color: var(--host); font-size: 0.8rem; margin-top: 0.4rem; max-width: 44rem; }
+.analysed-field figcaption { color: var(--host); font-size: 0.8rem; margin-top: 0.4rem; max-width: 100%; }
 
 /* FR-02. First in the document, first in the viewport, and with no control that removes
    it: nothing about it stops being true while the page is open. */
@@ -887,92 +892,118 @@ textarea[data-testid='manifest-input'] {
 
 h3 { font-size: 0.95rem; margin: 1.25rem 0 0.35rem; }
 
-/* The walkthrough (the help button and its steps).
-   The button is the one bright thing on an otherwise paper-coloured page, which is the
-   point: a reader who does not know what they are looking at should not have to hunt for
-   the control that tells them. It stays fixed, because the question "what is this?" arrives
-   at whichever panel the reader has scrolled to. */
-.help-button {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  z-index: 62;
-  width: 2.6rem;
-  height: 2.6rem;
+/* Panel help (SRD-v2 FR-052, FR-053, FR-057; spec 016 FR-001 to FR-003, FR-008).
+
+   The control is a small mark in the panel's head, not a fixed button in the corner of the
+   window: the question a reader has is about the thing they are looking at, so the answer is
+   offered at that thing. The one bright colour on this page is reserved for it, and nothing
+   that carries a figure uses that colour, so it cannot be mistaken for a kind of number. */
+.help-control {
+  flex: 0 0 auto;
+  width: 1.15rem;
+  height: 1.15rem;
   padding: 0;
-  border: 2px solid var(--ink);
+  border: 1px solid var(--ink);
   border-radius: 50%;
   background: var(--help);
   color: var(--ink);
-  font: 700 1.4rem/1 ui-serif, Georgia, "Times New Roman", serif;
-  box-shadow: 0 2px 6px rgb(16 23 29 / 25%);
+  font: 700 0.72rem/1 ui-serif, Georgia, "Times New Roman", serif;
+  cursor: pointer;
 }
 
-.help-button:hover,
-.help-button:focus-visible {
+.help-control:hover,
+.help-control:focus-visible {
   background: var(--ink);
   color: var(--help);
 }
 
-/* The dimming is this element's own box-shadow rather than a separate overlay, so there is
-   exactly one thing to position and the hole in it cannot drift from the ring around it.
-   It never takes the pointer: the page underneath stays usable while a step is open. */
-.walkthrough-spotlight {
-  position: fixed;
-  z-index: 60;
-  pointer-events: none;
-  border: 2px solid var(--help);
-  border-radius: 3px;
-  box-shadow: 0 0 0 9999px rgb(16 23 29 / 45%);
+.help-control[aria-expanded='true'] {
+  background: var(--ink);
+  color: var(--help);
 }
 
-.walkthrough-card {
+/* A panel's head: its heading, and the control at the head's right. `space-between` rather
+   than a margin, so a panel whose heading wraps still keeps the control at the top right. */
+.panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.panel-head > h2,
+.panel-head > h3 { margin: 0 0 0.3rem; }
+
+.control-group .panel-head > h3 {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--host);
+}
+
+/* The head of a panel that is a disclosure. The control is floated rather than laid out,
+   because a summary laid out as a flex box loses its own disclosure marker. */
+.controls details > summary > .help-control { float: right; }
+
+/* A panel that is a whole region has no head line to hang the control on, and giving it one
+   would change the region's height -- which is the one thing FR-049 says a click may not do.
+   So it is placed in the region's corner, out of the flow. */
+.scores { position: relative; }
+
+.panel-corner {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+}
+
+/* The explanation itself. It is placed rather than laid out (`position: fixed`, anchored to
+   its control by Help.tsx), for two reasons that are both requirements: opening it may not
+   change any region's bounding rectangle (SC-005), and it may not grow the page (FR-041).
+   Help longer than the room there is scrolls within itself and says so with `data-scrolls`,
+   like every other scroller on this surface.
+
+   There is nothing to animate. FR-057 asks the surface to respect `prefers-reduced-motion`,
+   and the honest way to respect it is to have no motion for anyone: opening and closing are
+   instantaneous in every setting. */
+.panel-help {
   position: fixed;
   z-index: 61;
-  max-height: calc(100vh - 2rem);
+  /* The card is a DOM child of the control's own panel, so it would otherwise inherit that
+     panel's head typography -- a disclosure's summary is uppercase and letter-spaced, which
+     is right for two words and unreadable for three paragraphs. */
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--ink);
+  text-align: left;
+  font-weight: 400;
+  font-style: normal;
   overflow-y: auto;
+  overflow-x: hidden;
   border: 2px solid var(--ink);
   border-top: 6px solid var(--help);
   background: #fff;
-  padding: 0.9rem 1.1rem 1rem;
+  padding: 0.7rem 0.9rem 0.8rem;
   box-shadow: 0 4px 18px rgb(16 23 29 / 30%);
-}
-
-.walkthrough-card h2 {
-  margin: 0.1rem 0 0.5rem;
-  border-bottom: 1px solid var(--rule);
-}
-
-.walkthrough-progress {
-  margin: 0;
-  color: var(--host);
-  font-size: 0.8rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.walkthrough-body p { margin: 0 0 0.6rem; font-size: 0.92rem; }
-.walkthrough-body p:last-child { margin-bottom: 0; }
-.walkthrough-note { color: var(--host); font-style: italic; }
-
-.walkthrough-legend {
-  margin: 0;
-  padding-left: 1.1rem;
   font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.panel-help h4 {
+  margin: 0 0 0.5rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--rule);
+  font-size: 0.95rem;
+}
+
+.panel-help h5 {
+  margin: 0.8rem 0 0.3rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--host);
 }
 
-.walkthrough-controls {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.9rem;
-  padding-top: 0.7rem;
-  border-top: 1px solid var(--rule);
-}
-
-.walkthrough-controls button { padding: 0.3rem 0.7rem; font-size: 0.9rem; }
-.walkthrough-close { margin-left: auto; }
-
-@media (prefers-reduced-motion: reduce) {
-  .walkthrough-spotlight { transition: none; }
-}
+.panel-help section:first-of-type > h5 { margin-top: 0; }
+.panel-help p { margin: 0 0 0.55rem; }
+.panel-help p:last-child { margin-bottom: 0; }

@@ -6,6 +6,17 @@ date: 2026-09-17
 
 # A walkthrough, and what building one found
 
+<div class="banner warn">
+<p><strong>Retired in beat 016.</strong> The walkthrough was the right instinct at the wrong
+altitude: it answered <em>why is this panel next to that one</em> in a fixed order beginning
+wherever it began, and it was a second place where the surface was described. Each panel now
+carries its own explanation behind a control at its top right, and every one of the eleven
+steps below has a recorded destination. See
+<a href="2026-09-21-beat-016-panel-help.html">Beat 016</a> and the
+<a href="../disposition.html">disposition record</a>. This note is kept because it is a record
+of a beat that happened, and because what building the tour <em>found</em> outlived it.</p>
+</div>
+
 The shell had a problem no test could have caught: a reader opening it for the first time
 did not know what they were looking at. Every panel says what it is — the run panel names
 the seed, the attribution panel explains that it is the analysis's own gain — but none of

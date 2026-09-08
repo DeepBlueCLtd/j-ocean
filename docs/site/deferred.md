@@ -11,6 +11,13 @@ rather than a habit: a deferral without a trigger is a wish, and a deferral with
 assessment is an excuse. Each has an ADR, each quotes its trigger, and one of them is
 *measured* on every test run.
 
+Four capabilities are assessed, deferred, and cheap to adopt. Each has a written trigger, and a
+test measures the triggers on every run — so this list fails when it becomes wrong instead of
+going stale.
+
+*The last sentence was the walkthrough's eleventh step, on the application page, until beat 016
+retired it.*
+
 ## Adaptive sampling — the trigger is measured, and not met
 
 Perturb the observations within their declared error, integrate an ensemble, and steer the
