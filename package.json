@@ -25,6 +25,7 @@
     "manifest-schema": "tsx scripts/docs/build-manifest-schema.ts"
   },
   "dependencies": {
+    "dockview": "^8.2.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "zod": "^4.5.4"

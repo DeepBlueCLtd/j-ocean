@@ -237,8 +237,16 @@ saved.
 - Data preparation is the one permitted second runtime, is a build step, and is never a
   runtime dependency (NFR-01, NFR-03). The browser application depends on committed
   artefacts alone.
-- The application builds to static assets; the demo is a URL. Nothing persists between
-  visits; manifest export and import provide replay (NFR-02).
+- The application builds to static assets; the demo is a URL. **No forecast input or output
+  persists between visits** — no seed, no manifest, no edit, no observation, no computed
+  quantity, in storage, in a cookie or in the URL; manifest export and import provide replay
+  (NFR-02).
+- **Workspace chrome is not a forecast input.** Where the surface is a layout the reader
+  arranges, that arrangement — pane geometry and pane identity, and nothing else — may persist.
+  The distinction is that a persisted run would be a second way to bring a forecast back with
+  none of the manifest's checks, while a persisted pane width is a preference about furniture.
+  What is stored is held by a key-set test in the same shape as the address grammar of feature
+  017: a planted run key fails by name. (Amendment of 8 September 2026; ADR-0014.)
 
 *Rationale (SRD §4, G-01): the harness's claims are worth what its truth record is worth,
 and a record that cannot be regenerated cannot be trusted.*
@@ -396,7 +404,7 @@ it, the constitution wins and the artefact is amended.
   added, or guidance materially expanded, including a new bounded exemption. **PATCH**:
   clarification, wording, or a non-semantic refinement.
 
-**Version**: 1.1.0 | **Ratified**: 2026-09-05 | **Last Amended**: 2026-09-21
+**Version**: 1.2.0 | **Ratified**: 2026-09-05 | **Last Amended**: 2026-09-08
 
 *1.1.0 — 2026-09-21, ADR-0013. Two gates added to the schedule: **G-07 surface invariance**,
 which landed in beat 013 and had been running in CI unlisted ever since, and **G-08 help

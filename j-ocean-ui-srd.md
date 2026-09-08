@@ -248,6 +248,31 @@ followed.
 
 ---
 
+## 8.1 Amendment of 8 September 2026: the surface is a workspace
+
+Beats 013 to 017 met every requirement in this document and the result still read as an article.
+Measured at 2560 x 1440: a 1,344 px scrolling controls pane in a 1,440 px window, two fifths of
+the surface empty, and state reported in sentences where an instrument shows a readout.
+
+The requirements below are amended by feature 018 and ADR-0014. What changes is the realisation,
+not the diagnosis of section 1.1.
+
+- **FR-41** is unchanged in its demand -- one viewport, no scrolling -- and gains a distinction it
+  lacked: a pane may scroll a **list** a reader scans, and may never scroll a **body of text**.
+  The declared-scroller doctrine that let a column of prose satisfy this requirement is withdrawn.
+- **FR-44 to FR-47** keep their division by rate of change and lose their realisation as a CSS
+  grid of four fixed regions. The surface is a docked pane workspace whose panes fill the screen.
+  In particular **FR-46**'s scores move *inside* each horizon panel rather than into a separate
+  region aligned to it, which is what the requirement asked for and is not achievable across
+  independent panes.
+- **FR-48** stands, and is narrowed: an empty region still says what would appear in it, in as
+  few words as will do it. It is not a licence for explanation on the surface.
+- **New: explanation belongs to help (FR-52) or to a walkthrough.** The walkthrough that FR-52
+  retired returns to explain the *workspace*; panel help continues to explain each panel. They
+  answer different questions.
+- **New: the workspace arrangement may persist.** Principle I forbids persisting forecast inputs
+  and outputs; pane geometry is neither. See ADR-0014.
+
 ## 9. Open questions
 
 - Whether the controls column stays fixed or gains its own disclosure as it grows. It is

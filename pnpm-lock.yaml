@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      dockview:
+        specifier: ^8.2.0
+        version: 8.2.0
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -761,6 +764,12 @@ packages:
 
   deep-is@0.1.4:
     resolution: {integrity: sha512-oIPzksmTg4/MriiaYGO+okXDT7ztn/w3Eptv/+gSIdMdKsJo0u4CfYNFJPy+4SKMuCqGw2wxnA+URMg3t8a/bQ==}
+
+  dockview-core@8.2.0:
+    resolution: {integrity: sha512-+L+xdvmO1b4in8rVkFtQM13IkPDKqDLoHJvq5HtAIsMxsPptSVveKeViYBqquaoHF+t0xb9f6692gTeKnjCKGw==}
+
+  dockview@8.2.0:
+    resolution: {integrity: sha512-Jj+fnFWSrdEhF+1DmpGNYjEvyqf7J0FHkDqsD98wL4WOYB2CSKavDCL49B3LHIGYvWNN7Q1O1j4p7Pts38CM5A==}
 
   electron-to-chromium@1.5.422:
     resolution: {integrity: sha512-UvA/32XqrLDdZSn7Jllo1AYNcWji/G0d5M0GTViE7KoGBiMunw3a34Sb2KO4ZZyrSEhqsxFoVhWWJshdyfKqJA==}
@@ -1915,6 +1924,12 @@ snapshots:
   deep-eql@5.0.2: {}
 
   deep-is@0.1.4: {}
+
+  dockview-core@8.2.0: {}
+
+  dockview@8.2.0:
+    dependencies:
+      dockview-core: 8.2.0
 
   electron-to-chromium@1.5.422: {}
 
