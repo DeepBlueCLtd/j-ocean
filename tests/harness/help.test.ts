@@ -269,6 +269,33 @@ describe('the gate reads the entries correctly', () => {
  * The declarations, held headlessly beside the gate. The gate is the enforcement; these are
  * the properties a reader of this suite would want stated in words.
  */
+/**
+ * FR-058 and SRD-v1 FR-02 (spec 017 T050).
+ *
+ * The statement that j-ocean is not an operational forecast system is the one piece of prose
+ * the layout beats may not reclaim, and the way it would be reclaimed is by being helpful: it
+ * is long, it is the same on every visit, and a panel's help is exactly where a tidy-minded
+ * beat would put it. So the rule is held from both ends -- `tests/shell/addressable.spec.ts`
+ * measures that it is on screen without interaction at the declared minimum and in the
+ * fallback, and this asserts that no rendered help entry carries it, so it cannot have become
+ * the only place the sentence appears.
+ */
+describe('the statement of what j-ocean is not', () => {
+  it('is in no help entry, so help can never be the only place it appears', () => {
+    const { config } = declaredConfiguration();
+    const carrying = HELP_ENTRIES.filter((entry) =>
+      entry.explains.some((one) =>
+        renderToStaticMarkup(one.body(config) as never).includes('not an operational forecast'),
+      ),
+    ).map((entry) => entry.panel);
+    expect(
+      carrying,
+      'FR-058 says the statement is visible without interaction and is not the thing moved ' +
+        'behind a help control; these help entries carry it',
+    ).toEqual([]);
+  });
+});
+
 describe('the panel declarations', () => {
   it('put every panel in a region the layout draws', () => {
     for (const panel of PANELS) {

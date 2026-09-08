@@ -101,6 +101,35 @@ they do.
 *Was on the application page, in the disclosure headed “The manifest this run replays from”
 (beat 011). Moved here by beat 014.*
 
+## What a link carries, and what it does not
+
+A link to j-ocean carries a **selection** and never a run. Three keys, and no others: which
+panel is enlarged, which cell is selected, and which observation. So a link means *“look at
+cell 2431 of the +48 h panel”*, and what you see there depends on the run you are in — which
+is the honest thing for it to mean, because a run is a seed and a manifest and a link is
+neither.
+
+That line is not a matter of taste. A URL carrying a seed would be a second way to bring a run
+back with none of the manifest's checks: no code version, no configuration digest, and no
+refusal when the tree has moved. The grammar is therefore three keys held by a test, and a
+link carrying anything else — `seed=` most of all — is ignored and reported rather than
+obeyed.
+
+The cell key carries the grid it was written against, as `2431@100x100`. A cell is an index,
+and an index into a different grid is a different place; without the dimensions an old link
+would silently select a cell that merely shared a number. With them, a run on another grid
+says so and selects nothing. The same applies to a horizon this configuration does not declare
+and to an observation this run did not make: each is reported by name, because a near match
+would be the surface pretending the link worked.
+
+Selecting writes the address; **mounting does not**. A surface that wrote its own default on
+mount would rewrite a reader's URL on any remount, and a citation would become whatever the
+last render felt like. Writes replace rather than push, so poking at cells to learn the field
+does not build a history to escape backwards through: the back button takes you to wherever
+you were before j-ocean, not through your own selections.
+
+*New in beat 017.*
+
 ## The attribution field is the analysis's own gain
 
 Principle IV says attribution is derived and never authored, and the field the application

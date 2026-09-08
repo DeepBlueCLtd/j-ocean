@@ -501,37 +501,21 @@ test.describe('enlargement is a selection', () => {
   });
 
   /**
-   * FR-057's third clause. There is nothing to animate -- the swap replaces the centre's
-   * contents -- and this asserts that rather than assuming it: under the reduced-motion
-   * preference nothing in the centre carries a transition or an animation, and the swap is one
-   * rendered frame to the next.
+   * FR-057's third clause, as it bears on the swap: it happens in one rendered frame, and the
+   * centre renders nothing but the horizon that was chosen.
+   *
+   * **The walk over every animated element moved to `tests/shell/addressable.spec.ts` in beat
+   * 017.** "Nothing animates" is one claim about the whole surface, and holding it in three
+   * files -- one per beat that touched something -- is how a surface ends up with a claim that
+   * is true of the parts somebody remembered. What is left here is the part that is about
+   * enlargement: the ledger, which is the record of what the centre actually rendered.
    */
-  test('swaps instantaneously and unanimated under prefers-reduced-motion', async ({ page }) => {
+  test('swaps in one rendered frame under prefers-reduced-motion', async ({ page }) => {
     test.setTimeout(240_000);
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await scoredRow(page);
     await page.getByTestId('enlarge-48').click();
     await expect(page.getByTestId('enlarged-centre')).toBeVisible();
-
-    const moving = await page.evaluate(() => {
-      const centre = document.querySelector('[data-testid="region-centre"]');
-      if (centre === null) return ['there is no centre'];
-      const named: string[] = [];
-      for (const element of [centre, ...Array.from(centre.querySelectorAll('*'))]) {
-        const style = getComputedStyle(element);
-        const durations = [style.transitionDuration, style.animationDuration]
-          .flatMap((value) => value.split(',').map((part) => part.trim()))
-          .filter((value) => value !== '0s' && value !== '');
-        if (durations.length > 0) {
-          named.push(`${element.tagName.toLowerCase()}.${String((element as HTMLElement).className)}: ${durations.join(' ')}`);
-        }
-      }
-      return named;
-    });
-    expect(
-      moving,
-      `these parts of the centre still move under prefers-reduced-motion: ${moving.join(', ')}`,
-    ).toEqual([]);
 
     const before = await ledger(page);
     await page.getByTestId('strip-96').click();

@@ -8,6 +8,14 @@ import { holdsField } from './field-identity.js';
  * Everything about *how* a field is painted lives in `field-surface.ts`; this component is
  * the geometry, the markers, the legend and the click target. Beat 003 had the two mixed
  * together, which was fine for one field and would not have been for twelve.
+ *
+ * **Beat 017 gave the field a keyboard (FR-057).** Selecting a cell was a click on an overlay
+ * canvas and nothing else, so the breakdown of SRD-v1 FR-18 -- one of the two things the
+ * detail region draws -- could only be reached by pointing. A field that takes a selection now
+ * also carries a **cell cursor**: one tab stop per field, the arrow keys move it a cell at a
+ * time and ten with Shift, Enter or Space selects the cell it is on. It is drawn over the
+ * field rather than into it, so nothing about what the canvas holds changes: a cursor painted
+ * into the array would be display writing into a computed quantity.
  */
 
 /**
@@ -92,6 +100,14 @@ export function FieldView({
   const overlay = useRef<HTMLCanvasElement | null>(null);
   const surface = useRef<FieldSurface | null>(null);
   const [backend, setBackend] = useState<string>('');
+  /**
+   * Where the keyboard is on the field, or null when it is not here.
+   *
+   * Cleared on blur, so the cursor is never a mark left behind on a field nobody is reading.
+   * It is display and only display: moving it computes nothing, and selecting with it goes
+   * through the same `onSelect` a click goes through.
+   */
+  const [cursor, setCursor] = useState<{ readonly x: number; readonly y: number } | null>(null);
 
   useEffect(() => {
     const element = canvas.current;
@@ -327,6 +343,62 @@ export function FieldView({
               : { cursor: 'crosshair', pointerEvents: 'auto' }
           }
         />
+
+        {/*
+          FR-057: the field is operable without a mouse. The layer takes no pointer events, so
+          the overlay above keeps every click it had; it is reached by Tab alone, which is the
+          only way it is meant to be reached.
+        */}
+        {onSelect !== undefined && (
+          <div
+            className="cell-cursor-layer"
+            {...(testId === undefined ? {} : { 'data-testid': `${testId}-cells` })}
+            tabIndex={0}
+            role="group"
+            aria-label={`${label}: the arrow keys move a cell cursor, Enter selects the cell it is on`}
+            onFocus={() => {
+              setCursor((current) => current ?? { x: Math.floor(nx / 2), y: Math.floor(ny / 2) });
+            }}
+            onBlur={() => { setCursor(null); }}
+            onKeyDown={(event) => {
+              const step = event.shiftKey ? 10 : 1;
+              const at = cursor ?? { x: Math.floor(nx / 2), y: Math.floor(ny / 2) };
+              const to = (dx: number, dy: number): void => {
+                setCursor({
+                  x: Math.min(nx - 1, Math.max(0, at.x + dx)),
+                  y: Math.min(ny - 1, Math.max(0, at.y + dy)),
+                });
+              };
+              if (event.key === 'ArrowRight') to(step, 0);
+              else if (event.key === 'ArrowLeft') to(-step, 0);
+              else if (event.key === 'ArrowUp') to(0, step);
+              else if (event.key === 'ArrowDown') to(0, -step);
+              else if (event.key === 'Enter' || event.key === ' ') onSelect(at.y * nx + at.x);
+              else return;
+              event.preventDefault();
+            }}
+          >
+            {cursor !== null && (
+              <>
+                <span
+                  className="cell-cursor"
+                  style={{
+                    left: `${String((cursor.x / nx) * 100)}%`,
+                    bottom: `${String((cursor.y / ny) * 100)}%`,
+                    width: `${String(100 / nx)}%`,
+                    height: `${String(100 / ny)}%`,
+                  }}
+                />
+                {/* Announced as it moves, and readable beside the cursor: which cell the
+                    keyboard is on is the one thing a reader cannot see from the cursor alone
+                    on a hundred-cell grid. */}
+                <span className="cell-cursor-label" aria-live="polite">
+                  cell <span className="figure computed">{cursor.y * nx + cursor.x}</span>
+                </span>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/*

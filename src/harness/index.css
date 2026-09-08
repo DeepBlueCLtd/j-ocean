@@ -380,14 +380,75 @@ body {
 .enlarged-aside .panel-labels { margin-top: 0; }
 .enlarged-aside .legend { font-size: 0.76rem; margin: 0.5rem 0 0; }
 
-/* FR-057. The swap is a replacement of the centre's contents and there is nothing to animate;
-   the marking's border and ink change, and they change at once. This says so rather than
-   leaving it to be inferred, and the test asserts the computed duration is zero. */
+/* FR-057, and beat 017 made the claim total. There is nothing to animate anywhere on this
+   surface: enlarging replaces the centre's contents, opening help places a card, and a
+   selection fills a region -- each of them one rendered frame to the next. So the honest way
+   to respect `prefers-reduced-motion` is to have no motion for anybody, and this is the
+   belt-and-braces that says so for anything a later beat adds without thinking about it.
+   `tests/shell/addressable.spec.ts` walks every element in every state and names any that
+   still moves. */
 @media (prefers-reduced-motion: reduce) {
-  .strip-slot,
-  .enlarged-centre,
-  .panel.enlarged { transition: none; animation: none; }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0s !important;
+    animation-duration: 0s !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
 }
+
+/* FR-057: operable by keyboard means the reader can see where they are. Chromium's own ring is
+   a hairline against this page's rules and borders, so the ring is declared here -- solid ink,
+   offset clear of the control -- and it is a *luminance* difference rather than a hue, so it
+   survives the page having its colour taken out. There is one rule for the whole surface: a
+   focus style per component is how a control ends up with none. */
+:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* The keyboard's own cursor on a field (FR-057, SRD-v1 FR-18). It takes no pointer events, so
+   the overlay beneath it keeps every click it had; Tab is the only way in, which is what it is
+   for. Drawn over the field rather than into it: a cursor painted into the array would be
+   display writing into a computed quantity. */
+.cell-cursor-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* The ring is drawn *inside* the field rather than around it. Outside, it would fall on the
+   panel's own border in the row and be indistinguishable from it; inside, it is unmistakably a
+   ring around the picture the keyboard is now on. */
+.cell-cursor-layer:focus-visible { outline: 3px solid var(--ink); outline-offset: -3px; }
+
+.cell-cursor {
+  position: absolute;
+  box-sizing: border-box;
+  min-width: 3px;
+  min-height: 3px;
+  /* Two rings, light over dark, so the cursor is visible over both ends of every palette and
+     over the hatch -- and visible with the colour removed, because both are neutral. */
+  border: 1px solid #fff;
+  box-shadow: 0 0 0 2px var(--ink);
+}
+
+.cell-cursor-label {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  padding: 0 0.25rem;
+  background: rgb(255 255 255 / 88%);
+  border: 1px solid var(--rule);
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
+/* The elevation is one tab stop and the arrow keys move along its needles, as the strip's are
+   one tab stop and its arrows move along its slots. The ring is on the box because the needle
+   the keyboard is on is already marked, by the same thicker stroke a pointer gives it. */
+.elevation-stack:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
 
 .region h2 {
   margin: 0 0 0.4rem;
@@ -523,10 +584,18 @@ dd { margin: 0; }
    distinct, and a figure does not change kind between states. The distinctions are
    carried by shape as well as by colour, so that they survive a greyscale print. */
 .figure { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }
-.figure.declared { color: var(--declared); border-bottom: 1px dotted var(--declared); }
-.figure.computed { color: var(--computed); font-weight: 600; }
-.figure.derived { color: var(--derived); font-style: italic; border-bottom: 1px dashed var(--derived); }
-.figure.host-time { color: var(--host); font-style: italic; }
+/* Beat 017 found these written as `.figure.declared` and so on, which meant a figure carrying
+   the kind class *without* the `figure` class -- and outside a panel, where the second copy of
+   these rules lives -- got no typography at all. A `derived` level in the detail region was
+   drawn as plain text beside a `computed` one, which is the distinction SRD-v1 FR-07 exists to
+   draw and NFR-05 says may never lapse. So the kind is the selector: wherever the class is,
+   the kind is on it. Each carries a channel that is not hue -- a weight, a slant, an underline
+   and its dash pattern -- because FR-057 asks the surface to be legible with the colour taken
+   out, and colour was the only thing three of these four had in common. */
+.declared { color: var(--declared); border-bottom: 1px dotted var(--declared); }
+.computed { color: var(--computed); font-weight: 600; }
+.derived { color: var(--derived); font-style: italic; border-bottom: 1px dashed var(--derived); }
+.host-time { color: var(--host); font-style: italic; }
 
 .unmeasured { color: var(--host); font-style: italic; }
 .within-budget { color: var(--host); font-size: 0.9rem; }

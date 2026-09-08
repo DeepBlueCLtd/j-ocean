@@ -40,10 +40,21 @@ import { REGIONS, type RegionId } from './panels.js';
 function RegionSection({
   id,
   scrolls,
+  live,
   children,
 }: {
   readonly id: RegionId;
   readonly scrolls?: boolean;
+  /**
+   * FR-057, fourth clause. The detail region is the one region that fills as a *consequence*
+   * of something the reader did somewhere else, and a reader working by keyboard has no way to
+   * know it filled: their focus is still on the cell cursor or the elevation they chose from.
+   * So it is announced, politely -- after whatever the reader is in the middle of hearing --
+   * and nothing takes their focus. Moving focus into the region would be the surface deciding
+   * where the reader should be looking, which is exactly what FR-047 gave the region its own
+   * rectangle to avoid.
+   */
+  readonly live?: boolean;
   readonly children: ReactNode;
 }) {
   return (
@@ -51,6 +62,7 @@ function RegionSection({
       className={`region ${id}`}
       data-testid={`region-${id}`}
       {...(scrolls === true ? { 'data-scrolls': 'true' } : {})}
+      {...(live === true ? { 'aria-live': 'polite' as const, 'aria-atomic': 'false' as const } : {})}
     >
       {children}
     </section>
@@ -158,7 +170,7 @@ export function Regions({ config, statement, controls, centre, scores, detail }:
       </div>
 
       {/* FR-47. Selecting fills this and moves nothing: its width is declared, not fitted. */}
-      <RegionSection id="detail" scrolls>
+      <RegionSection id="detail" scrolls live>
         {detail}
       </RegionSection>
     </main>
@@ -215,7 +227,9 @@ export function BelowFloor(props: BelowFloorProps) {
       <div className="below-floor-body" data-testid="below-floor-body" data-scrolls="true">
         <RegionSection id="centre">{props.centre}</RegionSection>
         <RegionSection id="scores">{props.scores}</RegionSection>
-        <RegionSection id="detail">{props.detail}</RegionSection>
+        <RegionSection id="detail" live>
+          {props.detail}
+        </RegionSection>
         {/*
           Last rather than first, and that is the one thing this arrangement gives up: above
           the floor the causes are the first column a reader meets. Below it the payload has
