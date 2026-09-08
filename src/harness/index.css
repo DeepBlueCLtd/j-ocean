@@ -392,14 +392,71 @@ body {
 
 .readout dd { margin: 0 0.5rem 0 0; }
 
-/* The walkthrough (spec 018 FR-009). Placed rather than laid out, like panel help: opening it
-   changes no pane's rectangle, and nothing behind it is covered by a scrim -- a reader may
-   drag the issue time with it open and what it says will still be true. */
+/* The walkthrough's mask (spec 018 FR-014).
+
+   This reverses a decision, at the author's request, and the old rationale is not left standing
+   beside it. Until this pass the card was placed near the pane it named and **nothing was
+   covered**, on the reasoning that a reader ought to be able to drag the issue time with the
+   tour open. That answered the wrong question. A workspace of seven rectangles raises *what am
+   I looking at*, and that is answered by suppressing what you are **not** looking at; a card in
+   a corner points at nothing in particular.
+
+   One element, and the hole is cut out of it rather than drawn beside it, so what is dimmed and
+   what is lit are the same fact. The four lengths come from `Walkthrough.tsx`, measured off the
+   named pane's own `getBoundingClientRect` at the moment the step is shown and re-measured
+   whenever the workspace moves; the fill rule makes the inner ring a hole rather than a second
+   shape. `clip-path` clips hit-testing as well as paint, so the dimmed area takes the reader's
+   clicks -- and closes on them -- while the lit pane goes on working.
+
+   The dim is a share of the ink at a declared opacity and never a colour of its own (Principle
+   X): the claim is that a monochrome print still says which pane is lit, so the difference has
+   to be luminance. Nothing here animates, in any media state -- this surface animates nothing
+   anywhere, so `prefers-reduced-motion` asks nothing of the mask that is not already true. */
+.walkthrough-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  background: var(--ink);
+  opacity: var(--walkthrough-mask-opacity, 0.62);
+  clip-path: polygon(
+    evenodd,
+    0 0, 100% 0, 100% 100%, 0 100%, 0 0,
+    var(--hole-left) var(--hole-top),
+    var(--hole-right) var(--hole-top),
+    var(--hole-right) var(--hole-bottom),
+    var(--hole-left) var(--hole-bottom),
+    var(--hole-left) var(--hole-top)
+  );
+}
+
+/* Both of the offer's labels occupy the same cell, so the control is one width in both states.
+   A control that narrowed when it was pressed would reflow the status strip, and the strip's
+   height is what the dock does not get: at the declared floor that was 11 px of dock and every
+   pane in it moved on the click that opened the walkthrough. */
+.walkthrough-offer { display: inline-grid; }
+.walkthrough-offer > span { grid-area: 1 / 1; }
+.walkthrough-offer > span[aria-hidden='true'] { visibility: hidden; }
+
+/* The way out may not be behind the thing it closes. The control that opened the walkthrough
+   stays above the scrim while it is open, so a reader can press it again; everything else on
+   the strip is dimmed with the rest of the surface unless the step is about the strip. */
+.walkthrough-offer[aria-expanded='true'] { position: relative; z-index: 40; }
+
+/* The walkthrough's card (spec 018 FR-009, FR-014). Placed rather than laid out, like panel
+   help: opening it and advancing it change no pane's rectangle. Where it goes is worked out in
+   `Walkthrough.tsx` from the space around the lit pane and set as `left` with either `top` or
+   `bottom`, so the card is beside the rectangle it is talking about instead of in a corner of
+   the window. The width is the declared figure that placement was worked out from, so the rule
+   and the arithmetic cannot disagree. */
 .walkthrough-card {
   position: fixed;
-  right: 1rem;
-  bottom: calc(var(--status-height, 46px) + 1rem);
-  width: min(30rem, calc(100vw - 2rem));
+  /* Where an unplaced card would go, which is only ever the frame before the pane has been
+     measured. The placed card sets `left` and exactly one of `top` and `bottom`. */
+  left: var(--walkthrough-card-gap, 12px);
+  top: var(--walkthrough-card-gap, 12px);
+  right: auto;
+  bottom: auto;
+  width: min(var(--walkthrough-card-width, 420px), calc(100vw - 2 * var(--walkthrough-card-gap, 12px)));
   max-height: 60dvh;
   overflow: auto;
   background: #fff;

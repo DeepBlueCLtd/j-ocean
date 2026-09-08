@@ -359,6 +359,30 @@ test('panel help, where the reader asks for it', async ({ page }) => {
 });
 
 /**
+ * Beat 018's mask, photographed on the pane it lights.
+ *
+ * The whole viewport, and it has to be: a figure cropped to the lit pane would be a picture of
+ * a pane, and what this beat added is what happened to the other six rectangles. The controls
+ * step is the one chosen because the controls pane is the narrowest of them, so the frame shows
+ * the hole, the dim on both sides of it and the card placed beside rather than over.
+ */
+test('the walkthrough, masking the pane it names', async ({ page }) => {
+  await inOneView(page);
+  await page.goto('/');
+  await expect(page.getByTestId('pane-controls')).toBeVisible();
+  await page.getByTestId('walkthrough-offer').click();
+
+  const card = page.getByTestId('walkthrough-card');
+  await expect(card).toBeVisible();
+  // The step about the controls pane, reached the way a reader reaches it.
+  while ((await card.getAttribute('data-walkthrough')) !== 'controls') {
+    await page.getByTestId('walkthrough-next').click();
+  }
+  await expect(page.getByTestId('walkthrough-mask')).toHaveAttribute('data-mask-pane', 'controls');
+  await page.screenshot({ path: `${IMAGES}018-walkthrough-mask.png` });
+});
+
+/**
  * Beat 017's own figures.
  *
  * Two, and each is a picture of a refusal or of an affordance rather than of a feature working

@@ -256,6 +256,40 @@ entries with `previously` and `reclaimedIn`, and the test renders each step and 
 against it — the same discipline as the site sections and the help entries, applied in the
 other direction.
 
+### And then it masks, which reverses a decision this beat had already made
+
+The first version of it placed a card near the pane its step named and **covered nothing**. The
+reasoning was written into the module: a reader ought to be able to drag the issue time with the
+tour open, and what the step said would still be true. The author read it and asked for the
+opposite — *the walkthrough should move around the UI, masking out the unrelated
+elements/panels* — and was right, because the reasoning had answered the wrong question. *What
+am I looking at* is answered by suppressing what you are **not** looking at, and a card in the
+corner of a workspace of seven rectangles points at nothing in particular.
+
+So each step dims the workspace apart from the pane it names. The hole is one element with the
+rectangle cut out of it, so what is dimmed and what is lit are the same fact rather than two
+that agree today, and `clip-path` clips hit-testing as well as paint: the dim takes the reader's
+clicks and closes on them, and the lit pane goes on working. The lit rectangle is measured from
+the pane at the moment the step is shown — **0.36 px** from it at the worst of the seven steps,
+against a stated tolerance of two — and re-measured on every layout event the workspace can
+produce, so it follows a sash drag, a tab moved into another group and a window resize rather
+than going on lighting where the pane was. Through `grayscale(1)` the lit pane's paper is 255.0
+of 255 and the dimmed pane's is 110.0.
+
+![The walkthrough on its controls step: the controls pane lit, the rest of the workspace dimmed,
+and the card beside it](images/018-walkthrough-mask.png)
+
+Beat 016 had deleted a test called *rings the panel its step is about, not some other part of
+the page* with the note "Gone. There is no spotlight." The claim comes back with its subject,
+and to the two pixels that beat asserted.
+
+**The test that says opening it moves nothing found a defect on its first run.** The offer's
+label went from *Walk me through the workspace* to *Close the walkthrough* when it was pressed.
+The control is in the status strip; the strip's height is what the dock does not get; and at the
+declared floor the shorter label let the strip reflow by 11 px, so **every pane in the dock
+moved** — on the click that opens a walkthrough whose whole claim is that it moves nothing.
+Both labels occupy one grid cell now, with the inactive one hidden.
+
 The below-the-floor answer went the same way, and it was the beat's own blind spot: beat 013's
 fallback said the size it needed in **two paragraphs of prose**, which is the fault this beat
 exists to fix, arriving in the one presentation nobody was looking at. It is one line now — the
@@ -383,7 +417,7 @@ container it believes is 100 px wide, and is then thrown away by the first real 
 declared widths are applied on the first frame at which the grid's own width is the window's,
 and the wait is bounded.
 
-Ninety-one shell tests were written against the region grid and there are 121 now. Their claims
+Ninety-one shell tests were written against the region grid and there are 130 now. Their claims
 mostly survived and their selectors mostly did not; eight lost their subject outright, and each
 is recorded in the plan's `## Measured` against the claim it made rather than deleted. The one worth naming here
 is beat 013's *each score is in its panel's column*, which was a claim about CSS `subgrid`

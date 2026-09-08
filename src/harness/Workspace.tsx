@@ -142,6 +142,13 @@ export function workspaceGeometry(config: Configuration): CSSProperties {
     '--sash-width': `${String(presentation.workspace.sashWidthPx)}px`,
     '--pane-minimum-width': `${String(presentation.workspace.paneMinimumWidthPx)}px`,
     '--skill-curve-fraction': String(presentation.workspace.skillCurveFraction),
+    /* The walkthrough's mask (spec 018 FR-014). Declared figures, handed to the stylesheet like
+       every other dimension of the layout: the dim is a share of the ink and the card's width
+       is what its placement is worked out from, so the arithmetic and the rule agree by
+       construction rather than by inspection. */
+    '--walkthrough-mask-opacity': String(presentation.workspace.walkthroughMaskOpacity),
+    '--walkthrough-card-width': `${String(presentation.workspace.walkthroughCardWidthPx)}px`,
+    '--walkthrough-card-gap': `${String(presentation.workspace.walkthroughCardGapPx)}px`,
     '--strip-height': `${String(presentation.strip.heightPx)}px`,
     '--strip-thumbnail-width': `${String(presentation.strip.thumbnailWidthPx)}px`,
     '--centre-chrome-height': `${String(presentation.centreChromeHeightPx)}px`,

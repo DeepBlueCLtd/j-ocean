@@ -103,3 +103,36 @@ requirement the tree did not yet meet.
       it overflowed the horizons pane by 970 px where the row fitted.
 - [x] **T073** The list/prose test runs at **every** viewport in the matrix, not only the
       reference — the hole through which a 6,584 px scrolling column reached the author.
+
+## The walkthrough masks (US5, FR-014, SC-010)
+
+The author's second direction: *"the walkthrough should move around the UI, masking out the
+unrelated elements/panels."* It reverses this beat's own decision that nothing would be covered
+by a scrim, and the old rationale is replaced rather than left standing beside its contradiction.
+
+- [x] **T080** The mask itself. One fixed element with the hole cut out of it by `clip-path`, so
+      what is dimmed and what is lit are the same fact and cannot drift apart; the four lengths
+      come from the named pane's own `getBoundingClientRect`. `clip-path` clips hit-testing as
+      well as paint, so the dimmed area takes the reader's clicks and the lit pane goes on
+      working.
+- [x] **T081** The hole follows the pane. Re-measured on a `ResizeObserver` over the pane and the
+      dock, a `MutationObserver` over the workspace's subtree, and the window's own resize and
+      scroll — coalesced to one measurement a frame, and taken in a **layout** effect so a step's
+      first frame is not the previous step's rectangle under the new step's name.
+- [x] **T082** The card is placed beside the lit pane, from the space around it and never from
+      its own measured height — beat 011's defect, written down there and not repeated.
+- [x] **T083** The mask's four figures declared in `presentation.workspace` and handed to the
+      stylesheet: the dim is a share of the ink at a declared opacity, and the card's width is the
+      figure its placement is worked out from (Principle X).
+- [x] **T084** `tests/shell/walkthrough.spec.ts`: the hole is the named pane's own rectangle at
+      every step to two pixels — beat 016's deleted claim, back with its subject; it follows a
+      sash drag, a tab move and a window resize; opening and advancing move no region by a pixel;
+      the lit pane is operable and the dimmed surface is not; the greyscale margin is measured
+      with `tests/shell/greyscale.ts` and printed; nothing scrolls at two viewports from the
+      matrix; and nothing animates in either media state.
+- [x] **T085** The offer holds its width in both states. Its label shrank by nine characters when
+      pressed, which reflowed the status strip and moved **every pane in the dock by 11 px** at the
+      declared floor — on the click that opens a walkthrough whose whole claim is that it moves
+      nothing. Found by T084's own no-reflow test on its first run.
+- [x] **T086** `018-walkthrough-mask.png`, captured from the running application: the whole
+      viewport, because what this beat added is what happened to the other six rectangles.

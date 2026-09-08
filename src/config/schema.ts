@@ -299,6 +299,29 @@ export const configurationSchema = z
         paneMinimumHeightPx: z.number().int().positive(),
         /** The draggable divider between two panes, as the layout manager draws it. */
         sashWidthPx: z.number().int().nonnegative(),
+        /*
+         * The walkthrough's mask (spec 018 FR-014, Principle X).
+         *
+         * The mask is geometry and ink, so its four figures are declared here beside the
+         * other furniture rather than written into the stylesheet. Nothing here is computed
+         * and nothing here is a forecast quantity: what a step lights is measured from the
+         * pane at the moment it is shown, and these say only how dark the rest is and where
+         * the card goes beside it.
+         */
+        /**
+         * How far the scrim dims everything a step is not about.
+         *
+         * A share of the ink and not a colour of its own, so the dim is luminance: the claim
+         * is that a monochrome print still says which pane is lit, and a scrim declared as a
+         * hue would be the second palette this surface has refused twice.
+         */
+        walkthroughMaskOpacity: z.number().gt(0).lt(1),
+        /** The card's own width, which is also what its placement is worked out from. */
+        walkthroughCardWidthPx: z.number().int().positive(),
+        /** The least room a card is placed in. Below this a card is a scrollbar with a sentence in it. */
+        walkthroughCardMinimumHeightPx: z.number().int().positive(),
+        /** Between the lit pane's edge and the card, so the card is beside it and not on it. */
+        walkthroughCardGapPx: z.number().int().nonnegative(),
         /** Where the arrangement is kept. Geometry and pane identity only; see workspace.ts. */
         storageKey: z.string().min(1),
         /**

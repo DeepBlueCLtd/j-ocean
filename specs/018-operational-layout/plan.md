@@ -359,6 +359,63 @@ asserted where it belongs: `tests/shell/figure-kinds.spec.ts` reads the skill ag
 climatology as a **number** with nothing opened, requires it to be negative, and requires the
 statement not to be visible until the disclosure is.
 
+### The mask, and a claim beat 016 deleted coming back with a subject
+
+The fourth pass reverses this beat's own decision that nothing would be covered by a scrim. The
+old rationale was written into `Walkthrough.tsx` — *"nothing is covered by a scrim. A reader may
+drag the …"* — and it is not left standing beside the thing that contradicts it; it is replaced
+by what the module now does and why. The author's direction is the reason, and the reason behind
+the reason is that *what am I looking at* is answered by suppressing what you are not looking at.
+
+**Beat 016 struck out a test called `rings the panel its step is about, not some other part of
+the page`, and recorded against it: "Gone. There is no spotlight."** There is one again, so the
+claim comes back with its subject and to the same tolerance that beat asserted — two pixels.
+
+| | Measured |
+|---|---|
+| The hole against the named pane's own rectangle, at all **7** steps | worst edge **0.36 px** out, against a stated tolerance of 2 |
+| The margin between lit and dimmed, through `grayscale(1)` | the lit pane's paper **255.0** of 255, the dimmed pane's **110.0**, margin **145.0** against a declared 40 |
+| Regions moved by opening the walkthrough, and by each of the six advances after it | **none**, to the pixel; the page grows on neither axis |
+| The card, at the reference viewport | beside the pane at every step: `status: above; controls: right; horizons: right; selection: left; provenance: left` |
+| The document, with a step open, at 1 366 × 768 and 2 560 × 1 440 | does not scroll on either axis, at any step |
+
+The hole is measured from the pane at the moment the step is shown and re-measured on every
+layout event the workspace can produce, so it follows the pane through a **sash drag** and a
+**window resize** (a `ResizeObserver` over the pane and the dock) and through a **tab moved into
+another group** (a `MutationObserver` over the dock's subtree — the layout manager builds new
+elements for a moved tab, and an observer still watching the old one is watching nothing). All
+three are asserted in a browser, each after waiting for the pane to have actually moved: the
+layout manager measures its container asynchronously, and a rectangle read in the same task as a
+resize is the rectangle before it.
+
+**Three things this pass had to decide, and each is a cost rather than a free win.**
+
+- **The hole is the pane's group, tab strip and all.** The element carrying `data-pane-id` is the
+  pane's *body*; the layout manager puts its tabs in a strip 26 px above it. Lighting the body
+  alone would leave a step about the provenance pane saying *the run, the instruments, the record
+  and the manifest, **as tabs*** with the tabs unpressable, and "the lit pane stays operable" is a
+  requirement. Nothing is guessed: the strip belongs to an element with a rectangle of its own,
+  and a pane with no group — the status strip, which is not in the dock — is lit as itself.
+- **A reader cannot move a tab while a step is open**, because the source or the target is
+  dimmed, and a scrim that let them would be masking nothing. The layout manager's own sashes sit
+  *above* the scrim by its own stacking, so resizing a pane still works — which matters, because
+  the walkthrough's last step is the one that tells a reader to do it. The tab-move test is the
+  one place in `walkthrough.spec.ts` that reaches past what a reader can do: it tells the scrim to
+  ignore the pointer for the length of the drag, and says so, because what is under test is
+  whether the mask re-measures and not the pointer path.
+- **Nothing animates, in either media state.** A mask that slid between steps for a reader who had
+  expressed no preference would be the first thing on this surface that moved — beat 017 holds
+  "nothing animates" as one claim over every element — so the test asks under `reduce` *and* under
+  `no-preference`.
+
+**A defect the no-reflow test found on its first run, which had been in the tree since the
+walkthrough returned.** The offer's label went from *Walk me through the workspace* to *Close the
+walkthrough* when it was pressed. It is in the status strip; the strip's height is what the dock
+does **not** get; and at the declared floor the shorter label let the strip reflow by 11 px, so
+**every pane in the dock moved** on the click that opened a walkthrough whose whole claim is that
+it moves nothing. Both labels occupy the same grid cell now, one of them hidden, so the control is
+one width in both states. Nothing about the words changed.
+
 ### The digests
 
 **One moved: `configuration`.** Forty others are byte-identical, seed unchanged. The
@@ -370,9 +427,15 @@ pass moved **one figure and nothing else** — the diff on `config/j-ocean.json`
 — and every other change it made is stylesheet, markup and test. No computed quantity moved,
 which is what G-07 exists to say.
 
+The fourth pass moves the same digest and no other, for the same reason: `presentation.workspace`
+gains the mask's four figures — `walkthroughMaskOpacity`, `walkthroughCardWidthPx`,
+`walkthroughCardMinimumHeightPx` and `walkthroughCardGapPx` — because a dimension or a colour the
+surface needs is declared and never a literal in a stylesheet (Principle X). A mask computes
+nothing, so nothing computed moved.
+
 ### The shell tests that lost their subject
 
-Ninety-one shell tests were written against the region grid, and there are **121** now. Their
+Ninety-one shell tests were written against the region grid, and there are **130** now. Their
 claims mostly survived and their selectors mostly did not: `region-controls` became `pane-controls`, `region-centre` became
 `pane-horizons`, `region-detail` became `pane-selection`, and four disclosures became four tabs.
 Those are repointings and are not recorded here. **Eight lost their subject outright**, and each
@@ -395,6 +458,12 @@ is recorded against the claim it made:
 |---|---|---|
 | `one-view` → *holds the same discipline below the declared floor* | The below-the-floor presentation — every pane in one column, the column scrolling — is held to the same census as the workspace, at 900 × 700 | The subject is gone: there is no second presentation to hold. What the test was *believing* is the defect — the column declared itself `data-scrolls="list"`, `data-list="the panes, one under another"`, and the census passed it as a list. The claim survives without its subject and is stronger for it: *is the same workspace below the width the row needs*, at 1 366 × 768, asserting the dock is there and `below-floor-body` is not. |
 | `viewport-floor` → *offers the single-panel presentation, with the strip and the scores* | Below the floor every pane is still present and named, in one column, with `pane-provenance` holding four sections | Half its subject is gone. One horizon and the strip survive and are asserted where they were; `pane-provenance` does not, because the provenance is four tabs at every viewport now rather than four sections stacked below the floor. The test asks for `pane-provenance/run`, which is the tab, and adds what the old claim could not make: the dock is on screen and the stacked column is not. |
+
+**The fourth pass killed one, and it died with the decision it was holding.**
+
+| The test | The claim it made | What happened to it |
+|---|---|---|
+| `walkthrough` → *names a pane that is on the surface at every step, and leaves the run usable* | Half of it: every step resolves to a pane the layout draws. The other half: *"The run underneath is still usable with the card open: nothing is behind a scrim"* — the `advance` control, in the controls pane, is clicked with a step about the **status** pane open, and the run steps | The second half's subject is the decision this pass reverses, at the author's request, so it is gone rather than corrected: a reader may no longer act on a pane they cannot see, and that is the point of the mask. What replaces it is the half of "not modal" that is still true and now matters more — `walkthrough` → *leaves the lit pane operable, and the dimmed surface not*, which walks to the step about the **controls** pane, asks the browser what the pointer would reach at the middle of every pane, and then clicks `advance` for real. The first half moved into `lights the pane its step is about at every step`, where it is asked of the same step as the mask. |
 
 The four tests this beat's second pass repointed are repointings and are recorded as such: the
 legend assertion in `shell` → *draws attribution that survives having its colour removed* now

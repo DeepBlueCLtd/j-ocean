@@ -139,27 +139,39 @@ produced.
 
 ---
 
-### User Story 5 - The walkthrough returns, as an offer (Priority: P2)
+### User Story 5 - The walkthrough returns, as an offer, and it masks (Priority: P2)
 
 A reader who wants the surface explained can ask for a walkthrough. It is offered, never
 imposed, and it explains the *workspace* — what the panes are and how they relate — while
-panel-level help continues to explain each panel.
+panel-level help continues to explain each panel. **Each step masks the workspace apart from the
+pane it names**: that pane is lit and stays operable, everything else is dimmed, and the card sits
+beside the lit pane.
 
 **Why this priority**: the author has asked for it back, and beat 016 retired it on the
 reasoning that panel help serves a confused reader better. Both are true: help answers *what is
 this*, a walkthrough answers *what am I looking at*.
 
-**Independent Test**: the walkthrough is reachable, is not shown unasked, and every step resolves
-to a pane that exists.
+The mask is the author's second direction — *"the walkthrough should move around the UI, masking
+out the unrelated elements/panels"* — and it **reverses** this beat's own decision that nothing
+would be covered by a scrim. That decision reasoned that a reader ought to be able to drag the
+issue time with the tour open. It answered the wrong question: *what am I looking at* is answered
+by suppressing what you are **not** looking at, and a card in the corner of a workspace of seven
+rectangles points at nothing in particular. Panel help (FR-052) is unaffected and still answers
+*what is this panel*; the two stay distinct.
+
+**Independent Test**: the walkthrough is reachable, is not shown unasked, every step resolves to a
+pane that exists, and at every step the lit rectangle is that pane's own, measured.
 
 **Acceptance Scenarios**:
 
 1. **Given** a first visit, **When** the application loads, **Then** no walkthrough starts by
    itself.
-2. **Given** the walkthrough, **When** it runs, **Then** each step names a pane that exists and
-   the run underneath stays usable.
+2. **Given** the walkthrough, **When** it runs, **Then** each step names a pane that exists, that
+   pane is the lit one, and it stays operable while everything else is dimmed and takes no action.
 3. **Given** beat 016's disposition record, **When** the walkthrough returns, **Then** the steps
    it reclaims are recorded as moving back, rather than silently reappearing.
+4. **Given** a step is open, **When** the reader drags a sash or resizes the window, **Then** the
+   mask moves with the pane rather than lighting where it was.
 
 ---
 
@@ -198,7 +210,12 @@ and nothing scrolls but a declared list.
   nothing that was computed is lost by closing it.
 - **A stored layout naming a pane this build has not got.** Reported, and the default restored —
   never a blank pane.
-- **`prefers-reduced-motion`.** Pane drag and tab transitions are suppressed.
+- **`prefers-reduced-motion`.** Pane drag and tab transitions are suppressed. The walkthrough's
+  mask is simply in the new place at every step, in either media state: this surface animates
+  nothing anywhere, so a mask that slid for a reader who had expressed no preference would be the
+  first thing on it that did.
+- **A pane the walkthrough names is closed by the reader.** The step still names a pane that the
+  layout *draws*; with no rectangle to light there is no mask, and the card stands on its own.
 - **Greyscale.** Pane headers, the active tab and the focused pane must be distinguishable
   without colour.
 
@@ -236,6 +253,15 @@ and nothing scrolls but a declared list.
   put a reader below the floor.
 - **FR-013**: The below-floor answer MUST be the workspace with one horizon and the strip. It MUST
   NOT be a vertical stack of panes, and it MUST NOT scroll a page.
+- **FR-014**: Each step of the walkthrough MUST mask the workspace apart from the pane it names.
+  The lit rectangle MUST be that pane's own rectangle, **measured** from the pane rather than
+  declared; it MUST follow the pane when the reader drags a sash, moves a tab or resizes the
+  window; opening and advancing the walkthrough MUST change no region's bounding rectangle and
+  MUST NOT grow the page; the lit pane MUST stay operable and the dimmed surface MUST take no
+  action; the mask MUST NOT animate between steps; and the lit and dimmed surfaces MUST be
+  distinguishable without colour. Escape MUST close it and return focus to the control that
+  opened it, and a click on the dim MUST close it too. Any dimension or colour the mask needs
+  MUST be declared in `presentation.workspace` (Principle X).
 
 ### Key Entities
 
@@ -261,6 +287,11 @@ and nothing scrolls but a declared list.
 - **SC-008**: At every viewport in the declared matrix the workspace renders and nothing scrolls
   but a declared list. The tallest scroll of any element, at any of them, is reported as a figure.
 - **SC-009**: The declared minimum height is smaller than the shortest viewport in the matrix.
+- **SC-010**: At every step of the walkthrough the lit rectangle is the named pane's own, to
+  within two CSS pixels of that pane's measured rectangle; it stays so through a sash drag, a tab
+  move and a window resize; opening and advancing the walkthrough changes no region's rectangle
+  to the pixel and grows the page on neither axis; and the margin between the lit and the dimmed
+  surface through a greyscale rendering is reported as a figure.
 
 ## Assumptions
 
