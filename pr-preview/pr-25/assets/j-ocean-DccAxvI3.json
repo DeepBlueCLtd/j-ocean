@@ -43,6 +43,10 @@
       "paneMinimumWidthPx": 220,
       "paneMinimumHeightPx": 120,
       "sashWidthPx": 4,
+      "walkthroughMaskOpacity": 0.62,
+      "walkthroughCardWidthPx": 420,
+      "walkthroughCardMinimumHeightPx": 180,
+      "walkthroughCardGapPx": 12,
       "storageKey": "j-ocean.workspace",
       "layoutVersion": 1
     },
