@@ -37,6 +37,18 @@ const PAD = { left: 46, right: 12, top: 12, bottom: 24 };
  */
 const TICKS = 5;
 
+/**
+ * How much height one of those labels needs to be read: the 10 px tick text and its leading.
+ *
+ * The ruling earns the space it is given, and where it is given none it has to say so by
+ * drawing fewer lines. In the band the row leaves at the declared floor this figure is 66 px
+ * tall, six labels down it are 6 px apart, and 6 px apart at 10 px is one number painted over
+ * the next -- which the overlap census in `tests/shell/census.ts` reports by name and which
+ * nothing had asked before beat 018's fifth pass. A literal here for the reason `PAD` is one:
+ * a chart's tick text is not the layout's business.
+ */
+const TICK_LABEL_HEIGHT_PX = 14;
+
 export function SkillInset({ curves, currentIssueInstantMs, widthPx, heightPx }: SkillInsetProps) {
   const leads = [...new Set(curves.flatMap((c) => c.points.map((p) => p.leadHours)))].sort(
     (a, b) => a - b,
@@ -51,10 +63,15 @@ export function SkillInset({ curves, currentIssueInstantMs, widthPx, heightPx }:
     PAD.left + (lead / maxLead) * (widthPx - PAD.left - PAD.right);
   const yOf = (skill: number): number =>
     PAD.top + (1 - (skill - low) / (high - low)) * (heightPx - PAD.top - PAD.bottom);
+  /** As many gridlines as can be read in the band there is, and never more than `TICKS`. */
+  const ticks = Math.max(
+    1,
+    Math.min(TICKS, Math.floor((heightPx - PAD.top - PAD.bottom) / TICK_LABEL_HEIGHT_PX)),
+  );
 
   return (
       <svg width={widthPx} height={heightPx} role="img" aria-label="Skill against persistence by lead time, one line per issue instant">
-        {Array.from({ length: TICKS + 1 }, (_ignored, at) => low + ((high - low) * at) / TICKS).map(
+        {Array.from({ length: ticks + 1 }, (_ignored, at) => low + ((high - low) * at) / ticks).map(
           (value) => (
             <g key={value}>
               <line

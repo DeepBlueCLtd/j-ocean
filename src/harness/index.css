@@ -282,6 +282,10 @@ body {
   padding: 0.5rem 0.6rem;
   height: 100%;
   min-height: 0;
+  /* So the term list below can ask how wide the tab it is in came out. At the declared floor
+     every pane is at `paneMinimumWidthPx` and these tabs are 220 px wide, which is narrower
+     than the label column and the digest together. */
+  container-type: inline-size;
 }
 
 .provenance-pane dl {
@@ -294,6 +298,39 @@ body {
   gap: 0.1rem 0.6rem;
   margin: 0;
   font-size: 0.8rem;
+}
+
+/* Label above figure rather than beside it, where the tab is too narrow to hold both. A
+   64-character digest in what is left of 220 px after a 7.5 rem label column wraps to five
+   lines; on its own line it takes three, and the term list is 35 px shorter for it. */
+@container (max-width: 340px) {
+  .provenance-pane > dl { grid-template-columns: 1fr; }
+  /* The paste box and its two controls, in a tab this narrow. Two rows rather than three and
+     the controls at the size the status strip's are: it is this or the box does not fit at
+     all. */
+  .provenance-pane details textarea { height: 3rem; }
+  /* The box says what it is in its own placeholder at this width, and the textarea carries the
+     same words as its accessible name, so the line above it is 17 px the tab has not got. */
+  .provenance-pane details > label { display: none; }
+  /* A control whose label is wider than the tab. `Download this manifest` is 253 px and the
+     tab is 209 px inside its padding at the floor, and a flex item's `min-width: auto` is its
+     longest line -- so the row hung 44 px outside the pane rather than wrapping. */
+  .provenance-pane .row-controls button { padding: 0.2rem 0.35rem; font-size: 0.72rem; min-width: 0; }
+  /* And the room the wrapped label costs comes off the document's minimum window, which is the
+     one thing on this tab that scrolls. */
+  .provenance-pane > pre[data-testid="manifest"] { min-height: 3rem; }
+  /* A file control is 253 px wide by its own intrinsic sizing, whatever the box around it. */
+  .provenance-pane details input[type='file'] { max-width: 100%; font-size: 0.68rem; }
+}
+
+/* While the paste box is open the tab holds the run's two figures and the box, and not the
+   document. At the declared floor the tab is 220 x 311 px and holding both wants 463: something
+   gives whatever is decided here, and what a reader pasting a manifest in is not reading is the
+   manifest they are about to replace. Closed -- which is how the tab arrives -- the document
+   has the pane to itself. */
+.provenance-pane:has(details[data-testid="manifest-import"][open]) > pre[data-testid="manifest"],
+.provenance-pane:has(details[data-testid="manifest-import"][open]) > .row-controls {
+  display: none;
 }
 
 .provenance-pane dt { font-size: 0.7rem; color: var(--host); }
@@ -314,7 +351,19 @@ body {
   padding: 0.4rem;
 }
 
-.provenance-pane textarea { width: 100%; font-size: 0.72rem; }
+/* The manifest tab's two terms -- what this build is, and the digest of what it computed --
+   are a fixed pair and not a list to scan, so they keep their own height and the manifest
+   below them is what gives way. Beat 018's fifth pass: `flex: 0 1 auto` on every provenance
+   term list let this one be squeezed to a 12 px window over 59 px of content at the floor, and
+   to between 20 and 53 px at every other viewport in the matrix. The code version and the
+   results digest were cut off at all six, on the one tab whose whole purpose is a figure
+   somebody copies. The manifest itself is the declared scroller and is where the room comes
+   from. */
+.provenance-pane[data-testid="manifest-panel"] > dl { flex: 0 0 auto; overflow: visible; }
+
+/* The paste box keeps the three rows it declares. Left to shrink with the rest of the column
+   it was given 13 px of the 30 one row needs. */
+.provenance-pane textarea { width: 100%; font-size: 0.72rem; flex: 0 0 auto; }
 .provenance-pane label { font-size: 0.7rem; color: var(--host); }
 
 /* The status strip (FR-58). Not a pane: it is outside the dock, it cannot be closed, tabbed or
@@ -356,6 +405,8 @@ body {
 
 .status-figures dt { color: var(--host); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.05em; }
 
+.status-figures dd { margin: 0; white-space: nowrap; }
+
 /* The digest is a 64-character hexadecimal figure and has been shown ellipsised since it
    arrived; what changed in beat 018's second pass is how much of it, and why (T071). At 22rem
    the three figures were 654 px wide, and the strip could not fit the statement, the links,
@@ -364,8 +415,18 @@ body {
    the row itself fits -- 66 px at the floor's width, 55 px at 1 920 and above -- and 44 px came
    off the declared minimum height. What a reader does with this figure is compare two visits, and a prefix
    compares as well as the whole. The whole is on the manifest tab, which is where a figure
-   somebody copies belongs. */
-.status-figures dd { margin: 0; max-width: 8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+   somebody copies belongs.
+
+   The cap is written against the digest and not against every readout in the strip, which is
+   beat 018's fifth pass. It was `.status-figures dd`, so the step time was ellipsised too --
+   and what fell off the end of *"1.234 ms/step over 16 ms"* was the word that says whether the
+   frame budget was met. A prefix of a digest compares; a prefix of a verdict is a different
+   verdict. The census caught it in the over-budget state, 65 px past the box. */
+.status-figures dd[data-testid="status-digest"] {
+  max-width: 8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 .status-actions { display: flex; gap: 0.4rem; align-items: center; }
 .status-actions button { padding: 0.2rem 0.4rem; font-size: 0.75rem; }
@@ -829,11 +890,14 @@ body {
   overflow: hidden;
 }
 
- /* The figure takes the width of the picture it holds rather than the width of the pane, so
-    that its head is the picture's own head line and the help control at that head's right is at
-    the top right of the thing it explains. */
+ /* The figure and the prose share what the pane has, and the figure takes its half rather
+    than the width of its own heading. `flex: 0 1 auto` sized this column from its content, and
+    with the picture sized from the column that made a 353 px square in a 1 343 px pane at
+    2 560 x 1 440 -- the largest piece of dead space this beat set out to remove, back again in
+    a different place. The picture is square, so the width it is given is the height it can
+    use. */
 .row-invitation > .analysed-field {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   display: flex;
@@ -849,21 +913,40 @@ body {
 /* The field takes the height the pane gives it and its width follows, because it is square.
    Beat 015 sized it from a declared centre height; the pane has no declared height, and left
    to size itself from its own content the picture collapsed to 102 px in a pane 808 px tall
-   -- the arrival state, and the largest piece of dead space on the surface. Height first,
-   width from the aspect ratio, is what fills it. */
+   -- the arrival state, and the largest piece of dead space on the surface.
+
+   **A column, and that is the fix of beat 018's fifth pass.** This was `display: flex` with no
+   direction, which is a row: the field's own label and its colour scale were laid out *beside*
+   the picture rather than under it, 93 px outside the figure's box, and painted on top of the
+   term list in the next column -- six pairs of overlapping words, at every viewport, on the
+   surface a reader arrives at. `overflow: hidden` would have hidden the words rather than the
+   fault, and a label that is cut off is a figure without its provenance (Principle V). */
 .analysed-field { margin: 0; min-width: 0; }
 .analysed-field .field { margin: 0; }
-.analysed-field .field { min-height: 0; display: flex; flex: 1 1 auto; }
+.analysed-field .field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  /* The picture is sized from this box **on both axes**, which is what a size container is for
+     and what `height: 100%` could not do: with the height definite and the width clamped by
+     `max-width`, the box stayed 353 x 726 and the square picture inside it was letterboxed --
+     two white bands, and an overlay canvas whose coordinates no longer matched the picture a
+     reader clicks on. */
+  container-type: size;
+}
 .analysed-field .field-stack {
-  flex: 0 1 auto;
-  height: 100%;
-  width: auto;
-  /* Height first and width from the square -- until the width is what there is least of,
-     which is what a 548 px pane beside a 16 rem column of figures is. Without this the
-     picture took 560 px of a 548 px pane and the column beside it hung 85 px outside. */
-  max-width: 100%;
-  max-height: 100%;
+  /* The largest square the box holds, once the label beneath it has its declared room.
+     Neither axis is preferred: whichever is scarcer decides the side. */
+  flex: 0 0 auto;
+  width: min(100cqw, 100cqh - var(--field-label-height));
+  height: min(100cqw, 100cqh - var(--field-label-height));
   aspect-ratio: 1 / 1;
+  /* The 28 rem cap below is for a field in a column of prose. This one has a pane, and with
+     the cap left standing the square was 448 px wide inside a 903 px box. */
+  max-width: none;
 }
 .analysed-field .field-stack canvas { width: 100%; height: 100%; object-fit: contain; }
 

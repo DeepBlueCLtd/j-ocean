@@ -55,6 +55,7 @@
       "thumbnailWidthPx": 40
     },
     "centreChromeHeightPx": 196,
+    "fieldLabelHeightPx": 72,
     "anomalyLimitMetres": 220,
     "attributionHatchThreshold": 0.5,
     "footprint": {

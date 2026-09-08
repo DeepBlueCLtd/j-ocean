@@ -5,7 +5,7 @@
   "quantities": [
     {
       "name": "configuration",
-      "digest": "5bac990a1b12f15b2d4293764856ea5a4b620aa80be71bb350bf20fe4d60d44c",
+      "digest": "daeafe80e9ca5da2e987a04db71adac4a19966199c872a29170c9d00949e78c4",
       "producer": "digestOf in src/config/digest.ts, over the configuration loadConfiguration validated."
     },
     {

@@ -368,6 +368,23 @@ export const configurationSchema = z
        */
       centreChromeHeightPx: z.number().int().positive(),
       /**
+       * Beat 018, fifth pass. The room a field's own label and colour scale take beneath the
+       * picture, in CSS pixels.
+       *
+       * The pre-row centre draws a square picture in a box whose height and width are both
+       * decided by the pane, and the square has to be the smaller of the two less whatever the
+       * label costs. A container query can ask the box how wide and how tall it is; it cannot
+       * ask how tall the words under the picture came out. So the reserve is declared, like
+       * every other length in this layout, and the census in `tests/shell/census.ts` is what
+       * holds it honest: a reserve too small puts the label over the caption below it and the
+       * overlap census fails by name.
+       *
+       * Measured from the built surface: the label and its colour scale are 46.4 px tall at
+       * every viewport in the declared matrix, and 66.8 px in a column of 230 px or narrower,
+       * where the label wraps to a second line. 72 declares the wrapped case.
+       */
+      fieldLabelHeightPx: z.number().int().positive(),
+      /**
        * The half-range the panels draw interface-depth anomalies against. Drawn raw, at a
        * limit that showed any structure at all, six panels were a uniform red; the scorer
        * compares anomalies, so the row draws them.

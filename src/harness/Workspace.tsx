@@ -152,6 +152,7 @@ export function workspaceGeometry(config: Configuration): CSSProperties {
     '--strip-height': `${String(presentation.strip.heightPx)}px`,
     '--strip-thumbnail-width': `${String(presentation.strip.thumbnailWidthPx)}px`,
     '--centre-chrome-height': `${String(presentation.centreChromeHeightPx)}px`,
+    '--field-label-height': `${String(presentation.fieldLabelHeightPx)}px`,
   } as CSSProperties;
 }
 

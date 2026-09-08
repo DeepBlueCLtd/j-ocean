@@ -942,6 +942,10 @@ test.describe('the shell', () => {
     await other.goto(page.url());
     await openDisclosure(other, 'manifest-panel');
     await expect(other.getByTestId('manifest')).toContainText('rootSeed');
+    /* Beat 018's fifth pass folded the paste box into a disclosure: at the declared floor the
+       tab is 220 px wide and the two figures, the document and this form together want 463 px
+       of a 311 px pane, so the tab arrives showing the manifest and opens the box on request. */
+    await openDisclosure(other, 'manifest-import');
     await other.getByTestId('manifest-input').fill(manifest);
     await other.getByTestId('import-manifest').click();
 
@@ -962,6 +966,7 @@ test.describe('the shell', () => {
     await openDisclosure(page, 'manifest-panel');
     const manifest = (await page.getByTestId('manifest').textContent()) ?? '';
     const parsed = JSON.parse(manifest) as Record<string, unknown>;
+    await openDisclosure(page, 'manifest-import');
 
     // FR-003 and FR-005. A digest difference is a refusal: the declared values differ, and a
     // run made against other values is a different run.
@@ -996,6 +1001,7 @@ test.describe('the shell', () => {
       string,
       unknown
     >;
+    await openDisclosure(page, 'manifest-import');
     // FR-005: a reader holding a manifest from last month is better served by a warned replay
     // than by a door, and the warning says identity is no longer promised.
     await page.getByTestId('manifest-input').fill(

@@ -136,3 +136,53 @@ by a scrim, and the old rationale is replaced rather than left standing beside i
       nothing. Found by T084's own no-reflow test on its first run.
 - [x] **T086** `018-walkthrough-mask.png`, captured from the running application: the whole
       viewport, because what this beat added is what happened to the other six rectangles.
+
+## The census, with no threshold (FR-002, SC-001, SC-008)
+
+The fourth pass called the manifest tab's clipped term list *"one pre-existing flake … marginal"*
+and left it. It was neither: `scrollHeight` 59 px against a client box of 12 to 53 at **all six**
+viewports, and it looked intermittent only because the census read a tab in the same task as the
+click that opened it. A threshold is the wrong instrument for a property that reached the author
+twice.
+
+- [x] **T090** The census walks **every** element and reports any whose content runs more than
+      1 px past its own client box, on either axis, whatever its `overflow` says. The filter it
+      replaces — computed `overflow` of `auto` or `scroll` — was a filter on the declaration and
+      not on the fact, and two faults lived in that gap for the whole beat.
+- [x] **T091** Three outcomes, decided in code: a declared list, an entry in `EXEMPT` with a
+      written reason, or a defect. The exemptions are one reviewable list; an entry whose reason
+      is under 60 letters excuses nothing and is named by
+      `one-view.spec.ts` → *gives a written reason for every exemption the census applies*.
+- [x] **T092** `selectTab` waits for the pane the tab names and for two frames in which no pane's
+      rectangle moves. The layout manager mounts a panel asynchronously, which is what made a
+      defect present at six viewports look like a flake at three.
+- [x] **T093** An **overlap** census beside the overflow one, because they are different
+      properties: a box can overflow without landing on anything, and a placed element can land
+      on its neighbour without overflowing. Asked of the words — one `Range` per text node, a
+      rectangle per painted line, cut down by every clipping ancestor — because a box's rectangle
+      is its whole grid cell and measuring those reports six help controls over six score figures
+      that no reader can see.
+- [x] **T094** The pre-row centre's field. `.analysed-field .field` was a flex **row**, so the
+      field's own label and colour scale were laid out beside the picture, 93 px outside the
+      figure and painted over the term list in the next column at every viewport — the author's
+      *"text overwriting other text"*. A column; the figure and the prose share the pane; and the
+      picture is the square itself rather than a square letterboxed in a 353 × 726 box with an
+      overlay canvas whose coordinates no longer matched it.
+- [x] **T095** `presentation.fieldLabelHeightPx`, declared: a container query can ask the box how
+      wide and how tall it is and cannot ask how tall the words under the picture came out.
+      Measured 46.4 px on one line and 66.8 px wrapped; declared 72.
+- [x] **T096** The manifest tab fits at every viewport and at the floor, with its paste box open
+      and closed. The two figures keep their height and the document gives way; the form is folded
+      into a disclosure, because at the floor the tab is 220 px wide and the figures, the document
+      and the form together want 463 px of a 311 px pane.
+- [x] **T097** The status strip's 8 rem ellipsis is written against the digest alone. It had been
+      written against every readout, so *1.234 ms/step **over** 16 ms* lost the word that says
+      whether the budget was met.
+- [x] **T098** The declared floor is **1 658 × 748**. The 8 px is the controls pane's own bottom
+      padding, which the floor's measurement had stopped short of; `viewport-floor.spec.ts` now
+      includes it.
+- [x] **T099** The skill curve's value axis carries as many gridlines as can be read in the band
+      there is. Six labels in the 66 px the row leaves at the floor were 6 px on top of each
+      other, which the overlap census reported as soon as the floor grew.
+- [x] **T100** Each of the three outcomes planted once and watched failing by name — a defect, an
+      overlap, an exemption with no reason, and a list that does not say which list — then removed.

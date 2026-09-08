@@ -100,7 +100,15 @@ async function measure(page: Page, leads: readonly number[]): Promise<Measured> 
         right = Math.max(right, child.right);
       }
       if (pane.dataset['paneId'] === 'controls') {
-        controlsContentHeight = Math.ceil(bottom - box.top);
+        /* The pane's own bottom padding is part of what the pane needs, and beat 018's fifth
+           pass is where that was noticed: the floor was measured to the last control's bottom
+           edge, so the declared height was 8 px short of the pane's content box and at the
+           floor the last control sat flush against the pane's rule. The census in `census.ts`
+           reports it as what it is -- `scrollHeight` 656 in a `clientHeight` of 648 -- because
+           it asks the box rather than the children. */
+        controlsContentHeight = Math.ceil(
+          bottom - box.top + parseFloat(getComputedStyle(pane).paddingBottom),
+        );
       }
       if (bottom - box.bottom > 1 || right - box.right > 1) {
         clipped.push(

@@ -1294,39 +1294,57 @@ export function App() {
         {manifest}
       </pre>
 
-      <label htmlFor="manifest-input">Paste a manifest to import</label>
-      <textarea
-        id="manifest-input"
-        data-testid="manifest-input"
-        rows={3}
-        value={pasted}
-        onChange={(event) => { setPasted(event.target.value); }}
-        placeholder="Paste a manifest"
-      />
-      <div className="row-controls">
-        <button
-          type="button"
-          data-testid="import-manifest"
-          onClick={() => { importManifest(pasted); }}
-          disabled={pasted.trim() === ''}
-        >
-          Import this manifest
-        </button>
-        <input
-          type="file"
-          accept="application/json,.json"
-          aria-label="Import a manifest from a file"
-          data-testid="manifest-file"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file === undefined) return;
-            void file.text().then((text) => {
-              setPasted(text);
-              importManifest(text);
-            });
-          }}
+      {/*
+        Bringing one back is folded away, and that is beat 018's fifth pass rather than tidiness.
+        At the declared floor every pane is at `paneMinimumWidthPx`, so this tab is 220 px wide
+        and 311 px tall; the two figures, the manifest and this form together need 421 px of it.
+        Something had to give and the stylesheet was choosing: the term list was squeezed to a
+        12 px window over 59 px of content -- the code version and the digest cut off at every
+        viewport in the matrix -- and the paste box to 13 px over 30. Folded, the tab fits with
+        the manifest itself taking what is left, which is between 92 and 200 px more of the
+        document than it had. Reading a manifest is what this tab is for; importing one is an
+        act, and an act may live behind the control that performs it.
+      */}
+      <details data-testid="manifest-import">
+        <summary>Bring a manifest back</summary>
+        <label htmlFor="manifest-input">Paste a manifest to import</label>
+        <textarea
+          id="manifest-input"
+          data-testid="manifest-input"
+          /* Named here as well as by the label beside it: in a tab as narrow as the floor's
+             the label is not drawn, and a box with no name is a box a screen reader cannot
+             announce. */
+          aria-label="Paste a manifest to import"
+          rows={3}
+          value={pasted}
+          onChange={(event) => { setPasted(event.target.value); }}
+          placeholder="Paste a manifest"
         />
-      </div>
+        <div className="row-controls">
+          <button
+            type="button"
+            data-testid="import-manifest"
+            onClick={() => { importManifest(pasted); }}
+            disabled={pasted.trim() === ''}
+          >
+            Import this manifest
+          </button>
+          <input
+            type="file"
+            accept="application/json,.json"
+            aria-label="Import a manifest from a file"
+            data-testid="manifest-file"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file === undefined) return;
+              void file.text().then((text) => {
+                setPasted(text);
+                importManifest(text);
+              });
+            }}
+          />
+        </div>
+      </details>
 
       {importFailure !== null && (
         <p className="banner warn" data-testid="import-failure">
@@ -1368,9 +1386,12 @@ export function App() {
             markers={attributionMarkers}
             onSelect={selectCell}
           />
-          <figcaption className="figure-label">
-            Weight carried by observations, per cell
-          </figcaption>
+          {/* One label, and it is the field's own. This figure carried a second caption --
+              "Weight carried by observations, per cell" over the field's "Weight carried by
+              observations in each cell" -- which was invisible only because the stylesheet was
+              laying the field's label out beside the picture rather than under it. With the
+              label back where it belongs the two stood one above the other, saying the same
+              thing twice. The field's label is the one that carries the colour scale. */}
         </figure>
         <div className="row-invitation-prose">
           <PanelHead panel="centre/horizon-row" level={2} />

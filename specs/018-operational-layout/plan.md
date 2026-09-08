@@ -151,10 +151,10 @@ honest price of it, and they are here rather than hidden inside a chart.
 
 | | Beat 013 declared | Beat 018, first pass | Beat 018 measures |
 |---|---|---|---|
-| Floor | 2 038 × 728 | 1 658 × 960 | **1 658 × 740** |
+| Floor | 2 038 × 728 | 1 658 × 960 | **1 658 × 748** |
 | Of which chrome, in width | 828 px (390 + 390 + 48), unshrinkable | 448 px | 448 px (2 × 220 at the pane minimum, 2 × 4 sashes) |
 | Of which chrome, in height | — | 136 px (110 status strip, 26 tab strip) | **92 px** (66 status strip, 26 tab strip) |
-| The controls pane's content at 220 px | — | 823 px | **648 px** |
+| The controls pane's content at 220 px | — | 823 px | **656 px** (648 to the last control, and the pane's own 8 px of bottom padding) |
 | A horizon panel at 2 560 | 277 px | 280 px | **280 px** |
 | A horizon panel at the floor | 190 px | 190 px | 190 px |
 | A 2 000 px window | the fallback | the six-panel row | **the six-panel row** |
@@ -174,10 +174,10 @@ What actually forced 960, measured pane by pane at the floor's own width:
 
 | | First pass | Now |
 |---|---|---|
-| The controls pane's own content, at the 220 px it is narrowest | **823 px** | **648 px** |
+| The controls pane's own content, at the 220 px it is narrowest | **823 px** | **656 px** |
 | The status strip, which wraps | **110 px** (two rows) | **66 px** (one row) |
 | The dockview tab strip | 26 px | 26 px |
-| The floor's height, which is their sum | 959, declared 960 | **740, declared 740** |
+| The floor's height, which is their sum | 959, declared 960 | **748, declared 748** |
 
 Neither of the two is a computed quantity and neither was a requirement. The controls pane was
 set at the body's line height of 1.5 — a rule for a paragraph somebody reads, where a label, a
@@ -194,10 +194,15 @@ because it was the first suspect. The provenance pane's content is a term list t
 it fills whatever height it is given and never asks for more; the selection pane's content is
 89 px. The controls pane is the only pane on the vertical axis with a floor of its own.
 
-Measured from the built workspace by `tests/shell/viewport-floor.spec.ts`: **1 658 × 740**, and
-declared 1 658 × 740. Walked down by hand at the floor's width with the row scored, the workspace
-holds at 740 and the controls pane clips by 10 px at 730 — which is what makes 740 the floor
-rather than a comfortable number.
+Measured from the built workspace by `tests/shell/viewport-floor.spec.ts`: **1 658 × 748**, and
+declared 1 658 × 748. Walked down by hand at the floor's width with the row scored, the workspace
+holds at 748 and the controls pane clips below it — which is what makes 748 the floor rather than
+a comfortable number.
+
+**740 stood here for one pass and was 8 px short**, because the measurement stopped at the last
+control's bottom edge and a pane needs its own bottom padding too. The census in
+`tests/shell/census.ts` reported it as what it is — `scrollHeight` 656 in a `clientHeight` of
+648 — and the fifth pass below records how.
 
 **The floor's width is what decides what the centre holds, and its height is not.** Six panels
 at `minimumPanelWidthPx` need width; a short window is short of height, and height is not what
@@ -232,7 +237,7 @@ profile pinned, and every disclosure forced open.
 |---|---|---|
 | 2 560 × 1 440 | **nothing**, in every state above but one | — |
 | 2 560 × 1 440, a profile pinned | `selection` → the level list | **list** — *a profile's levels, measured against the model's derived ones*; an Argo profile carries hundreds |
-| 1 658 × 740, the declared floor | `provenance/run` → its own `dl` | **list** — *the run's own figures, one to a line* |
+| 1 658 × 748, the declared floor | `provenance/run` → its own `dl`, and the manifest itself on its tab | **list** — *the run's own figures, one to a line*; **list** — *the manifest, as a reader copies it* |
 | 1 366 × 768, below the width the row needs | `provenance/run` → its own `dl`, and the horizon strip sideways | **list** — *the run's own figures, one to a line*; **list** — *every declared horizon, as controls* |
 
 Nothing scrolls a body of text at any of them. `tests/shell/one-view.spec.ts` also fails on a
@@ -435,7 +440,7 @@ nothing, so nothing computed moved.
 
 ### The shell tests that lost their subject
 
-Ninety-one shell tests were written against the region grid, and there are **130** now. Their
+Ninety-one shell tests were written against the region grid, and there are **131** now. Their
 claims mostly survived and their selectors mostly did not: `region-controls` became `pane-controls`, `region-centre` became
 `pane-horizons`, `region-detail` became `pane-selection`, and four disclosures became four tabs.
 Those are repointings and are not recorded here. **Eight lost their subject outright**, and each
@@ -494,3 +499,134 @@ FR-58 says the statement that j-ocean is not an operational forecast system is v
 interaction and is not the thing moved behind a control, and every dockview panel can be
 closed, tabbed behind another or dragged into a corner. So it is outside the dock, and there is
 no arrangement a reader can reach in which the statement is not on screen.
+
+### The fifth pass: a census with no threshold, and the flake that was not one
+
+The fourth pass reported, of `viewport-matrix.spec.ts`, *"one pre-existing flake:
+`provenance/manifest / dl scrolls vertically, declaring null` at three viewports … marginal and
+pre-existing, not caused by this change"*, and left it standing. **That claim was wrong on both
+counts and it is corrected here rather than deleted.** The manifest tab's term list has
+`scrollHeight` **59 px** at every viewport in the matrix; only the window it is given varies —
+**12, 20, 20, 30, 23 and 53 px** at 1 366 × 768, 1 536 × 864, 1 920 × 900, 1 920 × 1 080,
+2 560 × 900 and 2 560 × 1 440. The code version and the results digest were cut off at all six.
+It looked intermittent because the census read the pane in the same task as the click that
+opened its tab, and the layout manager mounts a panel asynchronously: what was measured at the
+other three viewports was the tab that was closing. Nothing about it was marginal, and calling a
+finding a flake is how a defect gets a second beat.
+
+**A threshold is the wrong instrument for this property**, which is why the census now has none.
+The fourth pass counted only elements whose computed `overflow` was `auto` or `scroll` — a filter
+on the declaration and not on the fact. An element that runs past its box with `overflow:
+visible` spills onto whatever is beside it and one with `hidden` cuts its content off, and
+neither had a scrollbar to count.
+
+#### What the census walks, and what it decides
+
+Every element on the surface, at every viewport in the declared matrix, in every state the
+suite reaches — loaded, the row built, scored, a cell selected, each of the four provenance tabs
+with the pane the tab names waited for, the manifest tab with its paste box open, the
+walkthrough on each of its steps, the over-budget notice and the configuration refusal. Anything
+whose content runs more than **1 px** past its own client box on either axis is reported, and
+`tests/shell/census.ts` then decides, in code, which of three things it is. There is no fourth.
+
+| Element | Over its box | Verdict, and why |
+|---|---|---|
+| `provenance/manifest` → `pre[data-testid="manifest"]` | vertically, 124–559 px | **a declared list** — *the manifest, as a reader copies it* |
+| `provenance/run` → its own `dl` | vertically, 43–328 px | **a declared list** — *the run's own figures, one to a line* |
+| `horizons` → `div[data-testid="horizon-strip"]` | horizontally, 483–653 px | **a declared list** — *every declared horizon, as controls* |
+| `selection` → the level list, with a profile pinned | vertically | **a declared list** — *a profile's levels, measured against the model's derived ones* |
+| `horizons` → six `ul.mark-list`, and their `li` | both axes, up to 1 343 px | **exempt** — the marks as text: 1 px square under `clip-path: inset(50%)`, in the accessibility tree and painted nowhere, because a canvas says nothing to a reader who cannot see it |
+| `.dv-live-region` | both axes, 106 px | **exempt** — the layout manager's own visually hidden live region, clipped to nothing |
+| `.dv-tabs-container` | horizontally, 31–273 px | **exempt** — the layout manager's tab strip. Four provenance tabs need 464 px and the strip is 374 px at 1 920 × 900; it scrolls as a list of tabs on dockview's own 4 px scrollbar. Measured: a wheel over the strip moves it to `scrollLeft` 90 and the Manifest tab comes fully inside the box |
+| `.dv-default-tab` | vertically, 2 px | **exempt** — an 18 px line box in a 16 px content box: the label's leading, not a glyph. The strip is 26 px tall and the overlap census measures the text rather than the box |
+| `status` → `dd[data-testid="status-digest"]` | horizontally, 232–236 px | **exempt** — 64 hexadecimal characters ellipsised to 8 rem, on purpose and since the figure arrived. A reader compares two visits and a prefix compares as well as the whole; the whole of it is on the manifest tab |
+| a closed `details` and its contents | either axis | **exempt** — the engine hides a closed disclosure with `content-visibility`, not `display: none`, so its boxes are measurable and painted nowhere. Nothing needs this entry today; it stays because the state worth measuring is the **open** one, and `one-view.spec.ts` opens the paste box at the floor and censuses that |
+
+Each exemption carries that reason in the list itself, and one that does not excuses nothing:
+`one-view.spec.ts` → *gives a written reason for every exemption the census applies* names any
+entry whose reason is under 60 letters, and the census drops it, so the element it names is
+reported as a defect until somebody writes down why it is not one.
+
+#### The defects, and what each turned out to be
+
+| Where | What the census said | What it was, and the fix |
+|---|---|---|
+| `horizons` → `figure.analysed-field`, and the `figure.field` inside it | horizontally by **93 px**, at every viewport (351 in 258 at 1 366, 446 in 353 above it) | `.analysed-field .field` was `display: flex` with no direction, which is a **row**: the field's own label and colour scale were laid out *beside* the picture, 93 px outside the figure, and painted over the term list in the next column. A column, and the label is back under the picture |
+| the same figure | not an overflow at all | the picture was **letterboxed**: 353 × 726 with a square canvas `object-fit: contain`'d in the middle third, and an overlay canvas whose coordinates no longer matched the picture a reader clicks. `container-type: size` on the figure and `min(100cqw, 100cqh - var(--field-label-height))` on the stack make the box the square itself — 258, 633 and 903 px at the three widths measured, with no band above or below |
+| `provenance/manifest` → its own `dl` | vertically, 59 px in 12–53 | the two terms shrank because every provenance term list is `flex: 0 1 auto`. On this tab they are a fixed pair and the document below them is the declared scroller, so the pair keeps its height and the document gives way |
+| `status` → `dd[data-testid="step-time"]` | horizontally by **65 px**, in the over-budget state | the 8 rem ellipsis was written against `.status-figures dd`, so the step time was ellipsised too — and what fell off the end of *1.234 ms/step **over** 16 ms* was the word that says whether the frame budget was met. A prefix of a digest compares; a prefix of a verdict is a different verdict. The cap is now written against the digest alone |
+| `controls` → the pane itself | vertically by **8 px** at the floor | the pane's own **bottom padding**. `viewport-floor.spec.ts` measured the floor to the last control's bottom edge, so the declared height was 8 px short of the pane's content box: the last control sat flush against the pane's rule and 8 px more content would have been cut. The measurement now includes the padding and the declared floor is **1 658 × 748** |
+| `provenance/manifest` → `textarea[data-testid="manifest-input"]` | vertically, 30 px in **13** | uncovered by the fix above: with the term list holding its height, the paste box became the thing that shrank. It keeps the three rows it declares, and the tab was then 421 px of content in a 311 px pane |
+| `provenance/manifest` → `div.row-controls` | horizontally, 253 px in 209 | at the floor every pane is at `paneMinimumWidthPx`, so this tab is 220 px wide; a flex item's `min-width: auto` is its longest line, so *Download this manifest* hung 44 px outside the pane rather than wrapping. Below 340 px of tab the controls are set at the strip's size and may shrink, the file control is capped to the box, and the term list puts its label above its figure |
+| the skill curve's value axis | 21 × 6 px of one label on the next, six times | found by the **overlap** census in the scored state once the floor grew by those 8 px: `TICKS` was 5 whatever the band's height, and the band the row leaves at the floor is 66 px. The axis now carries as many gridlines as can be read at the tick text's own line height |
+
+#### The overlap census, which is a different question
+
+An element can overflow without landing on anything, and a placed element can land on its
+neighbour without overflowing anything. The author found the second kind by looking at the
+surface — *"on App load, the Horizons panel has text overwriting other text"* — on a tree whose
+overflow census was green. So the census asks both, and it asks the overlap of the **words**:
+one `Range` per text node gives a rectangle per painted line, cut down by every clipping
+ancestor, because what a scroller or an ellipsis does not paint cannot land on anything.
+
+Measured on the boxes instead, the same walk reported six help controls painted over six score
+figures, which is a `dd`'s whole grid cell and not its digits — a false positive that would have
+bought the instrument's honesty for nothing.
+
+What it found, before the fixes above, at every viewport in the matrix and on arrival:
+
+| Painted over | By | How much |
+|---|---|---|
+| `dt` *Influence radius*, *Observations used*, *Excluded, still drawn*, *Cells clamped* | the analysed field's own label | 71 × 24 px each, 71 × 48 at 1 366 × 768 |
+| `p[data-testid="row-invitation-statement"]`, and the declared horizons in it | the same label | 71 × 16 px |
+| `dt` *Observations used*, *Excluded, still drawn* | the field's colour scale | 71 × 16 px |
+| the *Download this manifest* control | the manifest tab's two clipped figures | 120 × 2 px — the same defect as the term list above, seen from the other side |
+
+It is green now, in every state the suite walks, at every viewport in the matrix.
+
+#### Watched failing, one class at a time
+
+Each of the three outcomes was planted and watched, and then removed:
+
+- **a defect.** `.status-figures dt { max-width: 12px; overflow: hidden }` →
+  *in the "loaded" state these run past their own box … `status / dt overflows horizontally:
+  scrollWidth 52 in clientWidth 12, scrollHeight 47 in clientHeight 47 (declaring null)`*
+- **an overlap.** `[data-testid="row-invitation-statement"] { position: relative; top: -28px }` →
+  *in the "loaded" state two pieces of text are painted on top of each other … `h2 "Horizons" is
+  painted over p[data-testid="row-invitation-statement"].region-empty "Panels at, once the row is
+  built.": 47 x 15 px of them intersect*
+- **an exemption with no reason.** `because: 'deliberate'` on the digest → both halves fired:
+  *these exemptions carry no reason a reader could review … `the status strip's digest`*, and the
+  digest itself reported as *`status / dd[data-testid="status-digest"].computed overflows
+  horizontally: scrollWidth 360 in clientWidth 128`*
+- **a list that does not say which list.** `data-list=""` on the manifest → *in the "the Manifest
+  tab" state these declare themselves lists and do not say which list …
+  `provenance/manifest / pre[data-testid="manifest"]`*
+
+#### The floor, and the digest that moved
+
+`presentation.minimumViewportHeightPx` is **748**, and the tables above are corrected to it: the
+8 px is the controls pane's own bottom padding, which the floor's measurement had left out. They
+were right about everything except that omission, and the sentence that used to say the workspace
+holds at 740 says 748.
+
+`presentation.fieldLabelHeightPx` is **72**, and it is new. A container query can ask the box
+how wide and how tall it is; it cannot ask how tall the words under the picture came out, so the
+room the field's label needs is declared like every other length in this layout (Principle X).
+Measured: the label and its scale are **46.4 px** at every viewport in the matrix and **66.8 px**
+in a column of 230 px or narrower, where the label wraps to a second line. A reserve too small
+puts the label on the caption below it, and the overlap census fails by name.
+
+Both are presentation figures and neither computes anything. G-07 records one digest moved —
+`configuration`, `5bac990a…` → `daeafe80…` — and the other forty quantities are byte-identical.
+
+#### One thing judged and left
+
+The pre-row centre shows the word *Horizons* twice: on the pane's own tab, and on the head of
+the column of figures beside the picture. The head is a `PanelHead`, which is how a panel's help
+control is drawn and how G-08 pairs a declaration with the surface that draws it, so removing
+the heading would remove the help (FR-052) and the gate would fail on the pairing. It is left,
+and recorded here rather than fixed quietly. What did go is the field's **second** label: the
+figure carried *Weight carried by observations, per cell* over the field's own *Weight carried by
+observations in each cell*, which was invisible only for as long as the stylesheet was laying the
+field's label out sideways.

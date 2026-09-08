@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { holdsOneView, selectTab } from './census.js';
+import { EXEMPT, holdsOneView, selectTab, unreviewableExemptions } from './census.js';
 import { BELOW_THE_ROW, declared, FLOOR, LEADS, PANE_IDS, REFERENCE } from './declared-geometry.js';
 
 /**
@@ -17,16 +17,30 @@ import { BELOW_THE_ROW, declared, FLOOR, LEADS, PANE_IDS, REFERENCE } from './de
  * place of the claim will pass while the claim is false. "No undeclared scrollbar" is easy.
  * "The content fits, and where it does not it is a list and not an argument" is the claim.
  *
- * So the census in `census.ts` asserts three things instead, and the second and third are new:
+ * So the census in `census.ts` asserts these instead:
  *
  * 1. **the page does not scroll**, on either axis, in every state it can reach;
- * 2. **every scroller is a list**, and says which list — a profile's levels, a manifest, the
- *    run's own figures — and the failure names the pane and what kind of content it held;
- * 3. **nothing is clipped**: a pane whose content does not fit is a fault whether it scrolls
- *    or not, and `overflow: hidden` is how not-fitting hides from a scrollbar test.
+ * 2. **everything that runs past its own box is one of three things** — a declared list, an
+ *    exemption with a written reason, or a defect — and the failure names the pane, the
+ *    element, the axis and both figures;
+ * 3. **a declared list says which list**, and never holds a body of text;
+ * 4. **nothing is clipped**: a pane whose content does not fit is a fault whether it scrolls
+ *    or not, and `overflow: hidden` is how not-fitting hides from a scrollbar test;
+ * 5. **no two pieces of text are painted on top of each other.**
  *
- * The third is what makes the first two mean something. A pane that clips is a pane a reader
- * cannot read all of, and it produces no scrollbar to catch.
+ * The fourth is what makes the first three mean something. A pane that clips is a pane a
+ * reader cannot read all of, and it produces no scrollbar to catch.
+ *
+ * ## Beat 018's fifth pass, and the two it caught immediately
+ *
+ * The fourth pass counted only elements whose computed `overflow` was `auto` or `scroll`,
+ * which is a filter on the declaration rather than on the fact. Two faults lived in that gap
+ * for the whole beat: the pre-row centre's field spilled its own label 71 px onto the term
+ * list beside it -- *"the Horizons panel has text overwriting other text"*, reported by the
+ * author on a green tree -- and the manifest tab's two figures were cut off at every viewport
+ * in the matrix. Neither element had a scrollbar to count. The fifth assertion is there for
+ * the same reason: overflow and overlap are different properties, and the one a reader
+ * notices first is the second.
  *
  * ## Where it is asserted
  *
@@ -94,6 +108,36 @@ test.describe('one view, and what a pane may scroll', () => {
       await holdsOneView(page, `the ${tab} tab`);
     }
     await expect(page.getByTestId('manifest')).toBeVisible();
+
+    /* And the manifest tab with its paste box open, which is the state that decided how that
+       tab is arranged. At the declared floor the tab is 220 px wide: the two figures, the
+       document and the form together want 463 px of a 311 px pane, so the box is folded away
+       and the document gives way to it while it is open. A state a reader can reach in one
+       click and no census had ever visited is exactly the hole this beat is closing. */
+    await page.getByTestId('manifest-import').evaluate((node) => {
+      (node as HTMLDetailsElement).open = true;
+    });
+    await expect(page.getByTestId('manifest-input')).toBeVisible();
+    await holdsOneView(page, 'the Manifest tab, with the paste box open');
+  });
+
+  /**
+   * The second of the census's three outcomes, held to the bar that makes it an outcome and
+   * not a threshold in disguise (spec 018 FR-002).
+   *
+   * A finding may be a declared list, an exemption, or a defect. The exemptions are a list in
+   * `census.ts` with a written reason each, and this is what stops that list becoming the
+   * place findings go to be forgotten: an entry with no reason, or with a reason too short to
+   * be one, excuses nothing -- the element it names is reported as a defect -- and it is named
+   * here so that whoever added it is told why it did not work.
+   */
+  test('gives a written reason for every exemption the census applies', () => {
+    expect(EXEMPT.length, 'the census has no exemptions at all, which is not a state it has been in').toBeGreaterThan(0);
+    expect(
+      unreviewableExemptions(),
+      'these exemptions carry no reason a reader could review, so they excuse nothing: an ' +
+        'element they name is reported as a defect until somebody writes down why it is not one',
+    ).toEqual([]);
   });
 
   /**
