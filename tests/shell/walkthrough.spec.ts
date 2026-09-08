@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { holdsOneView } from './census.js';
+import { holdsOneView, settled } from './census.js';
 import { BELOW_THE_ROW, FLOOR, REFERENCE, VIEWPORT_MATRIX, declared } from './declared-geometry.js';
 import { decodePng } from './greyscale.js';
 
@@ -375,6 +375,11 @@ test.describe('a walkthrough of the workspace', () => {
   test('changes no region’s rectangle, and does not grow the page', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByTestId('run-panel')).toBeVisible();
+    /* The baseline is the arrangement the reader has, which is the one the layout manager has
+       finished laying out: it sizes its panes on the first frame at which the grid knows its
+       own width, so a snapshot taken in the frame before that is three equal thirds and every
+       later comparison is against a layout nobody ever saw. */
+    await settled(page);
 
     const before = await regionBoxes(page);
     const extentBefore = await extents(page);

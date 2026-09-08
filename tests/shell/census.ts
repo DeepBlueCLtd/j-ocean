@@ -507,8 +507,18 @@ export async function measure(page: Page): Promise<Measured> {
  * verdict (SC-008).
  */
 export async function holdsOneView(page: Page, state: string): Promise<number> {
-  const measured = await measure(page);
+  return judgeOneView(await measure(page), state);
+}
 
+/**
+ * The census's verdict, apart from the taking of it.
+ *
+ * Split out because one state cannot be measured and judged in one call: the integrating state
+ * lasts as long as an advance does, and `holdsOneViewIntegrating` below has to know it caught
+ * the surface in that state *before* it starts asserting things about it. Every other caller
+ * asks `holdsOneView`, which is these two in the order they were always in.
+ */
+export function judgeOneView(measured: Measured, state: string): number {
   const tallest = measured.overflowing.reduce((worst, one) => Math.max(worst, one.over), 0);
   console.log(
     `    ${state}: page ${String(measured.page.scrollWidth)}x${String(measured.page.scrollHeight)} ` +
@@ -599,6 +609,91 @@ export async function holdsOneView(page: Page, state: string): Promise<number> {
   ).toEqual([]);
 
   return tallest;
+}
+
+/**
+ * The configuration request the shell makes, so a test can answer it with a figure of its own.
+ *
+ * One figure is changed to census the integrating state, and it is `model.chunkSteps`: how far
+ * an advance goes before it yields (NFR-04). Set to one step it yields 180 times instead of
+ * three, which changes nothing about how far the run goes -- `tests/harness/advance.test.ts`
+ * holds every chunking to the same bytes -- and gives the census somewhere to stand.
+ */
+export const CONFIG_REQUEST = /j-ocean.*\.json$/;
+
+/** Yield after every step, so the integrating state has gaps a census can be taken in. */
+export async function yieldEveryStep(page: Page): Promise<void> {
+  await page.route(CONFIG_REQUEST, async (route) => {
+    const response = await route.fetch();
+    const config = JSON.parse(await response.text()) as { model: { chunkSteps: number } };
+    config.model.chunkSteps = 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(config),
+    });
+  });
+}
+
+/**
+ * How much slower than the machine the browser runs the page while the advance is censused.
+ *
+ * The shipped advance is 180 steps and is over in about a seventh of a second, and a census
+ * taken across a socket costs more than that to ask -- so unthrottled, every attempt measures
+ * the surface *after* the advance and calls it the integrating state. The browser's own CPU
+ * throttle holds the state open without changing a declared figure, a step count, or what any
+ * label says: it slows the page and nothing else. Thirty is measured rather than chosen -- at
+ * ten the advance was over before the census returned, and at thirty the census lands about
+ * seven steps in with the state still up.
+ */
+const CENSUS_THROTTLE = 30;
+
+/**
+ * The census of an advance: while it runs, and once it has finished (spec 018 FR-002).
+ *
+ * A new state for the census, and the author's request is why: a control that relabels itself
+ * while it works and a confirmation that appears when it is done are exactly the things that
+ * overflow a box, land on a neighbour or wrap a strip to two rows. Neither had ever been
+ * measured, because neither had ever been on the surface.
+ *
+ * It is reached the way a reader reaches it -- press, be refused on the frame budget, press
+ * *Integrate anyway* -- rather than by routing the budget out of the way, because the figure
+ * the strip prints is that budget and a test that changes it is measuring a strip no reader
+ * has. The refusal is certain under the throttle: the projected time for the longest horizon
+ * is thousands of times the declared 16 ms.
+ */
+export async function holdsOneViewIntegrating(page: Page, where: string): Promise<number> {
+  const client = await page.context().newCDPSession(page);
+  await client.send('Emulation.setCPUThrottlingRate', { rate: CENSUS_THROTTLE });
+  let tallest = 0;
+  try {
+    await page.getByTestId('advance').click();
+    await expect(page.getByTestId('over-budget')).toBeVisible({ timeout: 120_000 });
+    await page.getByTestId('proceed-anyway').click();
+    /* Let the arrangement stop moving first, for the reason `selectTab` does: the layout
+       manager sizes its panes asynchronously, so a census taken in the same task as the click
+       measures an arrangement that is still moving. It is not what keeps this state green --
+       the surface holds the strip's height across an advance so that the dock is never resized
+       under a reader mid-integration (see `.status-figures dd` and `.announcement` in
+       `index.css`, and what the census found before they did) -- but a census that measures
+       before the layout manager has answered is measuring nothing in particular. */
+    await settled(page);
+    const measured = await measure(page);
+    // Measured first and judged after, because the state has to be the one that was asked
+    // about: a census of the integrating state taken after the advance ended is a census of
+    // something else that would pass and mean nothing.
+    expect(
+      await page.getByTestId('one-view').getAttribute('data-working'),
+      `the advance was over before the census of "${where}, integrating" could be taken`,
+    ).toBe('integrating');
+    tallest = judgeOneView(measured, `${where}, integrating`);
+  } finally {
+    await client.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+  }
+
+  await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 120_000 });
+  await expect(page.getByTestId('advance-report')).toContainText('Integrated');
+  return Math.max(tallest, await holdsOneView(page, `${where}, integrated`));
 }
 
 /**

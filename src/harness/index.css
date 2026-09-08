@@ -137,11 +137,7 @@ body {
 /* A trailing margin on the last control group is a few pixels of content the pane cannot show
    and a reader cannot reach, and at the floor those pixels are the difference between "fits"
    and "does not". */
-.controls > *:last-child, .control-group > *:last-child,
-/* The live region below is out of flow and painted nowhere, so the control before it is still
-   the last thing in the pane. Without this the rule above stopped applying to it and the
-   controls pane grew 3 px -- which, at the floor, is the difference this comment describes. */
-.control-group > *:has(+ .announcement) { margin-bottom: 0; }
+.controls > *:last-child, .control-group > *:last-child { margin-bottom: 0; }
 
 /* A control surface is not prose, and it is measured as furniture rather than set as text
    (spec 018 T071). The pane's own content was **823 px tall at the 220 px it is narrowest**,
@@ -397,6 +393,20 @@ body {
 .status .not-operational h1 { font-size: 0.95rem; margin: 0; display: inline; margin-right: 0.4rem; }
 .status .not-operational p { display: inline; }
 
+/* The strip's readouts: the three figures, and beneath them what the last advance did.
+
+   A column and not a fourth term in the grid, and the floor decided it. A fourth column takes
+   width from FR-58's statement, which is the one flexible thing in the strip, and the
+   statement answers by wrapping to another line -- measured at the floor's width, 19 px of a
+   height budget the floor spends exactly. Under the figures it takes no width the figures do
+   not already have, and the strip's height is the statement's either way. */
+.status-readouts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
 .status-figures {
   display: grid;
   grid-auto-flow: column;
@@ -404,12 +414,27 @@ body {
   gap: 0 1rem;
   margin: 0;
   font-size: 0.72rem;
-  align-items: baseline;
+  /* Tops and not baselines: see the readouts' own rule below for what a moving baseline cost. */
+  align-items: start;
 }
 
 .status-figures dt { color: var(--host); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.05em; }
 
-.status-figures dd { margin: 0; white-space: nowrap; }
+/* A readout keeps the height of the figure it will hold before it holds one, and the rows are
+   aligned to their own tops rather than to a shared baseline.
+
+   Both are one requirement: **the strip is the same height before an advance and after one.**
+   The kinds are set in a monospace face and the budget verdict beside the step time is set
+   larger, so the *Step* readout is 17.27 px while it says *not yet measured* and 21.61 px once
+   it holds a figure -- and a baseline that moves with it takes the grid from 39.02 px to
+   42.02 px. Those few pixels used to disappear into the strip's height, which the site links
+   set; with the advance's confirmation under the figures the readouts are the tallest thing in
+   the strip at every width above the floor, so they became pixels the strip grew at the moment
+   a reader's first advance reported its step time. The dock is re-laid out for that, and it
+   cannot be: measured at 1 920 x 1 080, 839 px of content in an 835 px dock, and the layout
+   manager gets no frame to give them back until the integration that is holding the main
+   thread ends. 1.36rem is the taller of the two measured heights. */
+.status-figures dd { margin: 0; white-space: nowrap; min-height: 1.36rem; }
 
 /* The digest is a 64-character hexadecimal figure and has been shown ellipsised since it
    arrived; what changed in beat 018's second pass is how much of it, and why (T071). At 22rem
@@ -493,14 +518,6 @@ body {
     var(--hole-left) var(--hole-top)
   );
 }
-
-/* Both of the offer's labels occupy the same cell, so the control is one width in both states.
-   A control that narrowed when it was pressed would reflow the status strip, and the strip's
-   height is what the dock does not get: at the declared floor that was 11 px of dock and every
-   pane in it moved on the click that opened the walkthrough. */
-.walkthrough-offer { display: inline-grid; }
-.walkthrough-offer > span { grid-area: 1 / 1; }
-.walkthrough-offer > span[aria-hidden='true'] { visibility: hidden; }
 
 /* The way out may not be behind the thing it closes. The control that opened the walkthrough
    stays above the scrim while it is open, so a reader can press it again; everything else on
@@ -1120,6 +1137,24 @@ pre {
 button[disabled] { opacity: 0.5; cursor: default; }
 button[disabled]:hover { background: #fff; color: var(--ink); }
 
+/* Something long is running, said by the pointer (NFR-04; the author's report: "when that long
+   process is running, I need to see some kind of busy cursor").
+
+   `progress` and not `wait`, and the difference is the promise each makes: `wait` says the
+   application is blocked, `progress` says it is working and can still be used. The advance
+   yields between chunks and the reader can still read every pane, scroll a list and open a
+   panel's help while it runs, so `progress` is the true one.
+
+   One rule for the whole surface, from one flag (`working.ts`), because three rules beside
+   three pieces of state are three rules that drift. It is written on the descendants too:
+   every control carries `cursor: pointer` of its own, and a busy surface whose buttons still
+   invite a click is the state the author saw. Nothing here animates -- a cursor is the
+   browser's own, and `prefers-reduced-motion` has nothing to turn off. */
+.one-view:not([data-working="false"]),
+.one-view:not([data-working="false"]) * {
+  cursor: progress;
+}
+
 .field-stack { position: relative; max-width: 28rem; }
 .field-stack canvas.overlay {
   position: absolute;
@@ -1233,6 +1268,24 @@ button[disabled]:hover { background: #fff; color: var(--ink); }
 
 .row-controls { display: flex; gap: 0.3rem; flex-wrap: wrap; margin-bottom: 0.15rem; }
 
+/* A control whose label changes, given the width of its widest label up front.
+
+   Every label is laid in the same grid cell, so the button is as wide as the widest of them
+   whatever it is saying, and the controls beside it never move. What is not being said is
+   `visibility: hidden` and out of the accessible name -- out of the census's overlap walk too
+   -- and still taking its width.
+
+   Two controls on this surface change what they say: the walkthrough's offer, which becomes
+   *Close the walkthrough*, and the advance, which becomes *Integrating 72 of 180*. Beat 018
+   wrote the technique twice before it wrote it once: the offer's own copy of these three lines
+   is what this replaced. The alternative is measured -- before the offer was given a width,
+   pressing it reflowed the status strip by 11 px and every pane in the dock moved, on the
+   click that opened a walkthrough whose whole claim is that it moves nothing. */
+button.reserving { display: inline-grid; }
+button.reserving > * { grid-area: 1 / 1; }
+button.reserving > .reserve,
+button.reserving > [aria-hidden='true'] { visibility: hidden; }
+
 .dot.ink { background: rgb(31, 51, 71); }
 .dot.cool { background: rgb(28, 71, 153); }
 .dot.warm { background: rgb(199, 33, 23); }
@@ -1323,22 +1376,31 @@ button[disabled]:hover { background: #fff; color: var(--ink); }
   padding: 0;
 }
 
-/* A live region the surface announces through, and paints nowhere.
+/* The live region the advance announces through, and it is painted (the author's request).
 
-   The controls pane's own content at the floor's width is 656 px and the declared floor is
-   that plus 92 px of chrome, so a visible line of confirmation costs 19 px of a height budget
-   with nothing left in it. The announcement is in the accessibility tree instead, hidden the
-   same way the mark lists are -- 1 px square under `clip-path: inset(50%)`, never
-   `display: none`, because a region that is not in the tree announces nothing. */
+   It stood clipped to nothing for one pass, because the controls pane's own content at the
+   floor's width *is* the declared floor and a line there was 30 px of a budget with none
+   left. In the status strip it costs nothing at all: the strip's height at the floor is set
+   by FR-58's statement -- 57 px of it in a 66 px strip -- and the readouts beneath it have
+   the room. It wraps rather than running on: the instant is 24 unbreakable characters, and a
+   line that overflows its box is a census defect wherever the reader's font is wider than
+   this one's.
+
+   Empty until an advance has run: a strip that always says something about an advance nobody
+   asked for is noise. The **line** is held whether or not there is anything to say, and that
+   is not the same thing -- blank paper says nothing. Without it the strip is 55 px until the
+   first advance finishes and 65 px afterwards, so the dock is resized under a reader at the
+   moment their integration completes, and the layout manager cannot answer that while the
+   integration holds the main thread: see `.status-figures dd` above, which is the other half
+   of the same fault and carries what the census measured. Above the floor holding the line
+   costs 10 px of dock; at the floor it costs nothing, because there the strip's height is the
+   statement's and the readouts have the room. */
 .announcement {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
   margin: 0;
-  padding: 0;
+  font-size: 0.72rem;
+  line-height: 1.3;
+  min-height: calc(0.72rem * 1.3);
+  min-width: 0;
 }
 
 .elevation-stack { position: relative; }

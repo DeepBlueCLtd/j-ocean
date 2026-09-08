@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { holdsOneView, selectTab } from './census.js';
+import { holdsOneView, holdsOneViewIntegrating, selectTab, yieldEveryStep } from './census.js';
 import { declared, LEADS, VIEWPORT_MATRIX } from './declared-geometry.js';
 
 /**
@@ -23,7 +23,10 @@ import { declared, LEADS, VIEWPORT_MATRIX } from './declared-geometry.js';
  * 1. it is the **workspace** -- panes with headers -- and never a presentation of its own;
  * 2. the row **builds and scores** there, and every declared horizon is on the surface;
  * 3. the **document does not scroll**, on either axis;
- * 4. nothing scrolls but a **declared list**, and nothing is clipped.
+ * 4. nothing scrolls but a **declared list**, and nothing is clipped;
+ * 5. and it holds through an **advance**: while it runs, where the control has relabelled
+ *    itself with how far it has got, and once it is done, where the status strip carries what
+ *    it did. Beat 018's seventh pass added both to the surface and both to this walk.
  *
  * ## What differs between the viewports, and what does not
  *
@@ -62,8 +65,12 @@ test.describe('the workspace, at every viewport a reader has', () => {
     const size = `${String(viewport.width)} x ${String(viewport.height)}`;
 
     test(`is the workspace at ${size}, and scrolls nothing but a list`, async ({ page }) => {
-      test.setTimeout(420_000);
+      test.setTimeout(600_000);
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      // The advance yields after every step here, so the state it runs in has gaps a census
+      // can be taken in. It changes nothing else: how far an advance goes is not how often it
+      // yields, and `tests/harness/advance.test.ts` holds every chunking to the same bytes.
+      await yieldEveryStep(page);
 
       let tallest = 0;
       const census = async (state: string): Promise<void> => {
@@ -132,6 +139,13 @@ test.describe('the workspace, at every viewport a reader has', () => {
         await selectTab(page, tab);
         await census(`the ${tab} tab`);
       }
+
+      // 4. The advance, while it runs and once it is done. Both are new states for the census
+      //    and both are new to the surface: the control relabels itself while it works, and
+      //    the status strip carries what the advance did when it is over. A relabelled control
+      //    is a control that can outgrow its row, and a line added to the strip is what wrapped
+      //    the strip to two rows and cost the floor 44 px before beat 018 cut it to one.
+      tallest = Math.max(tallest, await holdsOneViewIntegrating(page, size));
 
       // SC-008: the figure, printed rather than asserted. What scrolls at any of these sizes
       // is a term list in a provenance tab and the manifest, and both are lists a reader scans.

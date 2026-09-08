@@ -1,5 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
-import { EXEMPT, holdsOneView, selectTab, unreviewableExemptions } from './census.js';
+import {
+  EXEMPT,
+  holdsOneView,
+  holdsOneViewIntegrating,
+  selectTab,
+  unreviewableExemptions,
+  yieldEveryStep,
+} from './census.js';
 import { BELOW_THE_ROW, declared, FLOOR, LEADS, PANE_IDS, REFERENCE } from './declared-geometry.js';
 
 /**
@@ -73,8 +80,11 @@ test.describe('one view, and what a pane may scroll', () => {
   test('does not scroll the page, or a body of text, in any state it can reach', async ({
     page,
   }) => {
-    test.setTimeout(300_000);
+    test.setTimeout(600_000);
 
+    // The advance yields after every step here, so the census has gaps to stand in while it
+    // runs. Nothing else about it changes: how far an advance goes is not how often it yields.
+    await yieldEveryStep(page);
     await page.goto('/');
     await expect(page.getByTestId('pane-controls')).toBeVisible();
     await holdsOneView(page, 'loaded');
@@ -119,6 +129,14 @@ test.describe('one view, and what a pane may scroll', () => {
     });
     await expect(page.getByTestId('manifest-input')).toBeVisible();
     await holdsOneView(page, 'the Manifest tab, with the paste box open');
+
+    /* And the advance, while it runs and once it is done -- two states the census had never
+       visited, because until beat 018's seventh pass the surface said nothing during one and
+       nothing after it. Both are the kind of thing this census exists for: the control
+       relabels itself while it works, which is how a control outgrows its row, and the status
+       strip carries what the advance did when it is over, which is how a strip wraps to two
+       rows. At the declared floor there is no room for either to be wrong. */
+    await holdsOneViewIntegrating(page, 'the declared floor');
   });
 
   /**

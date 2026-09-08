@@ -61,6 +61,8 @@ interface Measured {
   readonly panelHeight: number;
   readonly skillCurveHeight: number;
   readonly horizonsPaneHeight: number;
+  /** The status strip, which is where the advance's confirmation is drawn (the seventh pass). */
+  readonly stripHeight: number;
   readonly clipped: readonly string[];
   readonly page: { scrollWidth: number; clientWidth: number; scrollHeight: number; clientHeight: number };
   readonly statementInside: boolean;
@@ -135,6 +137,9 @@ async function measure(page: Page, leads: readonly number[]): Promise<Measured> 
         document.querySelector<HTMLElement>('[data-testid="skill-curve"]')?.getBoundingClientRect()
           .height ?? 0,
       horizonsPaneHeight: horizonsPane.clientHeight,
+      stripHeight:
+        document.querySelector<HTMLElement>('[data-testid="pane-status"]')?.getBoundingClientRect()
+          .height ?? 0,
       clipped,
       page: {
         scrollWidth: root.scrollWidth,
@@ -145,6 +150,24 @@ async function measure(page: Page, leads: readonly number[]): Promise<Measured> 
       statementInside: rect !== null && rect.top >= -0.5 && rect.bottom <= root.clientHeight + 0.5,
     };
   }, [...leads]);
+}
+
+/**
+ * Twelve hours integrated, by the path a reader takes: press, be refused on the frame budget,
+ * press *Integrate anyway*.
+ *
+ * The floor is measured after this and not before, because the surface after an advance is a
+ * surface with two things on it that were not there before: the run's own step time in the
+ * status strip, and the confirmation that the advance finished (the author's request). A floor
+ * measured only in the state before a reader has pressed anything is a floor for a surface
+ * nobody has used.
+ */
+async function advanced(page: Page): Promise<void> {
+  await page.getByTestId('advance').click();
+  await expect(page.getByTestId('over-budget')).toBeVisible({ timeout: 120_000 });
+  await page.getByTestId('proceed-anyway').click();
+  await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 120_000 });
+  await expect(page.getByTestId('advance-report')).toContainText('Integrated');
 }
 
 /** The recorded case, with the row built and scored: the fullest the workspace ever is. */
@@ -192,6 +215,8 @@ test.describe('the viewport floor', () => {
     await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 120_000 });
     await page.getByTestId('score-row').click();
     await expect(page.getByTestId('panel-score-24')).toContainText('persistence', { timeout: 120_000 });
+    const beforeTheAdvance = await measure(page, LEADS);
+    await advanced(page);
     const atWidth = await measure(page, LEADS);
     expect(
       atWidth.widthTheFlanksCost,
@@ -213,6 +238,9 @@ test.describe('the viewport floor', () => {
         `${String(presentation.panelGapPx)} px gaps and ${String(presentation.pageGutterPx)} px of pane padding\n` +
         `      the workspace's chrome costs ${String(Math.round(atWidth.heightTheChromeCost))} px of height, ` +
         `and the controls pane's own content is ${String(atWidth.controlsContentHeight)} px at that width\n` +
+        `      the status strip is ${String(Math.round(beforeTheAdvance.stripHeight))} px before the ` +
+        `advance and ${String(Math.round(atWidth.stripHeight))} px with its confirmation on screen, ` +
+        `and the controls pane was ${String(beforeTheAdvance.controlsContentHeight)} px before it\n` +
         `      declared: ${String(presentation.minimumViewportWidthPx)} x ` +
         `${String(presentation.minimumViewportHeightPx)}\n` +
         `      beat 013 declared 2038 x 728, of which 828 px of width was chrome that could not shrink`,
@@ -250,6 +278,7 @@ test.describe('the viewport floor', () => {
     expect(unbuilt.clipped, 'a pane clips its content at the declared floor, unbuilt').toEqual([]);
 
     await scoredRow(page);
+    await advanced(page);
     const at = await measure(page, LEADS);
 
     expect(at.page.scrollWidth, 'the page scrolls horizontally at the declared floor').toBeLessThanOrEqual(

@@ -48,6 +48,7 @@ import {
   stepsPerAdvance as stepsPerAdvanceOf,
 } from './advance.js';
 import { Computed, Declared, HostTime } from './figures.js';
+import { useLongOperations } from './working.js';
 import { Walkthrough } from './Walkthrough.js';
 import { HelpProvider, PanelCorner, PanelHead } from './Help.js';
 import { THE_ROW, type CentreContent } from './CentreContent.js';
@@ -321,6 +322,16 @@ export function App() {
     };
   }, [loaded, chosenDomainId]);
 
+  /**
+   * Everything on this surface that takes seconds, under one flag (NFR-04).
+   *
+   * The advance drives itself in chunks and is folded in here rather than asked about
+   * separately; building the row and scoring block the main thread outright, so they are
+   * begun through this and run on the frame after the one that says they are running. See
+   * `working.ts` for why a flag set in the handler is a flag nobody sees.
+   */
+  const longOperations = useLongOperations(view?.integrating === true ? 'integrating' : null);
+
   const buildRun = useCallback(
     (
       seed: string | undefined,
@@ -553,48 +564,56 @@ export function App() {
    * The row's forecasts. Integrating six horizons costs a couple of seconds, so it happens
    * when a reader asks rather than on load -- NFR-04 says the integration does not block the
    * interface, and the honest way to obey that is not to start it unbidden.
+   *
+   * It runs through `longOperations` for the same reason the advance yields between chunks:
+   * the six integrations block the main thread from the moment this is entered, so a surface
+   * that only says it is working once they are over has said nothing. Three controls reach
+   * this -- Build the horizon row, Re-issue, and applying an edit -- and wrapping the body
+   * rather than each control is what keeps the three saying the same thing.
    */
   const buildRow = useCallback(
     (issueInstantMs?: number, edits?: readonly Edit[]) => {
       if (loaded === null || record === null || view === null) return;
-      const domain = loaded.config.domains.list.find((d) => d.id === record.domainId);
-      if (domain === undefined) return;
-      const startMs = Date.parse(loaded.config.truth.period.start);
-      const defaultIssueInstantMs = startMs + loaded.config.forecast.spinUpHours * 3_600_000;
-      const counterfactual = edits ?? view.edits;
-      const inputs = {
-        config: loaded.config,
-        domain,
-        truth: record.truth,
-        climatology: record.climatology,
-        argo: record.observations,
-        issueInstantMs: issueInstantMs ?? view.forecast?.issueInstantMs ?? defaultIssueInstantMs,
-        // The declared horizons are measured from the *default* issue instant, so moving the
-        // control leaves every panel valid at the same moment it was (FR-002).
-        anchorInstantMs: defaultIssueInstantMs,
-        ...(view.recordedCase ? {} : { seed: view.run.rng.rootSeed }),
-      };
-      const forecast = runForecast({ ...inputs, counterfactual });
-      // The same run without the edits, so a difference field is a difference from something
-      // that came from the same issue time (FR-005). With no edits it *is* the run.
-      const baseline =
-        counterfactual.length === 0 ? forecast : runForecast({ ...inputs, counterfactual: [] });
-      // FR-009 and FR-002: the manifest records the issue time and the edits.
-      view.run.reissue(forecast.issueInstantMs);
-      view.run.setCounterfactual(counterfactual);
-      // FR-026: computed once and held. It is never refreshed, and the identity assertion in
-      // the test is on this object.
-      const brief = view.brief ?? departureBrief(inputs);
-      setView({
-        ...view,
-        forecast,
-        baseline,
-        brief,
-        edits: counterfactual,
-        pendingIssueInstantMs: forecast.issueInstantMs,
+      longOperations.begin('building the horizon row', () => {
+        const domain = loaded.config.domains.list.find((d) => d.id === record.domainId);
+        if (domain === undefined) return;
+        const startMs = Date.parse(loaded.config.truth.period.start);
+        const defaultIssueInstantMs = startMs + loaded.config.forecast.spinUpHours * 3_600_000;
+        const counterfactual = edits ?? view.edits;
+        const inputs = {
+          config: loaded.config,
+          domain,
+          truth: record.truth,
+          climatology: record.climatology,
+          argo: record.observations,
+          issueInstantMs: issueInstantMs ?? view.forecast?.issueInstantMs ?? defaultIssueInstantMs,
+          // The declared horizons are measured from the *default* issue instant, so moving the
+          // control leaves every panel valid at the same moment it was (FR-002).
+          anchorInstantMs: defaultIssueInstantMs,
+          ...(view.recordedCase ? {} : { seed: view.run.rng.rootSeed }),
+        };
+        const forecast = runForecast({ ...inputs, counterfactual });
+        // The same run without the edits, so a difference field is a difference from something
+        // that came from the same issue time (FR-005). With no edits it *is* the run.
+        const baseline =
+          counterfactual.length === 0 ? forecast : runForecast({ ...inputs, counterfactual: [] });
+        // FR-009 and FR-002: the manifest records the issue time and the edits.
+        view.run.reissue(forecast.issueInstantMs);
+        view.run.setCounterfactual(counterfactual);
+        // FR-026: computed once and held. It is never refreshed, and the identity assertion in
+        // the test is on this object.
+        const brief = view.brief ?? departureBrief(inputs);
+        setView({
+          ...view,
+          forecast,
+          baseline,
+          brief,
+          edits: counterfactual,
+          pendingIssueInstantMs: forecast.issueInstantMs,
+        });
       });
     },
-    [loaded, record, view],
+    [loaded, record, view, longOperations],
   );
 
   /**
@@ -881,6 +900,9 @@ export function App() {
        is the shell's and the row is handed it. */
     requested: requestedCentre,
     onRequest: requestCentre,
+    /* NFR-04: scoring six horizons is the third thing on this surface that takes seconds, and
+       it goes through the same notion the other two do. */
+    beginLongOperation: longOperations.begin,
     /* FR-043. Narrower than the row needs, the centre is forced to an enlargement -- the strip
        and one panel -- because six panels shrunk past legibility are six panels nobody can
        read. It is the same enlargement a reader chooses at any width, not a second
@@ -1025,13 +1047,38 @@ export function App() {
       <div className="control-group" data-testid="run-controls" aria-busy={view.integrating}>
         <PanelHead panel="controls/run" />
         <div className="row-controls">
+          {/*
+            The control says how far it has got, and it is the same control (NFR-04; the
+            author's report). A progress line under the button would be another line in the
+            pane whose content height *is* the declared floor; a relabel costs none.
+
+            **The width is reserved so that saying so moves nothing.** The two labels and the
+            widest count this advance can show are all laid in one grid cell, so the button is
+            as wide as the widest of them in every state and the buttons beside it never
+            reflow. That defect is not hypothetical: beat 018's walkthrough offer changed its
+            own label and moved every pane in the dock by 11 px. The count's sizer is written
+            with the widest digit rather than the count's own, because this surface's serif
+            draws `1` narrower than the rest -- so `180` is not the widest three digits the
+            label can hold, and reserving its width would leave a pixel of reflow behind.
+            `tests/shell/shell.spec.ts` measures the button and its neighbour through a whole
+            integration, at the floor and at the reference width.
+          */}
           <button
             type="button"
             onClick={() => { integrate(false); }}
             data-testid="advance"
+            className="reserving"
             disabled={view.integrating}
           >
-            Integrate {ADVANCE_HOURS} hours
+            <span className="reserve" aria-hidden="true">Integrate {ADVANCE_HOURS} hours</span>
+            <span className="reserve" aria-hidden="true">
+              Integrating {'0'.repeat(String(stepsPerAdvance).length)} of {stepsPerAdvance}
+            </span>
+            <span data-testid="advance-label">
+              {view.integrating && view.advanceToStep !== null
+                ? `Integrating ${String(view.steps - (view.advanceToStep - stepsPerAdvance))} of ${String(stepsPerAdvance)}`
+                : `Integrate ${String(ADVANCE_HOURS)} hours`}
+            </span>
           </button>
           <button type="button" onClick={newRun} data-testid="new-run" disabled={view.integrating}>
             New run
@@ -1059,44 +1106,6 @@ export function App() {
             </button>
           </div>
         )}
-
-        {/*
-          What the advance did, said where the advance was asked for (the author's report:
-          "it let it run for a couple of seconds, but got no confirmation that it had
-          completed"). The run's own figures do move -- `steps` and `instant`, on the run tab
-          -- and the tab a reader is looking at may be one of the other three.
-
-          It is a live region and it is painted nowhere, for a measured reason rather than a
-          preference: the controls pane's own content height at the floor's width **is** the
-          declared floor -- 656 px of content under 92 px of chrome, declared 748 -- so a line
-          of visible confirmation costs 19 px of a budget with none left, and the only way to
-          buy it is to re-declare `presentation.minimumViewportHeightPx`. That is a declared
-          value, and this change moves none. So the announcement goes into the accessibility
-          tree, where it costs no layout, and the figures stay where FR-55 keeps them.
-
-          Figures and their kinds, not a sentence: FR-007 counts what is left when every
-          figure's own text is removed, and what is left here is five words.
-        */}
-        <p
-          className="announcement"
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-          data-testid="advance-report"
-        >
-          {view.integrating && view.advanceToStep !== null ? (
-            <>
-              Integrating {ADVANCE_HOURS} hours:{' '}
-              <Computed>{view.steps - (view.advanceToStep - stepsPerAdvance)}</Computed> of{' '}
-              <Computed>{stepsPerAdvance}</Computed> steps
-            </>
-          ) : advanceReport === null ? null : (
-            <>
-              Integrated {ADVANCE_HOURS} hours: <Computed>{advanceReport.steps}</Computed> steps,
-              valid at <Computed>{advanceReport.instant}</Computed>
-            </>
-          )}
-        </p>
       </div>
     </>
   );
@@ -1675,41 +1684,96 @@ export function App() {
           because FR-053 says a panel with nothing to explain shows none. */}
       <PanelCorner panel="status" />
       {statement}
-      <dl className="status-figures" data-testid="status-figures">
-        <dt>Run</dt>
-        <dd data-testid="recorded-case">
-          {view.recordedCase ? (
-            <Declared>{config.run.recordedCaseLabel}</Declared>
-          ) : (
+      {/*
+        The strip's readouts: the three figures a reader wants at a glance, and beneath them
+        what the last advance did (the author's report: "I need ... some verification that it
+        is complete", and before that "it let it run for a couple of seconds, but got no
+        confirmation that it had completed").
+
+        **Here rather than beside the control that asked for it, and the measurement decided
+        it.** The controls pane's own content at the floor's width *is* the declared floor, so
+        a line of confirmation there is 30 px of a budget with nothing left in it -- measured,
+        two wrapped lines in a pane 220 px wide -- and it would take the floor past the 768 px
+        of the shortest window in the matrix. In this strip it costs **nothing**: the strip's
+        height at the floor is set by FR-58's statement, 57 px of it in a 66 px strip, and
+        these readouts are 39 px under that. A fourth *column* would not have been free -- it
+        takes width the statement is using, and the statement answers by wrapping -- so the
+        line goes under the figures, inside the width they already have.
+
+        And it is on screen whatever pane has focus, which the run controls are not: a reader
+        may close the controls pane, and the strip cannot be closed, tabbed behind anything or
+        dragged into a corner.
+      */}
+      <div className="status-readouts">
+        <dl className="status-figures" data-testid="status-figures">
+          <dt>Run</dt>
+          <dd data-testid="recorded-case">
+            {view.recordedCase ? (
+              <Declared>{config.run.recordedCaseLabel}</Declared>
+            ) : (
+              <>
+                <Computed>{view.run.rng.rootSeed}</Computed>{' '}
+                <span className="unmeasured">drawn for this visit</span>
+              </>
+            )}
+          </dd>
+          <dt>Step</dt>
+          <dd data-testid="step-time">
+            {view.lastStepMs === null ? (
+              <span className="unmeasured">not yet measured</span>
+            ) : (
+              <>
+                <HostTime>{view.lastStepMs.toFixed(3)} ms/step</HostTime>{' '}
+                <span
+                  className={
+                    overBudget(view.lastStepMs, config.budget.frameBudgetMs)
+                      ? 'over-budget'
+                      : 'within-budget'
+                  }
+                >
+                  {overBudget(view.lastStepMs, config.budget.frameBudgetMs) ? 'over' : 'within'}{' '}
+                  <Declared>{config.budget.frameBudgetMs} ms</Declared>
+                </span>
+              </>
+            )}
+          </dd>
+          <dt>Fields and analysis</dt>
+          <dd className="computed" data-testid="status-digest">{resultsDigest}</dd>
+        </dl>
+        {/*
+          What the advance is doing, and what it did. A live region, so a reader whose focus is
+          anywhere on the surface is told; and empty until an advance has run, because a strip
+          that always says something about an advance nobody asked for is noise. FR-048's "an
+          empty region says what would appear in it" is answered by the control itself, which
+          says what it will do before it does it. The stylesheet holds the line's height
+          whether or not there is anything in it, so the strip is the same height before an
+          advance and after one, and the dock is never resized under a reader who has just
+          pressed something.
+
+          Figures and their kinds, not a sentence: FR-007 counts what is left when every
+          figure's own text is removed, and what is left here is six words.
+        */}
+        <p
+          className="announcement"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          data-testid="advance-report"
+        >
+          {view.integrating && view.advanceToStep !== null ? (
             <>
-              <Computed>{view.run.rng.rootSeed}</Computed>{' '}
-              <span className="unmeasured">drawn for this visit</span>
+              Integrating {ADVANCE_HOURS} hours:{' '}
+              <Computed>{view.steps - (view.advanceToStep - stepsPerAdvance)}</Computed> of{' '}
+              <Computed>{stepsPerAdvance}</Computed> steps
+            </>
+          ) : advanceReport === null ? null : (
+            <>
+              Integrated {ADVANCE_HOURS} hours: <Computed>{advanceReport.steps}</Computed> steps,
+              valid at <Computed>{advanceReport.instant}</Computed>
             </>
           )}
-        </dd>
-        <dt>Step</dt>
-        <dd data-testid="step-time">
-          {view.lastStepMs === null ? (
-            <span className="unmeasured">not yet measured</span>
-          ) : (
-            <>
-              <HostTime>{view.lastStepMs.toFixed(3)} ms/step</HostTime>{' '}
-              <span
-                className={
-                  overBudget(view.lastStepMs, config.budget.frameBudgetMs)
-                    ? 'over-budget'
-                    : 'within-budget'
-                }
-              >
-                {overBudget(view.lastStepMs, config.budget.frameBudgetMs) ? 'over' : 'within'}{' '}
-                <Declared>{config.budget.frameBudgetMs} ms</Declared>
-              </span>
-            </>
-          )}
-        </dd>
-        <dt>Fields and analysis</dt>
-        <dd className="computed" data-testid="status-digest">{resultsDigest}</dd>
-      </dl>
+        </p>
+      </div>
       <div className="status-actions">
         {/* FR-009 of this beat: offered, and it starts when a reader presses it and at no
             other time. There is no first-visit flag here and nothing that could become one. */}
@@ -1832,6 +1896,7 @@ export function App() {
         panes={panes}
         placements={placements}
         status={status}
+        working={longOperations.running}
         onRefusal={setWorkspaceRefusal}
         onReady={onWorkspaceReady}
       />

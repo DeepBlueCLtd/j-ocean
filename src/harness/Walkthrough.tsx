@@ -532,7 +532,9 @@ export function Walkthrough({ config }: WalkthroughProps) {
       <button
         type="button"
         ref={control}
-        className="walkthrough-offer"
+        /* `reserving`: both labels in one grid cell, so the control is one width in both
+           states. See `index.css` for the 11 px of dock that cost before it was. */
+        className="walkthrough-offer reserving"
         data-testid="walkthrough-offer"
         aria-expanded={at !== null}
         onClick={() => { setAt((current) => (current === null ? 0 : null)); }}

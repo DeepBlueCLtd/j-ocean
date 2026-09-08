@@ -16,6 +16,7 @@ import { Counterfactuals } from './Counterfactuals.js';
 import { PanelHead } from './Help.js';
 import { ObservationHover } from './ObservationHover.js';
 import { scoreEveryHorizon } from './scoring-run.js';
+import type { LongOperation } from './working.js';
 import { SkillPane, type SkillCurve } from './SkillInset.js';
 import type { Edit } from '../instruments/edits.js';
 import type { DepartureBrief } from '../run/forecast.js';
@@ -110,6 +111,15 @@ export interface HorizonRowInputs {
    */
   readonly requested: CentreContent;
   readonly onRequest: (next: CentreContent) => void;
+  /**
+   * How the row asks for something long to be run (NFR-04).
+   *
+   * Scoring six horizons against the truth record blocks the main thread for seconds, exactly
+   * as an advance and a row build do, and until this prop it was the one of the three that
+   * said nothing while it ran. The shell holds the notion -- `working.ts` -- so that the
+   * busy cursor has one flag behind it rather than three that drift.
+   */
+  readonly beginLongOperation: (what: LongOperation, work: () => void) => void;
 }
 
 /**
@@ -252,24 +262,27 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
   const scoreAll = useCallback(() => {
     if (config === null || domain === null || forecast === null) return;
     if (truth === null || climatology === null || props.brief === null) return;
-    const run = scoreEveryHorizon({ config, domain, forecast, truth, climatology, brief: props.brief });
-    if (run.refusal !== null) {
+    const brief = props.brief;
+    props.beginLongOperation('scoring every horizon', () => {
+      const run = scoreEveryHorizon({ config, domain, forecast, truth, climatology, brief });
+      if (run.refusal !== null) {
+        setScores(run.scores);
+        setScoringFailure(run.refusal);
+        return;
+      }
       setScores(run.scores);
-      setScoringFailure(run.refusal);
-      return;
-    }
-    setScores(run.scores);
-    setBriefScores(run.briefScores);
-    setCurves((current) =>
-      // The inset draws the curves that have actually been computed, labelled by issue
-      // instant. It never draws a curve for an issue time nobody has scored.
-      [
-        ...current.filter((curve) => curve.issueInstantMs !== run.issueInstantMs),
-        { issueInstantMs: run.issueInstantMs, points: run.points },
-      ].sort((a, b) => a.issueInstantMs - b.issueInstantMs),
-    );
-    setScoringFailure(null);
-  }, [config, domain, forecast, truth, climatology, props.brief]);
+      setBriefScores(run.briefScores);
+      setCurves((current) =>
+        // The inset draws the curves that have actually been computed, labelled by issue
+        // instant. It never draws a curve for an issue time nobody has scored.
+        [
+          ...current.filter((curve) => curve.issueInstantMs !== run.issueInstantMs),
+          { issueInstantMs: run.issueInstantMs, points: run.points },
+        ].sort((a, b) => a.issueInstantMs - b.issueInstantMs),
+      );
+      setScoringFailure(null);
+    });
+  }, [config, domain, forecast, truth, climatology, props.brief, props.beginLongOperation]);
 
   useEffect(() => {
     // The scores belong to the forecast that has just been replaced, so they go. The

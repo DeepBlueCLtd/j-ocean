@@ -18,6 +18,7 @@ import {
   writeWorkspace,
   type StoredWorkspace,
 } from './workspace-state.js';
+import type { LongOperation } from './working.js';
 
 /**
  * The workspace (SRD-v2 §8.1, FR-41, FR-44 to FR-48; spec 018 FR-001 to FR-005; ADR-0014).
@@ -118,6 +119,16 @@ export interface WorkspaceProps {
   readonly placements: readonly PanePlacement[];
   /** The strip along the foot: FR-58's statement and the run's live figures. Never a pane. */
   readonly status: ReactNode;
+  /**
+   * Which long operation is running, or null (NFR-04).
+   *
+   * Stamped on the workspace's own element rather than handed to each pane, because the answer
+   * is about the surface and not about a pane: an advance, a row being built and a scoring run
+   * all block the same main thread, so the pointer says so wherever it is. `working.ts` is the
+   * one place that decides; this is the one place it is written down, and it writes the
+   * operation's name rather than a flag so that a failing measurement says which.
+   */
+  readonly working: LongOperation | null;
   /**
    * What to say when a stored arrangement could not be applied (FR-005). The workspace hands
    * the sentence up rather than drawing it, because it belongs beside the control that puts
@@ -511,6 +522,7 @@ export function Workspace(props: WorkspaceProps) {
       className="one-view workspace"
       data-testid="one-view"
       data-presentation="workspace"
+      data-working={props.working ?? 'false'}
       style={workspaceGeometry(config)}
     >
       <div className="workspace-dock" data-testid="workspace-dock" ref={host} />

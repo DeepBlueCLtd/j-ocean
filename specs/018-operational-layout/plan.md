@@ -721,7 +721,10 @@ hours: **180** steps, valid at **2013-09-01T12:00:00.000Z*** in the provenance-t
 components, and *Integrating 12 hours: **72** of **180** steps* while it runs. It carries five
 words once its figures are removed, against FR-007's eight.
 
-**It is painted nowhere, and that is a measured decision rather than a preference.** The controls
+**It is painted nowhere, and that is a measured decision rather than a preference** — and the
+seventh pass below reverses it, because the author asked for the confirmation to be visible and a
+home was found where it costs nothing. What follows is what the sixth pass measured and why it
+stopped where it did. The controls
 pane's own content at the floor's width is 656 px and the declared floor is that plus 92 px of
 chrome. A visible line of confirmation is 19 px of a budget with nothing left in it, and the only
 way to buy it is to re-declare `presentation.minimumViewportHeightPx` — a declared value, and this
@@ -755,3 +758,158 @@ pressable while the surface said it was busy.
   new seed. The control is disabled while an advance runs, and the commit refuses a view whose run
   is not the one it began on: two answers, because the disabled control is a promise about a
   reader and the guard is a property of the code.
+
+
+### The seventh pass: a busy pointer, a control that says how far, and a confirmation on screen
+
+> *"When that long process is running, I need to see some kind of busy cursor — plus some
+> verification that it's complete."*
+
+#### Three long operations, one flag
+
+The sixth pass gave the advance a busy state. It gave it to **one** of the three things on this
+surface that take seconds:
+
+| What a reader presses | What it does | What it said while it did it |
+|---|---|---|
+| *Integrate 12 hours* | 180 steps, chunked, yielding between chunks | `aria-busy`, a disabled control |
+| *Build the horizon row* | six four-day integrations, in one blocking call | **nothing** |
+| *Score every horizon against truth* | six horizons scored against the record, in one blocking call | **nothing** |
+
+So the notion is one module, `src/harness/working.ts`, and the stylesheet has one rule against
+it: `cursor: progress` on the workspace and everything in it while anything long is running.
+The workspace's own element carries the operation's **name** rather than a flag —
+`data-working="building the horizon row"` — for the reason `data-presentation` and
+`data-centre-content` carry theirs: a measurement that fails then says which of the three it
+was looking at.
+`progress` rather than `wait`, and the difference is a promise — `wait` says the application is
+blocked, `progress` says it is working and still usable, which is what the chunked advance
+delivers and what the panes a reader can still read make true. Nothing animates: a cursor is the
+browser's own, so `prefers-reduced-motion` has nothing to turn off, and no spinner was added.
+
+The two synchronous ones needed the sixth pass's own lesson one layer down. A flag set in a
+click handler is committed to the DOM and **never painted**, because the browser's next chance to
+draw comes after the work the flag describes is over. `working.ts` commits the flag and hands the
+work to the frame after the one that paints it, bounded by a 100 ms timer so that a tab which is
+never painted cannot leave a control disabled for ever.
+
+One consequence is recorded rather than hidden: an edit applied through this — the quality-control
+box, the bias field — now shows the reader's change when the rebuild **commits**, not when the
+box is clicked, because until then the surface is showing the run as it stands. `shell.spec.ts`
+clicks the box and asserts the edit list and the box together, where it used to ask Playwright's
+`uncheck()` to prove the box had flipped by the time the click returned.
+
+#### The control says how far it has got, and moves nothing saying it
+
+*Integrating 72 of 180* is a relabel, and a relabel costs no line in a pane whose content height
+**is** the declared floor. What it could cost is a reflow: beat 018's own walkthrough offer
+changed its label and moved every pane in the dock by 11 px.
+
+So the width is reserved. Both labels and the widest count the advance can show are laid in one
+grid cell, `visibility: hidden` on the sizers, and the button is the widest of them in every
+state. Measured through a whole advance, at the floor's width and at the reference width:
+
+| | |
+|---|---|
+| The control, resting and working | **126.64 px**, at 1 658 and at 2 560 |
+| It was, before the width was reserved | 105.5 px |
+| The row it sits in, at the floor | 201 px, holding 126.64 + 4.8 + 58.08 = **189.5 px** |
+| Samples of one advance in which anything moved | **0 of 5**, at each width |
+
+The sizer for the count is written with `0` and not with the count's own digits, and that is not
+fussiness: this surface's serif draws `1` 0.42 px narrower than every other digit, so *180 of
+180* is **not** the widest three digits the label can hold and reserving its width would have
+left a pixel of reflow behind for counts like *888*.
+
+#### The confirmation, and where a measurement put it
+
+Two homes were offered. The measurement chose, and it was not close:
+
+| | Where the line goes | What it costs at the floor | The floor it implies |
+|---|---|---|---|
+| The run controls, beside the control that asked | 201 px wide, **two lines, 30 px** | 656 + 30 px of pane, + 92 px of chrome | **778 px** |
+| The status strip, under the three figures | 372 px wide, **one line, 15 px** | **nothing** | **748 px** |
+
+748 is the declared floor and 778 is past the **768 px** of the shortest window in the matrix,
+which SC-009 forbids for the reason the first pass proved: a floor no browser window reaches puts
+every reader below it. So the run controls were never really available, and the strip is not a
+consolation — it is the better place twice over. It is on screen whatever pane has focus, and a
+reader may close the controls pane; and it is where an operational surface puts *what just
+happened*, beside RUN, STEP and FIELDS AND ANALYSIS.
+
+**Why it is free there, measured at the floor's own width.** The strip's height is set by FR-58's
+statement — 57 px of it in a 66 px strip — and the three figures beside it are 39 px, so there are
+18 px under them that nothing was using. The confirmation is 15 px of that. It goes **under** the
+figures rather than beside them as a fourth term, and that is the whole of why it is free: a
+fourth column takes width from the statement, the statement is the one flexible thing in the
+strip, and it answers by wrapping to a fourth line — 19 px, measured, of a height budget the floor
+spends exactly.
+
+| At the floor, 1 658 px wide | Before an advance | With the confirmation on screen |
+|---|---|---|
+| The status strip | 66 px | **66 px** |
+| FR-58's statement | 519 × 57 | 421 × 57 |
+| The readouts beside it | 430 × 56 | 529 × 56 |
+| Of which the confirmation | 430 × 15, **empty** | 529 × 15, *Integrated 12 hours: 180 steps, valid at 2013-09-01T12:00:00.000Z* |
+| The controls pane's own content | 656 px | **656 px** |
+| The floor those imply | 748 | **748, declared 748** |
+
+**`presentation.minimumViewportHeightPx` does not move, and no digest moves with it.** The pass
+was authorised to spend the floor and did not have to. All 41 of G-07's quantities are
+byte-identical, `configuration` included.
+
+**Above the floor the line is *reserved*, and the census is why.** At 1 920 × 900 the strip is not
+held up by the statement — it is 55 px, held up by the two site links — so a line that appears when
+an advance finishes grows the strip and resizes the dock at the moment a reader's integration
+completes. The layout manager needs a frame to answer that and cannot have one: the integration is
+what is holding the main thread. The census caught it at three viewports of six, **839 px of
+content in an 835 px dock**, and again at 1 920 × 1 080 after the first fix, which is how the
+second half of the same fault was found — the *Step* readout is 17.27 px while it says *not yet
+measured* and 21.61 px once it holds a figure, and a baseline that moves with it takes the three
+figures from 39.02 px to 42.02 px. Those pixels used to vanish into a strip the site links were
+holding up; under the confirmation they are pixels the strip grows.
+
+So three things are held rather than allowed to arrive: the confirmation's line, whether or not
+there is anything in it; the height of a readout, before it holds a figure; and the rows' tops
+instead of a shared baseline. The strip is then the same height before an advance and after one,
+at every viewport:
+
+| | 1 366 × 768 | 1 658 × 748, the floor | 1 920 × 900 | 1 920 × 1 080 |
+|---|---|---|---|---|
+| The strip, before an advance and after | 106 px | **66 px** | 65 px | 65 px |
+| What holding it costs there | 0 | **0** | 10 px of dock | 10 px of dock |
+
+Holding a line is not saying anything in it. The line is **empty** until an advance has finished,
+so a reader who has integrated nothing reads nothing; what is held is blank paper, which is the
+opposite of the permanent noise FR-048 was narrowed against — and the alternative is a layout that
+moves under the reader as a reward for pressing the control.
+
+#### The integrating state, which the census had never seen
+
+A control that relabels itself and a strip that gains a line are exactly the things that overflow
+a box, land on a neighbour or wrap a strip to two rows, and neither had ever been censused —
+because until this pass neither was on the surface. Both states are in the census now, at every
+viewport in the matrix and at the declared floor: green, at all six, with nothing new over its box,
+nothing clipped and nothing painted on anything — and it took one finding to get there, the
+transient dock overflow above, which is exactly the class of thing the fifth pass wrote this
+census for.
+
+Holding the state open took two things and neither doctors a figure the surface draws. The advance
+is 180 steps and is over in about **145 ms**, where one census across the socket costs **40 to
+70 ms** to ask — so every unthrottled attempt measured the surface *after* the advance and would
+have called that the integrating state. `model.chunkSteps` is routed to 1, which changes how often
+an advance yields and not how far it goes (`tests/harness/advance.test.ts` holds every chunking to
+the same bytes), and the browser's own CPU throttle is set to 30 while the census is taken. The
+route a reader takes is the route the test takes — press, be refused on the frame budget, press
+*Integrate anyway* — rather than routing the budget out of the way, because the budget is a figure
+the strip prints and a test that changes it is measuring a strip nobody has.
+
+#### A finding this pass did not fix
+
+**At the floor, the over-budget notice does not fit the controls pane.** Measured at 1 658 × 748
+with the row scored, the pane's content is **1 012 px in a 656 px box** while the notice stands:
+a paragraph of five lines and a second button, in the pane whose content height is the floor. No
+census had visited that state either — this pass added the integrating and integrated states and
+found it on the way past — and it is left standing because fixing it is a change to what FR-008's
+notice says and where, which is its own pass. The notice clears the moment a reader answers it,
+either way.

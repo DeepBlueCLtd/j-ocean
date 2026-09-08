@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Request } from '@playwright/test';
-import { declared } from './declared-geometry.js';
+import { declared, FLOOR, REFERENCE } from './declared-geometry.js';
 
 /**
  * SC-003 and User Story 3 of spec 001.
@@ -53,7 +53,9 @@ async function advanceTheControlOffers(page: Page): Promise<{
   readonly steps: number;
   readonly instantAfter: (fromMs: number, advances: number) => string;
 }> {
-  const label = ((await page.getByTestId('advance').textContent()) ?? '').trim();
+  // The label the reader is being shown, and not the two the control reserves its width
+  // against: `advance-label` is what the button says now (see `App.tsx`, the run controls).
+  const label = ((await page.getByTestId('advance-label').textContent()) ?? '').trim();
   const match = /(\d+(?:\.\d+)?)\s*hours?/.exec(label);
   expect(match, `the advance control does not say how far it advances: "${label}"`).not.toBeNull();
   const hours = Number(match?.[1]);
@@ -320,6 +322,300 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 60_000 });
     await expect(page.getByTestId('run-controls')).toHaveAttribute('aria-busy', 'false');
     await expect(page.getByTestId('advance-report')).toContainText('Integrated');
+  });
+
+  /**
+   * The pointer says something long is running, for all three of them (NFR-04; the author's
+   * report: *"when that long process is running, I need to see some kind of busy cursor"*).
+   *
+   * **Three operations and one flag.** An advance, building the horizon row and scoring every
+   * horizon each block the main thread for seconds, and until beat 018's seventh pass only the
+   * advance said anything at all -- and it said it in a live region and a disabled button, not
+   * at the pointer, which is where a reader who has just clicked is looking. `working.ts`
+   * holds the one notion; the stylesheet has one rule against it, so the three cannot drift
+   * into saying different things.
+   *
+   * **`progress` and not `wait`.** `wait` says the application is blocked. The advance yields
+   * between chunks and every pane stays readable while it runs, so `progress` -- "working,
+   * still usable" -- is the true one.
+   *
+   * **Sampled from inside the page**, because each of these blocks the main thread from the
+   * moment it starts: an assertion driven from the test process cannot ask a question while
+   * the work it is asking about is running. What is sampled for the two synchronous ones is
+   * the frame *after* the one that paints the busy state, which is the frame the work is
+   * scheduled on -- if the flag were not up by then, no reader would ever see it.
+   */
+  test('shows a busy pointer for every operation that takes seconds', async ({ page }) => {
+    test.setTimeout(300_000);
+    await page.route(CONFIG_REQUEST, async (route) => {
+      const response = await route.fetch();
+      const config = JSON.parse(await response.text()) as { budget: { frameBudgetMs: number } };
+      // A budget no step time can exceed: this test is about the pointer, and the over-budget
+      // refusal is a different question, asked above.
+      config.budget.frameBudgetMs = 1_000_000;
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(config) });
+    });
+    await page.goto('/');
+    await expect(page.getByTestId('pane-controls')).toBeVisible();
+
+    /** Press a control, and read the surface on the frame the work is scheduled on. */
+    const press = async (testId: string): Promise<{ resting: string; working: string; flag: string }> =>
+      page.evaluate(async (id) => {
+        const surface = document.querySelector('[data-testid="one-view"]') as HTMLElement;
+        const cursor = (): string => getComputedStyle(surface).cursor;
+        const resting = cursor();
+        (document.querySelector(`[data-testid="${id}"]`) as HTMLButtonElement).click();
+        await new Promise((resolve) => { requestAnimationFrame(() => { resolve(null); }); });
+        return { resting, working: cursor(), flag: surface.dataset['working'] ?? '(unset)' };
+      }, testId);
+
+    const building = await press('build-row');
+    expect(building.resting, 'the surface said it was working before anything was asked of it').toBe('auto');
+    expect(building.flag, 'building the horizon row does not say what the surface is doing').toBe(
+      'building the horizon row',
+    );
+    expect(
+      building.working,
+      'the pointer does not say the surface is working while the row is built, which is the ' +
+        'longest wait this surface has',
+    ).toBe('progress');
+    await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 120_000 });
+    await expect(page.getByTestId('one-view')).toHaveAttribute('data-working', 'false');
+
+    const scoring = await press('score-row');
+    expect(scoring.flag, 'scoring every horizon does not say what the surface is doing').toBe(
+      'scoring every horizon',
+    );
+    expect(scoring.working, 'the pointer does not say the surface is working while it scores').toBe(
+      'progress',
+    );
+    await expect(page.getByTestId('panel-score-24')).toContainText('persistence', { timeout: 120_000 });
+    await expect(page.getByTestId('one-view')).toHaveAttribute('data-working', 'false');
+
+    // The advance drives itself in chunks, so it is sampled between them rather than on one
+    // frame: every sample of it must say the same thing the other two said once.
+    const samples = await page.evaluate(async () => {
+      const surface = document.querySelector('[data-testid="one-view"]') as HTMLElement;
+      const read = (): { busy: boolean; says: string; cursor: string } => ({
+        busy: surface.dataset['working'] !== 'false',
+        says: surface.dataset['working'] ?? '(unset)',
+        cursor: getComputedStyle(surface).cursor,
+      });
+      const taken: { busy: boolean; says: string; cursor: string }[] = [];
+      (document.querySelector('[data-testid="advance"]') as HTMLButtonElement).click();
+      for (let i = 0; i < 400; i += 1) {
+        const state = read();
+        taken.push(state);
+        if (!state.busy && i > 0) break;
+        await new Promise((resolve) => { setTimeout(resolve, 0); });
+      }
+      return taken;
+    });
+    const busy = samples.filter((sample) => sample.busy);
+    expect(busy.length, 'no sample caught the advance in progress').toBeGreaterThan(0);
+    expect(
+      busy.filter((sample) => sample.cursor !== 'progress'),
+      'the pointer did not say the surface was working while it integrated',
+    ).toEqual([]);
+    expect(
+      busy.filter((sample) => sample.says !== 'integrating').map((sample) => sample.says),
+      'the surface said it was doing something other than integrating while it integrated',
+    ).toEqual([]);
+    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 60_000 });
+    await expect(page.getByTestId('one-view')).toHaveAttribute('data-working', 'false');
+  });
+
+  /**
+   * The control says how far it has got, and saying so moves nothing (the author's request;
+   * spec 018 FR-002).
+   *
+   * A progress line under the button would be a line in the pane whose content height **is**
+   * the declared floor. A relabel costs no line at all -- and costs nothing else either, which
+   * is the property measured here: the button reserves the width of its widest label up front,
+   * so the button, the control beside it and every pane in the dock have the same rectangle
+   * while it works as when it is idle.
+   *
+   * The defect this is written against is beat 018's own: the walkthrough offer changed its
+   * label from *Walk me through it* to *Close the walkthrough* and moved every pane in the
+   * dock by 11 px. A label that changes width is a layout that moves under the reader's
+   * pointer, and it is measured at the floor -- where the controls pane is narrowest and a
+   * wider button is a wrapped row -- and at the reference width.
+   */
+  test('relabels the advance control while it works, and reflows nothing', async ({ page }) => {
+    test.setTimeout(300_000);
+    await page.route(CONFIG_REQUEST, async (route) => {
+      const response = await route.fetch();
+      const config = JSON.parse(await response.text()) as { budget: { frameBudgetMs: number } };
+      config.budget.frameBudgetMs = 1_000_000;
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(config) });
+    });
+
+    for (const width of [FLOOR.width, REFERENCE.width]) {
+      await page.setViewportSize({ width, height: FLOOR.height });
+      await page.goto('/');
+      await page.evaluate(() => { window.localStorage.clear(); });
+      await page.reload();
+      await expect(page.getByTestId('pane-controls')).toBeVisible();
+
+      /* One advance first, and the resting layout measured after it. What is under test is
+         the relabel and nothing else, and the run's own figures arrive with the first advance
+         -- the step time in the status strip is *not yet measured* until then, and a strip
+         whose figures have just been filled in is a strip that changed for a reason that has
+         nothing to do with this control. So both snapshots are taken with the run in the same
+         state: advanced, its step time measured, its completion confirmed. */
+      await page.getByTestId('advance').click();
+      await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 60_000 });
+      await expect(page.getByTestId('advance-report')).toContainText('Integrated');
+
+      const run = await page.evaluate(async () => {
+        const boxes = (): string =>
+          JSON.stringify(
+            [
+              ...Array.from(document.querySelectorAll<HTMLElement>('[data-pane-id]')).map(
+                (pane) => [pane.dataset['paneId'], pane.getBoundingClientRect()] as const,
+              ),
+              ...['advance', 'new-run'].map(
+                (id) =>
+                  [
+                    id,
+                    (document.querySelector(`[data-testid="${id}"]`) as HTMLElement).getBoundingClientRect(),
+                  ] as const,
+              ),
+            ].map(([name, box]) => [name, box.x, box.y, box.width, box.height]),
+          );
+        const label = (): string =>
+          (document.querySelector('[data-testid="advance-label"]')?.textContent ?? '').trim();
+
+        const resting = { boxes: boxes(), label: label() };
+        const seen: { boxes: string; label: string }[] = [];
+        (document.querySelector('[data-testid="advance"]') as HTMLButtonElement).click();
+        for (let i = 0; i < 400; i += 1) {
+          const surface = document.querySelector('[data-testid="one-view"]');
+          seen.push({ boxes: boxes(), label: label() });
+          if (surface?.getAttribute('data-working') === 'false' && i > 0) break;
+          await new Promise((resolve) => { setTimeout(resolve, 0); });
+        }
+        return { resting, seen, after: { boxes: boxes(), label: label() } };
+      });
+
+      const relabelled = run.seen.filter((sample) => sample.label !== run.resting.label);
+      expect(
+        relabelled.length,
+        `at ${String(width)} px the control never said it was integrating, so there is no ` +
+          'relabel to measure',
+      ).toBeGreaterThan(0);
+      expect(
+        relabelled.filter((sample) => !/^Integrating \d+ of \d+$/.test(sample.label)).map((s) => s.label),
+        'the control said something other than how far it has got',
+      ).toEqual([]);
+      const moved: string[] = [];
+      for (const sample of run.seen) {
+        if (sample.boxes === run.resting.boxes) continue;
+        const was = JSON.parse(run.resting.boxes) as [string, number, number, number, number][];
+        const now = JSON.parse(sample.boxes) as [string, number, number, number, number][];
+        for (const [at, one] of now.entries()) {
+          const then = was[at];
+          if (then === undefined || JSON.stringify(one) === JSON.stringify(then)) continue;
+          moved.push(`"${sample.label}": ${one[0]} was ${JSON.stringify(then.slice(1))} and is ${JSON.stringify(one.slice(1))}`);
+        }
+      }
+      expect(
+        moved,
+        `at ${String(width)} px the relabel moved something: every pane's rectangle, the ` +
+          "control's own and its neighbour's are measured against the resting layout, and one " +
+          'of these samples differs from it',
+      ).toEqual([]);
+      expect(run.after.boxes, 'the layout did not come back to where it started').toBe(run.resting.boxes);
+      expect(run.after.label).toBe(run.resting.label);
+
+      console.log(
+        `    at ${String(width)} px the advance control is ` +
+          `${String(JSON.parse(run.resting.boxes).find((one: [string, number, number, number]) => one[0] === 'advance')[3])} px wide ` +
+          `saying "${run.resting.label}" and saying "${relabelled[0]?.label ?? ''}", across ` +
+          `${String(run.seen.length)} samples of one advance, and nothing else moved`,
+      );
+    }
+  });
+
+  /**
+   * The advance is confirmed where a reader can see it, and says nothing before there is one
+   * (the author's request: *"plus some verification that it's complete"*).
+   *
+   * **In the status strip, and the measurement chose it.** Beside the control that asked for
+   * it, a visible line is 30 px of the controls pane -- two wrapped lines in a pane 220 px
+   * wide -- and the pane's own content height at the floor's width *is* the declared floor, so
+   * it would take the floor past the 768 px of the shortest window in the matrix. In the strip
+   * it costs **nothing**: the strip's height at the floor is set by FR-58's statement, and the
+   * readouts beside it have 22 px of room under them. That is what the last assertion here
+   * measures -- the strip is the same height with the confirmation on screen as without it, so
+   * it cannot be the two-row strip that cost the floor 44 px before beat 018 cut it to one.
+   *
+   * And it is on screen whatever pane has focus, which the run controls are not: a reader may
+   * close the controls pane, and the strip is not a pane.
+   */
+  test('confirms a completed advance in the strip, and says nothing until there is one', async ({
+    page,
+  }) => {
+    test.setTimeout(300_000);
+    await page.setViewportSize(FLOOR);
+    await page.goto('/');
+    await page.evaluate(() => { window.localStorage.clear(); });
+    await page.reload();
+    await expect(page.getByTestId('pane-controls')).toBeVisible();
+
+    const report = page.getByTestId('advance-report');
+    await expect(report).toHaveAttribute('role', 'status');
+    // FR-048 is answered by the control, which says what it will do before it does it: a strip
+    // that always says something about an advance nobody asked for is noise.
+    await expect(report).toHaveText('');
+    const before = await page.getByTestId('pane-status').evaluate((strip) => ({
+      strip: strip.getBoundingClientRect().height,
+      report: (strip.querySelector('[data-testid="advance-report"]') as HTMLElement).getBoundingClientRect()
+        .height,
+    }));
+    expect(
+      before.report,
+      'the line is not held before there is anything to say, so the strip will grow under a ' +
+        'reader at the moment their advance finishes',
+    ).toBeGreaterThan(0);
+
+    const advance = await advanceTheControlOffers(page);
+    const start = Date.parse((await page.getByTestId('instant').textContent()) ?? '');
+    await page.getByTestId('advance').click();
+    await expect(page.getByTestId('over-budget')).toBeVisible({ timeout: 60_000 });
+    await page.getByTestId('proceed-anyway').click();
+    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 60_000 });
+
+    // Painted, and inside the strip rather than in the accessibility tree alone.
+    await expect(report).toBeVisible();
+    await expect(page.getByTestId('pane-status').getByTestId('advance-report')).toHaveCount(1);
+    await expect(report).toContainText(String(advance.steps));
+    await expect(report).toContainText(advance.instantAfter(start, 1));
+    // Principle V: both figures carry their kind, and the kind is the one the run's own
+    // figures carry, because these are the run's own figures.
+    await expect(report.locator('.figure.computed')).toHaveCount(2);
+
+    const after = await page.getByTestId('pane-status').evaluate((strip) => ({
+      strip: strip.getBoundingClientRect().height,
+      report: (strip.querySelector('[data-testid="advance-report"]') as HTMLElement).getBoundingClientRect()
+        .height,
+      scrolls: strip.scrollWidth > strip.clientWidth + 1,
+    }));
+    expect(after.report, 'the confirmation is not drawn').toBeGreaterThan(0);
+    expect(after.report, 'the confirmation is more than the line the strip held for it').toBe(before.report);
+    expect(after.scrolls, 'the confirmation runs past the strip').toBe(false);
+    expect(
+      after.strip,
+      `the confirmation made the status strip ${String(after.strip)} px tall against ` +
+        `${String(before.strip)} px without it. At the floor's width the strip is one row, and ` +
+        'a second row is 44 px of a height budget the floor spends exactly (spec 018, "the ' +
+        'floor, re-measured")',
+    ).toBe(before.strip);
+    console.log(
+      `    at the declared floor the strip is ${String(before.strip)} px tall without the ` +
+        `confirmation and ${String(after.strip)} px with it, of which the confirmation is ` +
+        `${String(Math.round(after.report))} px`,
+    );
   });
 
   /**
@@ -1000,10 +1296,19 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('run-status')).toContainText('edit', { timeout: 120_000 });
     await expect(page.getByTestId('edit-list')).toContainText('biased by 1.50');
 
-    await page.getByTestId('quality-control').uncheck();
+    /* Clicked rather than `uncheck()`ed, and the difference is what beat 018's seventh pass
+       changed. Applying an edit rebuilds the row, which takes seconds, so it now runs on the
+       frame after the one that says the surface is working (`working.ts`) -- and until that
+       work commits, the control shows the state of the run, which is the state before the
+       edit. `uncheck()` asserts the box has flipped by the time the click returns, which is
+       an assertion that the edit was applied before the surface said it was working.
+       FR-034's claim is about what the run is, and it is asserted below on the edit list and
+       the box together. */
+    await page.getByTestId('quality-control').click();
     await expect(page.getByTestId('edit-list')).toContainText('quality control off', {
       timeout: 120_000,
     });
+    await expect(page.getByTestId('quality-control')).not.toBeChecked();
 
     // FR-010: edits compose in order, and one action removes all of them.
     await page.getByTestId('revert').click();
