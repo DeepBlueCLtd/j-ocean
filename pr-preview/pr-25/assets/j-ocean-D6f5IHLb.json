@@ -31,7 +31,7 @@
     "referenceViewportHeightPx": 1440,
     "minimumPanelWidthPx": 190,
     "minimumViewportWidthPx": 1658,
-    "minimumViewportHeightPx": 740,
+    "minimumViewportHeightPx": 748,
     "controlsWidthPx": 340,
     "detailWidthPx": 470,
     "panelGapPx": 10,
@@ -55,6 +55,7 @@
       "thumbnailWidthPx": 40
     },
     "centreChromeHeightPx": 196,
+  "fieldLabelHeightPx": 72,
     "anomalyLimitMetres": 220,
     "attributionHatchThreshold": 0.5,
     "footprint": {
