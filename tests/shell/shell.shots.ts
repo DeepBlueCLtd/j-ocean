@@ -325,3 +325,37 @@ test('panel help, where the reader asks for it', async ({ page }) => {
   await expect(page.getByTestId('help-centre/horizon-panel#48')).toBeVisible();
   await page.screenshot({ path: `${IMAGES}016-help-horizon-panel.png` });
 });
+
+/**
+ * Beat 017's own figures.
+ *
+ * Two, and each is a picture of a refusal or of an affordance rather than of a feature working
+ * -- the working case is a page that looks exactly like the page beside it, which photographs
+ * as nothing. The first is a link this run cannot honour, reported by name in the region the
+ * thing it named would have appeared in. The second is the field's keyboard cursor, which is
+ * the whole of "operable without a mouse" in one frame.
+ */
+test('an address this run cannot honour, and the keyboard on a field', async ({ page }) => {
+  test.setTimeout(240_000);
+  await inOneView(page, REFERENCE_WIDTH, FLOOR_HEIGHT);
+
+  // A link written against a different grid, naming a horizon this configuration does not
+  // declare, and carrying a seed. Each is said by name, and nothing near it is selected.
+  await page.goto('/?panel=144&cell=2431@120x120&seed=6a09e667f3bcc908');
+  await expect(page.getByTestId('address-refusals')).toBeVisible();
+  await page.screenshot({ path: `${IMAGES}017-address-refused.png` });
+  await page.getByTestId('region-detail').screenshot({
+    path: `${IMAGES}017-address-refusals.png`,
+  });
+
+  // The cell cursor, on the analysed field, reached by Tab and moved by the arrow keys.
+  await page.goto('/');
+  await expect(page.getByTestId('analysed-field')).toBeVisible();
+  // Reached by Tab rather than focused directly, so the picture shows the focus ring a reader
+  // working by keyboard actually sees: `:focus-visible` is about how focus arrived.
+  await page.getByTestId('help-control-centre/attribution').focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowUp');
+  await page.getByTestId('analysed-field').screenshot({ path: `${IMAGES}017-cell-cursor.png` });
+});

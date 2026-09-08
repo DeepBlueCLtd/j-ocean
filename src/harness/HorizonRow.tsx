@@ -81,6 +81,16 @@ export interface HorizonRowInputs {
   readonly shownMark: { readonly id: string; readonly leadHours: number } | null;
   readonly onShowMark: (mark: { readonly id: string; readonly leadHours: number } | null) => void;
   readonly onPinMark: (mark: { readonly id: string; readonly leadHours: number }) => void;
+  /**
+   * Release what is pinned, and empty the detail region.
+   *
+   * Separate from `onShowMark(null)`, which beat 017 found could not do it: a hover may not
+   * take a pinned selection away -- that is the whole of pinning -- so the guard that protects
+   * a pinned mark from the pointer leaving also swallowed the Release control's own click, and
+   * the control had been inert since beat 008. Clearing a selection is its own act, and it
+   * returns the address to its unselected form (spec 017 T032).
+   */
+  readonly onClearMark: () => void;
   readonly markPinned: boolean;
   /**
    * FR-043. Above the declared floor the centre may hold the row; below it there is no room
@@ -89,6 +99,17 @@ export interface HorizonRowInputs {
    * either way: the fields, the analysis and the scores are the same objects.
    */
   readonly aboveFloor: boolean;
+  /**
+   * What the centre has been asked to hold (FR-049), and how to ask for something else.
+   *
+   * Beat 015 held this here. Beat 017 lifted it to the shell, because an enlargement is one of
+   * the three things an address names (FR-056) and the shell is where the address is written:
+   * a piece of state the address carries cannot live in a hook the address cannot see. Nothing
+   * about the union or its resolution moved -- `resolveCentreContent` is still the only thing
+   * that decides what the centre holds.
+   */
+  readonly requested: CentreContent;
+  readonly onRequest: (next: CentreContent) => void;
 }
 
 /** What the row puts in each region. Null where the row has not been built. */
@@ -116,10 +137,11 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
   );
 
   /**
-   * What the centre holds (FR-049). One piece of state, one union, and the only decider: an
-   * enlargement is a selection like any other and changes nothing else on the surface.
+   * What the centre holds (FR-049). One union, and the only decider: an enlargement is a
+   * selection like any other and changes nothing else on the surface. The request comes from
+   * the shell, which is where a selection is written to the address (FR-056).
    */
-  const [requested, setRequested] = useState<CentreContent>(THE_ROW);
+  const requested = props.requested;
   const { content, undeclared } = resolveCentreContent(requested, horizons, !props.aboveFloor);
   const [showAttribution, setShowAttribution] = useState(false);
   const [showDifference, setShowDifference] = useState(false);
@@ -656,8 +678,8 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
       enlarged={isEnlarged}
       showAttribution={showAttribution}
       onEnlarge={() => {
-        setRequested((current) =>
-          current.kind === 'enlarged' && current.leadHours === leadHours
+        props.onRequest(
+          requested.kind === 'enlarged' && requested.leadHours === leadHours
             ? THE_ROW
             : { kind: 'enlarged', leadHours },
         );
@@ -763,7 +785,7 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
           <HorizonStrip
             slots={stripSlots}
             enlargedLeadHours={content.leadHours}
-            onSelect={(leadHours) => { setRequested({ kind: 'enlarged', leadHours }); }}
+            onSelect={(leadHours) => { props.onRequest({ kind: 'enlarged', leadHours }); }}
             nx={forecast.parameters.grid.nx}
             ny={forecast.parameters.grid.ny}
             limit={
@@ -848,7 +870,7 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
       <ObservationHover
         mark={shown}
         pinned={props.markPinned}
-        onUnpin={() => { props.onShowMark(null); }}
+        onUnpin={props.onClearMark}
         derived={
           shown.kind === 'track'
             ? null

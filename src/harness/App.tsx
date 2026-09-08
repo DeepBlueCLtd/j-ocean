@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import configUrl from '../../config/j-ocean.json?url';
 import { ConfigurationError, fetchConfiguration, type LoadedConfiguration } from '../config/load.js';
 import type { Configuration } from '../config/schema.js';
@@ -15,7 +15,7 @@ import { sha256Bytes } from '../config/digest.js';
 import { stateBytes } from '../model/grid.js';
 import { loadClimatology, loadObservations, loadTruth } from './artefacts.js';
 import { FieldView, type Marker } from './FieldView.js';
-import { footprintOf, markersFrom, type Footprint } from './footprint.js';
+import { footprintOf, markersFrom, marksOf, type Footprint } from './footprint.js';
 import type { Edit } from '../instruments/edits.js';
 import { useHorizonRow } from './HorizonRow.js';
 import { BelowFloor, Regions, useAboveFloor } from './Regions.js';
@@ -43,6 +43,14 @@ import { drawRootSeed } from './seed-provisioning.js';
 import { measure, overBudget } from './timing.js';
 import { Computed, Declared, HostTime } from './figures.js';
 import { HelpProvider, PanelCorner, PanelHead, PanelSummary } from './Help.js';
+import { THE_ROW, type CentreContent } from './CentreContent.js';
+import {
+  addressHref,
+  NOTHING_SELECTED,
+  parseAddress,
+  resolveAddress,
+  type Address,
+} from './address.js';
 
 /**
  * The shell (FR-002, FR-013, NFR-02, constitution Principle V and VI).
@@ -196,6 +204,47 @@ export function App() {
     readonly leadHours: number;
     readonly pinned: boolean;
   } | null>(null);
+
+  /**
+   * What the centre has been asked to hold (FR-049), lifted here by beat 017.
+   *
+   * It was beat 015's state inside `useHorizonRow`. An enlargement is one of the three things
+   * an address names, and the address is written here, so a piece of state the address carries
+   * cannot live where the address cannot see it.
+   */
+  const [requestedCentre, setRequestedCentre] = useState<CentreContent>(THE_ROW);
+
+  /**
+   * The address, and the rules it lives by (FR-056, SC-002, SC-003).
+   *
+   * **It is read once, on the way in, and it is never read again.** `arrived` is the query
+   * string as the reader's link had it; the surface resolves it against the run once a run
+   * exists, and after that the reader's selections are the only thing that moves.
+   *
+   * **Mounting does not write.** There is no effect here that reconciles the address with the
+   * selection, and that absence is the requirement rather than an oversight: an effect like
+   * that would canonicalise a reader's URL on any remount -- reordering it, dropping the key it
+   * refused, normalising a value -- and a reordered query string is still a rewritten URL to
+   * anyone who copies it. The address is written from the selection handlers below and from
+   * nowhere else, so there is no code path from mounting to a write.
+   *
+   * **Writes replace rather than push.** A reader poking at cells to learn the field would
+   * otherwise build a history they have to escape backwards through, which punishes exactly
+   * the behaviour the instrument wants. The consequence is stated rather than left emergent:
+   * the back button leaves j-ocean for whatever the reader was looking at before it, and no
+   * number of selections stands between them and it.
+   */
+  const arrived = useRef<ReturnType<typeof parseAddress>>(parseAddress(window.location.search));
+  /** What is selected now, as an address. Written from here; never read back from the bar. */
+  const selection = useRef<Address>(NOTHING_SELECTED);
+  const addressApplied = useRef(false);
+  /** Everything the link named that this run has not got, each said by name (FR-005). */
+  const [addressRefusals, setAddressRefusals] = useState<readonly string[]>([]);
+
+  const writeSelection = useCallback((patch: Partial<Address>) => {
+    selection.current = { ...selection.current, ...patch };
+    window.history.replaceState(null, '', addressHref(window.location, selection.current));
+  }, []);
 
   useEffect(() => {
     let live = true;
@@ -588,13 +637,33 @@ export function App() {
   /**
    * FR-047. Selecting a cell fills the detail region, and takes it from whatever mark was
    * there: the region carries *the last selection*, not two of them.
+   *
+   * This is one of the three places the address is written (FR-056), and it writes the grid the
+   * index was written against with it: a cell is an index, and an index into a different grid
+   * is a different place.
    */
-  const selectCell = useCallback((cellIndex: number) => {
-    setMark(null);
-    setView((current) => (current === null ? current : { ...current, selectedCell: cellIndex }));
-  }, []);
+  const selectCell = useCallback(
+    (cellIndex: number) => {
+      setMark(null);
+      setView((current) => (current === null ? current : { ...current, selectedCell: cellIndex }));
+      writeSelection({
+        cell:
+          loaded === null
+            ? null
+            : { index: cellIndex, nx: loaded.config.grid.nx, ny: loaded.config.grid.ny },
+        observation: null,
+      });
+    },
+    [loaded, writeSelection],
+  );
 
-  /** A hover previews; a pinned mark survives the pointer leaving, as it did under the panel. */
+  /**
+   * A hover previews; a pinned mark survives the pointer leaving, as it did under the panel.
+   *
+   * A hover does not write the address, and that is a choice rather than an omission: an
+   * address written on every pointer move across a field would be a hundred rewrites of a
+   * reader's URL for a selection they never made. What a link names is what somebody chose.
+   */
   const showMark = useCallback(
     (next: { readonly id: string; readonly leadHours: number } | null) => {
       setMark((current) =>
@@ -605,11 +674,89 @@ export function App() {
   );
 
   /** Clicking the same mark again releases it, which is what the Release control also does. */
-  const pinMark = useCallback((next: { readonly id: string; readonly leadHours: number }) => {
-    setMark((current) =>
-      current !== null && current.pinned && current.id === next.id ? null : { ...next, pinned: true },
-    );
-  }, []);
+  const pinMark = useCallback(
+    (next: { readonly id: string; readonly leadHours: number }) => {
+      const releasing = mark !== null && mark.pinned && mark.id === next.id;
+      setMark(releasing ? null : { ...next, pinned: true });
+      writeSelection({ observation: releasing ? null : next.id, cell: null });
+    },
+    [mark, writeSelection],
+  );
+
+  /**
+   * Release what is pinned (spec 017 T032).
+   *
+   * The Release control had been calling `showMark(null)`, which a pinned mark is guarded
+   * against by design -- a hover may not take a pinned selection away -- so the control had
+   * done nothing since beat 008. Clearing is its own act, and it returns the address to its
+   * unselected form.
+   */
+  const clearMark = useCallback(() => {
+    setMark(null);
+    writeSelection({ observation: null });
+  }, [writeSelection]);
+
+  /** Enlarging, and returning to the row. The third of the three things an address names. */
+  const requestCentre = useCallback(
+    (next: CentreContent) => {
+      setRequestedCentre(next);
+      writeSelection({ panel: next.kind === 'enlarged' ? next.leadHours : null });
+    },
+    [writeSelection],
+  );
+
+  /**
+   * The link a reader arrived on, resolved against the run they are in (FR-001, FR-005).
+   *
+   * It happens **once**, when a run and its observations exist, because that is when the
+   * questions the address asks can be answered: whether the horizon is declared, whether the
+   * grid is this grid, and whether this run made that observation. Applying it writes nothing:
+   * `selection.current` is set to what was actually honoured, so the next thing the reader
+   * chooses writes a clean address, and until they choose something the bar keeps the string
+   * their link had -- refused key and all.
+   *
+   * Anything this run has not got is **reported by name** and selects nothing. A near match --
+   * the nearest declared horizon, the same index in this grid -- would be the surface
+   * pretending the link worked, and a reader would be discussing a different cell from the one
+   * they were sent (Principle VI).
+   */
+  useEffect(() => {
+    if (addressApplied.current) return;
+    if (loaded === null || view === null || runFootprint === null) return;
+    addressApplied.current = true;
+
+    const grid = { nx: loaded.config.grid.nx, ny: loaded.config.grid.ny };
+    const resolved = resolveAddress(arrived.current, {
+      declaredHorizons: loaded.config.horizons.leadHours,
+      grid,
+      observationIds: new Set(marksOf(runFootprint).map((one) => one.id)),
+    });
+
+    setAddressRefusals(resolved.refusals);
+    selection.current = {
+      panel: resolved.panel,
+      cell: resolved.cell === null ? null : { index: resolved.cell, ...grid },
+      observation: resolved.observation,
+    };
+
+    if (resolved.panel !== null) {
+      setRequestedCentre({ kind: 'enlarged', leadHours: resolved.panel });
+    }
+    if (resolved.cell !== null) {
+      const cell = resolved.cell;
+      setView((current) => (current === null ? current : { ...current, selectedCell: cell }));
+    }
+    if (resolved.observation !== null) {
+      /*
+       * A profile is drawn beside the model's derived profile at that cell, and which panel's
+       * field that comes from is a lead time. The address does not carry one of its own -- a
+       * fourth key would be a fourth key -- so it is the panel the link names, or the first
+       * declared horizon where the link names none.
+       */
+      const leadHours = resolved.panel ?? Math.min(...loaded.config.horizons.leadHours);
+      setMark({ id: resolved.observation, leadHours, pinned: true });
+    }
+  }, [loaded, view, runFootprint]);
 
   const defaultIssueInstantMs =
     loaded === null
@@ -651,7 +798,12 @@ export function App() {
     shownMark: mark,
     onShowMark: showMark,
     onPinMark: pinMark,
+    onClearMark: clearMark,
     markPinned: mark?.pinned ?? false,
+    /* FR-056. What the centre holds is one of the three things an address names, so the state
+       is the shell's and the row is handed it. */
+    requested: requestedCentre,
+    onRequest: requestCentre,
     /* FR-043. Below the declared floor the centre is forced to an enlargement -- the strip
        and one panel -- because six panels shrunk past legibility are six panels nobody can
        read. It is the same enlargement a reader chooses above the floor, not a second
@@ -1180,6 +1332,29 @@ export function App() {
         </figure>
         <div className="row-invitation-prose">
           <PanelHead panel="centre/horizon-row" level={2} />
+          {/*
+            FR-048 and spec 017 T023. A link may name a panel, or a measurement drawn on one,
+            before the row that holds it has been built. The selection is **held** rather than
+            honoured early or thrown away, and the region says what building the row costs --
+            because a reader who followed a link to a panel and found the row unbuilt is owed
+            the reason and the price, not a blank centre. Nothing has been computed to say it.
+          */}
+          {(requestedCentre.kind === 'enlarged' || mark !== null) && (
+            <p className="banner" data-testid="address-held">
+              This link names{' '}
+              {requestedCentre.kind === 'enlarged' && (
+                <>
+                  the <Declared>+{requestedCentre.leadHours} h</Declared> panel
+                </>
+              )}
+              {requestedCentre.kind === 'enlarged' && mark !== null ? ' and ' : ''}
+              {mark !== null && <>a measurement drawn on the row</>}. The row has not been built
+              yet: building it integrates the analysis forward{' '}
+              <Declared>{Math.max(...config.horizons.leadHours)} h</Declared>, which takes a
+              couple of seconds, so it happens when you ask. The selection is held and will be
+              honoured the moment the row is there.
+            </p>
+          )}
           <p className="region-empty" data-testid="row-invitation-statement">
             Six panels at the declared horizons &mdash;{' '}
             <Declared>
@@ -1237,6 +1412,20 @@ export function App() {
   const detail = (
     <>
       <PanelHead panel="detail/attribution-breakdown" level={2} />
+      {/*
+        FR-005 and Principle VI. A link that named something this run has not got says so, by
+        name, here -- where the thing it named would have appeared. Each refusal is the whole
+        sentence: which horizon, which grid, which observation, and what is there instead. The
+        surface then shows its unselected state beneath, because substituting the nearest
+        declared horizon or the same index in this grid would be it pretending the link worked.
+      */}
+      {addressRefusals.length > 0 && (
+        <div className="banner warn" data-testid="address-refusals">
+          {addressRefusals.map((refusal) => (
+            <p key={refusal}>{refusal}</p>
+          ))}
+        </div>
+      )}
       {row.detail !== null ? (
         row.detail
       ) : view.selectedCell !== null ? (

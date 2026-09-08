@@ -17,6 +17,12 @@ import { inflateSync } from 'node:zlib';
  * Deliberately small: it handles the one shape Playwright emits -- eight-bit, non-interlaced,
  * truecolour with or without alpha -- and throws by name on anything else rather than
  * guessing.
+ *
+ * **Beat 017 added `channelsAt` and nothing else.** That beat renders the whole page through a
+ * saturation filter and measures what survives, and it has to be able to check that the filter
+ * actually applied: a "greyscale" measurement taken on a photograph that is still in colour
+ * would pass while measuring nothing. Reading the three channels is how that is checked, and
+ * it is the same decoder rather than a second one.
  */
 
 export interface Pixels {
@@ -24,6 +30,8 @@ export interface Pixels {
   readonly height: number;
   /** Rec. 709 relative luminance, 0 to 255, at (x, y) from the top left. */
   luminanceAt(x: number, y: number): number;
+  /** The three channels as they were painted, so a claim about colour can be checked. */
+  channelsAt(x: number, y: number): readonly [number, number, number];
 }
 
 export function decodePng(png: Buffer): Pixels {
@@ -91,15 +99,22 @@ export function decodePng(png: Buffer): Pixels {
     }
   }
 
+  const at = (x: number, y: number): number =>
+    Math.min(height - 1, Math.max(0, Math.round(y))) * stride +
+    Math.min(width - 1, Math.max(0, Math.round(x))) * channels;
+
   return {
     width,
     height,
     luminanceAt(x, y) {
-      const i = Math.min(height - 1, Math.max(0, Math.round(y))) * stride +
-        Math.min(width - 1, Math.max(0, Math.round(x))) * channels;
+      const i = at(x, y);
       return (
         0.2126 * (pixels[i] ?? 0) + 0.7152 * (pixels[i + 1] ?? 0) + 0.0722 * (pixels[i + 2] ?? 0)
       );
+    },
+    channelsAt(x, y) {
+      const i = at(x, y);
+      return [pixels[i] ?? 0, pixels[i + 1] ?? 0, pixels[i + 2] ?? 0] as const;
     },
   };
 }

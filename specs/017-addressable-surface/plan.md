@@ -78,4 +78,62 @@ implying a link restores anything.
 
 ## Measured
 
-_Filled in when the beat lands._
+**The grammar.** `ADDRESS_KEYS` is `panel, cell, observation`, serialised in that order, so the
+address of a selection is a function of the selection and not of the order things happened in.
+A cell is `2431@100x100`; an observation is its own id; the unselected address is the empty
+string. `tests/harness/address.test.ts` rejects a fourth key from two directions, and was
+watched failing on a `seed` planted in `ADDRESS_KEYS` and honoured by the parser: four tests
+fail, and the one worth having says *why* rather than that a list changed —
+
+> the address grammar carries seed, which names the run rather than a selection. A run is a
+> seed and a manifest, and replay is re-computation from the manifest: an address that carried
+> one would be a second way to bring a run back, with no code version, no configuration digest,
+> and no refusal when the tree has moved (constitution Principle I, SRD-v1 "no run in the URL").
+
+The full output is in the beat's note.
+
+**Mounting does not write**, asserted twice over because either assertion alone is too weak.
+The whole address string is compared across three mounts — first load, reload, returning tab —
+on a link that deliberately carries an unknown key, a cell from another grid and an observation
+this run has not got, because a URL like that is where a tidying-up write would show. And
+`history.replaceState` and `pushState` are wrapped from before the page's own script runs, so
+*no write* is the absence of a call rather than the absence of a visible difference: **zero
+writes across all three mounts**, and the string byte-identical each time. There is no effect
+reconciling address with selection; the three selection handlers are the only writers, so there
+is no code path from mounting to a write.
+
+**The back button.** Writes replace, so three selections leave `history.length` where it was,
+and Back lands on whatever the reader was looking at before j-ocean rather than on one of their
+own selections. Asserted with three selections in between. The reason is that a reader poking
+at cells to learn the field would otherwise build a history to escape backwards through, which
+punishes the behaviour the instrument wants.
+
+**The keyboard pass.** **25 tab stops, all reached**, in the order
+`region-controls → region-centre → region-scores → region-detail`, never going backwards, every
+one showing a focus ring. One further control is reachable only inside a radio group, which is
+recorded rather than dropped: a group of choices is one tab stop with the arrows moving inside
+it. The strip's six slots and the elevation's needles are roving-focus groups and are walked
+with the arrow keys. Two things were **not reachable at all** before this beat and were built:
+a cell could only be selected by pointing at it, and so could a profile. The field now carries a
+cell cursor and the elevation is a roving-focus group.
+
+**Greyscale**, measured through a real `grayscale(1)` filter on the composited page, with the
+filter's application checked first so that a measurement on a photograph still in colour cannot
+pass:
+
+| Distinction | Margin, of 255 | Bar |
+|---|---|---|
+| The attribution field, brightest against darkest patch | **233.0** (22.0 to 255.0) | 40 |
+| The strip's marking, marked border against unmarked | **176.0** | 40 |
+
+**Two findings.** Three of the four figure kinds were distinguished by **colour alone** wherever
+a figure carried the kind class without `.figure` and outside a panel — a `derived` level in the
+profile comparison was drawn as plain text beside a `computed` one, which is the distinction
+SRD-v1 FR-07 exists to draw. Fixed by making the kind the selector; display only. And the
+Release control on a pinned mark had been **inert since beat 008**: it called the hover path,
+which a pinned mark is guarded against by design, so the guard swallowed the control's own
+click. Clearing is now its own act, which is also what T032 needs.
+
+**Nothing moved.** G-07 is green with `scripts/gates/records/surface-invariance.json` untouched:
+all 41 digests byte-identical. The measured viewport floor is still **2038 × 728** CSS px. 311
+headless tests, 91 in a browser, nine gates, 19 screenshots.
