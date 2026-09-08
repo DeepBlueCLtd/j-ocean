@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { FLOOR } from './declared-geometry.js';
+import { BELOW_THE_ROW, FLOOR } from './declared-geometry.js';
 
 /**
  * How many steps there are, read off the surface rather than imported.
@@ -132,7 +132,7 @@ test.describe('a walkthrough of the workspace', () => {
    * reader in that state cannot get to would not have been moved; it would have been dropped.
    */
   test('carries the below-the-floor explanation, reachable below the floor', async ({ page }) => {
-    await page.setViewportSize({ width: 900, height: 700 });
+    await page.setViewportSize({ width: BELOW_THE_ROW.width, height: BELOW_THE_ROW.height });
     await page.goto('/');
     await expect(page.getByTestId('viewport-floor-notice')).toBeVisible();
     await page.getByTestId('walkthrough-offer').click();
@@ -140,7 +140,7 @@ test.describe('a walkthrough of the workspace', () => {
     const steps = await stepCount(page);
     for (let step = 0; step < steps; step += 1) {
       const card = page.getByTestId('walkthrough-card');
-      if ((await card.textContent())?.includes('When the window is too small') === true) {
+      if ((await card.textContent())?.includes('When the window is too narrow') === true) {
         await expect(card).toContainText('one horizon at a time');
         await expect(card).toContainText('measured from the built workspace');
         return;

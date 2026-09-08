@@ -218,11 +218,25 @@ export const configurationSchema = z
       /** Below this a panel stops being legible, so the row stops shrinking panels. */
       minimumPanelWidthPx: z.number().int().positive(),
       /**
-       * Beat 013, FR-009 and FR-010. The smallest viewport the four regions hold, in CSS
-       * pixels, **measured from the built layout** by `tests/shell/viewport-floor.spec.ts`
-       * rather than chosen here. Below it the application says the size it needs and offers
-       * the single-panel presentation of FR-049; it does not shrink six panels past
-       * legibility and it does not scroll the row.
+       * Beat 013, FR-009 and FR-010. The smallest viewport the workspace holds, in CSS pixels,
+       * **measured from the built layout** by `tests/shell/viewport-floor.spec.ts` rather than
+       * chosen here.
+       *
+       * The two axes answer different questions, which beat 018's second pass had to separate
+       * (spec 018 FR-012, FR-013).
+       *
+       * The **width** is what the row needs: every declared horizon at
+       * `minimumPanelWidthPx`, plus what the flanking panes cost at the width below which they
+       * cannot be read. Below it the surface says the width it needs and the centre carries one
+       * horizon with the strip carrying the rest (FR-049); it does not shrink six panels past
+       * legibility and it does not scroll the row. It is a media query on this figure alone.
+       *
+       * The **height** is what a floor otherwise is: below it a pane clips. It decides nothing
+       * about what is drawn, and the first pass of beat 018 made it decide, which is how the
+       * defect happened -- 960 was declared, no browser window is 960 px tall, and so every
+       * reader fell below the floor and met the answer meant for a small window. It must stay
+       * below the shortest viewport in `tests/shell/declared-geometry.ts`'s matrix, and
+       * `viewport-matrix.spec.ts` asserts that as arithmetic.
        *
        * CSS pixels, so a nominally adequate window at 200 per cent zoom is below the floor
        * and gets the same answer. That is the correct behaviour and not a bug: the reader at
@@ -674,8 +688,8 @@ export const configurationSchema = z
   /**
    * Beat 018, FR-011. The reference viewport is the window the workspace is designed for, so
    * it cannot be smaller than the window the workspace refuses to lay out in. Declaring a
-   * reference below the floor would mean every figure in the documentation was taken in the
-   * fallback presentation.
+   * reference below the floor would mean every figure in the documentation was taken in a
+   * window the workspace does not fit.
    */
   .superRefine((c, ctx) => {
     const p = c.presentation;

@@ -85,3 +85,37 @@ export const PANE_IDS: readonly string[] = [
   'provenance/truth',
   'provenance/manifest',
 ];
+
+/**
+ * The viewports the workspace is held to (spec 018 FR-012, SC-008), declared once.
+ *
+ * Real browser sizes, and that is the whole of why they are here. Beat 018's first pass
+ * measured the workspace at 2 560 x 1 440 and 1 920 x 1 080 -- the two heights it was designed
+ * at -- declared a minimum of 1 658 x 960, and shipped a floor 960 px tall that **no browser
+ * viewport reaches**: a 1080-tall screen gives a window about 900 px of it once the browser's
+ * own chrome is taken. So 1920 x 900, 1536 x 864 and 2560 x 900 all fell below the floor and
+ * got a stacked column that scrolled 6,584 px in a 560 px box. A requirement measured only
+ * where it passes is not measured.
+ *
+ * They are literals rather than declared figures because they are facts about the machines
+ * readers have and not about this application: `presentation` declares what the workspace
+ * needs, and this list is what it is held against. 1 366 x 768 is the smallest laptop of the
+ * six and is the case that was broken.
+ */
+export const VIEWPORT_MATRIX: readonly { readonly width: number; readonly height: number }[] = [
+  { width: 1366, height: 768 },
+  { width: 1536, height: 864 },
+  { width: 1920, height: 900 },
+  { width: 1920, height: 1080 },
+  { width: 2560, height: 900 },
+  { width: 2560, height: 1440 },
+];
+
+/**
+ * The narrowest viewport in the matrix, which is narrower than the row needs.
+ *
+ * Where a test wants the answer below the floor, it wants a window a reader actually has:
+ * 900 x 700 is not one, and every test in this suite that used it was asserting the fallback
+ * at a size nobody meets.
+ */
+export const BELOW_THE_ROW = VIEWPORT_MATRIX[0] as { readonly width: number; readonly height: number };

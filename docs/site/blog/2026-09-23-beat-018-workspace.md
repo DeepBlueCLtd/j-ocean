@@ -1,6 +1,6 @@
 ---
 title: "Beat 018: the surface stops being an article and becomes an instrument"
-summary: The four-region grid became a docked workspace of panes. The measurable part is that the empty space fell from 71.9 per cent of the screen to 56.0, that the declared floor came down from 2038 px to 1658 because 828 px of the old floor was chrome nobody had checked could shrink, and that the one instrument measuring the emptiness preferred a surface the requirements forbid.
+summary: The four-region grid became a docked workspace of panes. The empty space fell from 71.9 per cent of the screen to 56.0, the declared floor came down from 2038 px wide to 1658 because 828 px of the old floor was chrome nobody had checked could shrink, and the one instrument measuring the emptiness preferred a surface the requirements forbid. Then the floor turned out to be 960 px tall, which no browser window is, so every real reader met a 6,584 px scrolling column -- and the fix is measured at six sizes a browser actually has.
 date: 2026-09-23
 ---
 
@@ -77,7 +77,7 @@ This is the measurable part of the beat.
 | Dead space at 2 560 × 1 440, row built and scored | **71.9 %** | **56.0 %** |
 | A horizon panel at 2 560 | 277 px | **280 px** |
 | A horizon panel at the declared floor | 190 px | 190 px |
-| The declared floor | 2 038 × 728 | **1 658 × 960** |
+| The declared floor | 2 038 × 728 | **1 658 × 740** |
 | A 2 000 px window | the fallback | **the six-panel row** |
 
 Dead space is measured with one instrument run against both builds: an eight-pixel grid over
@@ -92,8 +92,11 @@ because in a grid of fixed tracks they were. The consequence was that an ordinar
 monitor — the author's own — got the below-the-floor fallback. In a workspace the flanking
 panes flex, so the floor is built from the width below which a pane cannot be **read**, and the
 declared widths are shared down proportionally when a window cannot afford them. The width fell
-by 380 px. The height rose from 728 to 960, for two honest reasons: every panel now carries its
-own skill figures, and the controls pane at its narrowest wraps more of its labels.
+by 380 px.
+
+The height is the part this beat got wrong on its first pass, and it is the section after next.
+
+
 
 ## The instrument preferred a surface the requirements forbid
 
@@ -256,8 +259,70 @@ other direction.
 The below-the-floor answer went the same way, and it was the beat's own blind spot: beat 013's
 fallback said the size it needed in **two paragraphs of prose**, which is the fault this beat
 exists to fix, arriving in the one presentation nobody was looking at. It is one line now — the
-size, as the declared figure it is — and the two paragraphs are a step of the walkthrough,
+width, as the declared figure it is — and the two paragraphs are a step of the walkthrough,
 reachable from that same presentation.
+
+## A floor no browser window reaches
+
+The author opened the preview on an ordinary browser window and got **a 6,584 px scrolling
+column beneath a fixed banner** — longer than the 5,757 px page the interface document was
+written to kill.
+
+Everything above was measured at 2 560 × 1 440 and 1 920 × 1 080. Those are screen sizes. A
+*window* on a 1080-tall screen is about 900 px tall once the browser's own chrome is taken, and
+the declared floor was **960 px tall**. So 1 920 × 900, 1 536 × 864 and 2 560 × 900 were all
+below the floor, and what was down there was beat 013's answer carried through unchanged: every
+pane stacked in one column with a scrollbar down the side.
+
+The census that should have caught it had classified that column as *"a list — the panes, one
+under another"*, and the list/prose test believed the classification. **Stacking a whole
+application vertically and scrolling it is not a list; it is the page.** That is this beat's own
+finding, one box larger: a class that means *this is allowed* is a licence and not a category.
+
+Three things follow, and all three are measured rather than argued.
+
+**The floor is a width.** Six panels at the declared minimum panel width need 1 658 px between
+them once the flanking panes have taken the least they can be read at. A short window is short
+of height, and height is not what makes a row of six unreadable — measured, too: forced to one
+horizon at 1 658 × 735 the horizons pane overflowed by 970 px, where the row it replaced fitted.
+So the query that decides what the centre holds asks the width, the line on the surface states a
+width, and `minimumViewportHeightPx` goes back to being what a floor is: the height below which
+a pane clips.
+
+**The column is deleted, not shortened.** Below the width the row needs, the workspace is the
+workspace — the same dock, the same panes, the same status strip — and the centre carries one
+horizon with the strip carrying the other five. That is beat 015's enlargement, which was
+already the union `CentreContent` forced to `enlarged`; what is gone is the second arrangement
+that used to be wrapped around it.
+
+**The height came down from 960 to 740, and what forced 960 was furniture.** Not, as it
+happened, any of the things the layout declares: the controls pane's own content was **823 px**
+at the 220 px it is narrowest, and the status strip wrapped to two rows and took **110**. A
+control surface had been set at a paragraph's line height, its groups separated twice over —
+once by a rule and once by a gap — and the strip gave 22 rem of its width to an ellipsised
+64-character digest, which left no room for the statement beside it. Set as furniture rather
+than as text the controls are **648** and the strip is one row of **66**, and no control, label,
+unit or declared bound left the pane. The floor measures **1 658 × 740**.
+
+![An ordinary browser window, 1920 x 900: the docked workspace with the six-panel row](../images/018-an-ordinary-window.png)
+
+740 is below 768, which is the shortest laptop in the matrix, and that matrix is now a declared
+list that a test walks: 1 366 × 768, 1 536 × 864, 1 920 × 900, 1 920 × 1 080, 2 560 × 900 and
+2 560 × 1 440. At every one of them the workspace renders, the row builds and scores, the
+document does not scroll, nothing is clipped, and the tallest scroll of any element in any state
+is **653 px sideways** at 1 366 × 768 — the horizon strip, which is a list of six controls and
+says so on the element. Its slots are held to the width a horizon is legible at, because sharing
+a 548 px pane between six of them squeezed each horizon's skill figures down to `0.0` and `-2.`,
+and a truncated figure is worse than a scrollbar on a list.
+
+Two faults surfaced only because the census was finally asked at those sizes, and both had been
+in the tree since this beat's first pass. The enlarged panel's depth elevation was given its
+**intrinsic** height, which for a viewBox of 100 × 170 at a width of 823 px is 1 398 px: it was
+laid out 879 px below the pane, painted nowhere, with its depth labels crowded into the top
+eighth of it. And the skill curve, which may shrink so the row keeps its room, could be crushed
+below its own heading and caption — 30 px of it in a 636 px pane, with the caption hidden by the
+`overflow` that was supposed to be protecting the layout. Neither produced a scrollbar for a
+scrollbar test to catch, which is the whole reason the census measures clipping.
 
 ## What did not change
 
@@ -318,7 +383,7 @@ container it believes is 100 px wide, and is then thrown away by the first real 
 declared widths are applied on the first frame at which the grid's own width is the window's,
 and the wait is bounded.
 
-Ninety-one shell tests were written against the region grid and there are 114 now. Their claims
+Ninety-one shell tests were written against the region grid and there are 121 now. Their claims
 mostly survived and their selectors mostly did not; eight lost their subject outright, and each
 is recorded in the plan's `## Measured` against the claim it made rather than deleted. The one worth naming here
 is beat 013's *each score is in its panel's column*, which was a claim about CSS `subgrid`

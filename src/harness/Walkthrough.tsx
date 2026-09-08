@@ -115,27 +115,27 @@ export const WALKTHROUGH_STEPS: readonly WalkthroughStep[] = [
   },
   {
     pane: 'horizons',
-    title: 'When the window is too small',
+    title: 'When the window is too narrow',
     body: (config) => (
       <>
         <p>
           All{' '}
           <Declared>{config.horizons.leadHours.length}</Declared> declared horizons side by
           side, each at the declared minimum of{' '}
-          <Declared>{config.presentation.minimumPanelWidthPx} px</Declared>, want a viewport of
-          at least{' '}
-          <Declared>
-            {config.presentation.minimumViewportWidthPx} &times;{' '}
-            {config.presentation.minimumViewportHeightPx} px
-          </Declared>{' '}
-          once the two flanking panes have taken the least they can be read at. That figure was
-          measured from the built workspace, not chosen.
+          <Declared>{config.presentation.minimumPanelWidthPx} px</Declared>, want a viewport at
+          least{' '}
+          <Declared>{config.presentation.minimumViewportWidthPx} px</Declared> wide once the two
+          flanking panes have taken the least they can be read at. It is a width, because width
+          is what a row of six is short of; the workspace itself needs{' '}
+          <Declared>{config.presentation.minimumViewportHeightPx} px</Declared> of height, which
+          is less than the shortest laptop has. Both figures were measured from the built
+          workspace, not chosen.
         </p>
         <p>
-          Below it the application shows one horizon at a time. The strip carries all of them
-          and what each was worth, because comparison across horizons is the lesson; choosing
-          one in the strip swaps the panel beneath it. Widen the window past the figure above
-          and the full workspace returns without a reload.
+          Narrower than that, the workspace is unchanged and its centre shows one horizon at a
+          time. The strip carries all of them and what each was worth, because comparison
+          across horizons is the lesson; choosing one in the strip swaps the panel beneath it.
+          Widen the window past the figure above and the row returns without a reload.
         </p>
       </>
     ),

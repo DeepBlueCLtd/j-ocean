@@ -48,10 +48,14 @@ import {
  * read once on mount, and a stored arrangement this build cannot apply is reported rather than
  * half-applied.
  *
- * **Below the declared floor the workspace does not lay out at all.** `BelowFloor` is beat
- * 013's answer, unchanged in what it says: the size the application needs, and one horizon at
- * a time with the strip carrying the rest. A docking layout manager in a 900 px window would
- * be five panes nobody can read, which is the fault the fallback exists to prevent.
+ * **Below the declared floor the workspace is still the workspace.** Beat 018's first pass
+ * had a second arrangement here -- every pane stacked in one column with a scrollbar down the
+ * side -- and it was the page this whole beat exists to kill: 6,584 px of it in a 560 px box
+ * on an ordinary 1920 x 900 window. What a small window is short of is **width**, because six
+ * panels at their declared minimum need width, so what gives way below the floor is the row
+ * and not the layout: the same panes, and the centre forced to one horizon with the strip
+ * carrying the other five. `resolveCentreContent` does the forcing and this module does not
+ * know it happened.
  */
 
 /** One pane the workspace draws: what it is called, where it belongs, and what is in it. */
@@ -148,32 +152,44 @@ export function workspaceGeometry(config: Configuration): CSSProperties {
 export { REGIONS };
 
 /**
- * Whether this window is at or above the declared floor (FR-043, unchanged from beat 013).
+ * Whether this window has the **width** the row needs (FR-043; spec 018 FR-013, US6).
+ *
+ * A width and not a size, which is the correction beat 018's second pass made. The query asked
+ * both axes and the declared height was 960 px -- taller than any browser viewport a reader
+ * has -- so 1920 x 900, 1536 x 864 and 2560 x 900 all answered no and got a presentation
+ * meant for a small window. What six panels at `minimumPanelWidthPx` are short of in a small
+ * window is width; a short window is short of height, and height is not what makes a row of
+ * six panels unreadable. It was also measured to be the wrong medicine: forced to an
+ * enlargement at 1 658 x 735 the horizons pane overflowed by 970 px, where the row it replaced
+ * fitted with the controls pane five pixels over.
+ *
+ * `presentation.minimumViewportHeightPx` is still declared and still measured -- it is the
+ * height below which a pane clips, which is what a floor is -- and it no longer decides what
+ * the centre holds.
  *
  * A media query rather than a resize listener, for two reasons. It is answered in **CSS
  * pixels**, so a reader at 200 per cent zoom on a nominally adequate window is below the floor
  * and gets the floor's answer -- which is correct, because they have as few pixels to read six
  * panels in as the reader with a small window. And it fires on the crossing rather than on
- * every pixel of a drag, so crossing the floor swaps the presentation without a reload.
+ * every pixel of a drag, so crossing the floor swaps the centre without a reload.
  */
-export function useAboveFloor(config: Configuration | null): boolean {
+export function useRoomForTheRow(config: Configuration | null): boolean {
   const query =
     config === null
       ? null
-      : `(min-width: ${String(config.presentation.minimumViewportWidthPx)}px) and ` +
-        `(min-height: ${String(config.presentation.minimumViewportHeightPx)}px)`;
-  const [above, setAbove] = useState(true);
+      : `(min-width: ${String(config.presentation.minimumViewportWidthPx)}px)`;
+  const [wide, setWide] = useState(true);
 
   useLayoutEffect(() => {
     if (query === null) return;
     const media = window.matchMedia(query);
-    setAbove(media.matches);
-    const onChange = (event: MediaQueryListEvent): void => { setAbove(event.matches); };
+    setWide(media.matches);
+    const onChange = (event: MediaQueryListEvent): void => { setWide(event.matches); };
     media.addEventListener('change', onChange);
     return () => { media.removeEventListener('change', onChange); };
   }, [query]);
 
-  return above;
+  return wide;
 }
 
 /**
@@ -516,78 +532,6 @@ export function Workspace(props: WorkspaceProps) {
           </div>
         )}
       </section>
-    </main>
-  );
-}
-
-export interface BelowFloorProps {
-  readonly config: Configuration;
-  readonly status: ReactNode;
-  /**
-   * The size the application needs (FR-043). Built by the shell, because that size is a
-   * **declared** figure and the figure kinds live with the shell; this module places it and
-   * does not phrase it.
-   */
-  readonly notice: ReactNode;
-  /** The same horizons pane the workspace gets: below the floor it is forced to one panel. */
-  readonly horizons: ReactNode;
-  readonly selection: ReactNode;
-  readonly controls: ReactNode;
-  readonly provenance: ReactNode;
-}
-
-/**
- * The answer below the declared floor (FR-043, US7 of beat 013, carried unchanged).
- *
- * The workspace needs the two declared column widths and every declared horizon at the
- * declared minimum. A window that has not got them invites two obvious answers -- shrink the
- * panels past legibility, or scroll the row -- and both are the fault the row exists to
- * prevent (ADR-0003). So this is the third: **say the size, and show one panel at a time.**
- *
- * Every pane is still here and still named, in one column. What changes is their arrangement
- * and what the horizons pane carries -- not what exists, and not what is computed. The
- * statement of FR-58 and the required size stay out of the scroller, because a statement a
- * reader has to scroll to find is not one the surface is making.
- */
-export function BelowFloor(props: BelowFloorProps) {
-  return (
-    <main
-      className="one-view below-floor"
-      data-testid="one-view"
-      data-presentation="single-panel"
-      style={workspaceGeometry(props.config)}
-    >
-      <section className="pane floor-answer" data-testid="pane-floor">
-        {props.status}
-        {props.notice}
-      </section>
-
-      <div className="below-floor-body" data-testid="below-floor-body" data-scrolls="list" data-list="the panes, one under another">
-        <section className="pane horizons" data-testid="pane-horizons" data-pane-id="horizons">
-          {props.horizons}
-        </section>
-        <section
-          className="pane selection"
-          data-testid="pane-selection"
-          data-pane-id="selection"
-          aria-live="polite"
-          aria-atomic="false"
-        >
-          {props.selection}
-        </section>
-        {/*
-          Last rather than first, and that is the one thing this arrangement gives up: above
-          the floor the causes are the first column a reader meets. Below it the payload has to
-          come first, because a reader who has been told the window is too small needs to see
-          what they are being offered instead before they are offered controls for it.
-        */}
-        <section className="pane controls" data-testid="pane-controls" data-pane-id="controls">
-          {props.controls}
-        </section>
-        <section className="pane provenance" data-testid="pane-provenance" data-pane-id="provenance">
-          {props.provenance}
-        </section>
-      </div>
     </main>
   );
 }

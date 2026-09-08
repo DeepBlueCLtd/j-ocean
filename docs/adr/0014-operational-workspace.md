@@ -86,18 +86,29 @@ with the same instruments:
   FR-45 gives it. The 13.5 points that costs are reported rather than absorbed by a chart.
 - **A horizon panel is 190 px at the floor and 280 px at the reference viewport.** Beat 017's
   was 277 px at 2 560 and could not have been anything else: the tracks were fixed.
-- **The declared floor came down from 2 038 × 728 to 1 658 × 960.** The width fell because
+- **The declared floor came down from 2 038 × 728 to 1 658 × 740.** The width fell because
   828 px of beat 013's floor was chrome declared unshrinkable — two 390 px columns and a 48 px
   gutter — and in a workspace the flanking panes flex to the width below which they cannot be
-  *read*. The height rose because each panel now carries its own skill figures and because the
-  controls pane, at its narrowest, wraps. **A 2 000 px window now shows the six-panel row**; on
-  beat 017's head it got the fallback, which is what the author's screenshot showed.
+  *read*. **A 2 000 px window now shows the six-panel row**; on beat 017's head it got the
+  fallback, which is what the author's screenshot showed.
+
+  The height is this beat's second pass and its correction. The first declared **960**, which
+  is taller than any browser viewport a reader has — a 1080-tall screen gives a window about
+  900 px of it — so every ordinary window fell below the floor and met the answer meant for a
+  small one. What forced 960 was the controls pane's own content at the 220 px it is narrowest,
+  **823 px** of it, and a status strip that wrapped to two rows and took **110**. Neither is a
+  quantity: a control surface set at a paragraph's line height, groups separated twice over,
+  and a 64-character digest given 22 rem of a strip that then had no room for the statement
+  beside it. Set as furniture the controls are **648** and the strip is one row of **66**, and
+  the floor measures **1 658 × 740** — below 768, which is the shortest laptop in the matrix.
 - **Nothing scrolls at the reference viewport** — not loaded, not with the row built and
   scored, not with a cell selected, not on any of the four provenance tabs, not with a panel
   enlarged — except with a profile pinned, when the selection pane scrolls that profile's
   levels, which is a list. At the declared floor one pane scrolls and it scrolls a list: the
-  run's own term list of figures. Below the floor two do, and both are lists: the panes one
-  under another, and the horizon strip sideways.
+  run's own term list of figures. Across the six viewports of the matrix the tallest scroll of
+  any element in any state is **653 px sideways**, at 1 366 × 768, and it is the horizon strip:
+  a list of six controls, each held to the width a horizon is legible at rather than squeezed
+  until its skill figures truncate.
 - **One digest moved**: `configuration`, and only because declared presentation figures
   changed. The other forty are byte-identical.
 

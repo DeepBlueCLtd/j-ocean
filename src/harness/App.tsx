@@ -18,7 +18,7 @@ import { FieldView, type Marker } from './FieldView.js';
 import { footprintOf, markersFrom, marksOf, type Footprint } from './footprint.js';
 import type { Edit } from '../instruments/edits.js';
 import { useHorizonRow } from './HorizonRow.js';
-import { BelowFloor, Workspace, useAboveFloor, type PaneDefinition, type PanePlacement } from './Workspace.js';
+import { Workspace, useRoomForTheRow, type PaneDefinition, type PanePlacement } from './Workspace.js';
 import { departureBrief, runForecast, type DepartureBrief, type ForecastResult } from '../run/forecast.js';
 import { climatologyReferenceOver } from '../instruments/climatology-reference.js';
 import { interfaceFieldFromContainer } from '../instruments/interface-field.js';
@@ -163,10 +163,12 @@ function flagSummary(view: RunView): [string, number][] {
 export function App() {
   const [loaded, setLoaded] = useState<LoadedConfiguration | null>(null);
   /**
-   * FR-009 and US7 scenario 3. Whether the window is at or above the declared floor, in CSS
-   * pixels, answered continuously: crossing the floor swaps the presentation with no reload.
+   * FR-009 and US7 scenario 3. Whether the window has the **width** six legible panels need,
+   * in CSS pixels, answered continuously: crossing that width swaps what the centre holds with
+   * no reload. It is not a question about height -- see `useRoomForTheRow` for why asking both
+   * put every reader below the floor.
    */
-  const aboveFloor = useAboveFloor(loaded?.config ?? null);
+  const roomForTheRow = useRoomForTheRow(loaded?.config ?? null);
   const [failure, setFailure] = useState<string | null>(null);
   /** Beat 011: what the reader pasted, and what happened when it was read. */
   const [pasted, setPasted] = useState('');
@@ -819,11 +821,11 @@ export function App() {
        is the shell's and the row is handed it. */
     requested: requestedCentre,
     onRequest: requestCentre,
-    /* FR-043. Below the declared floor the centre is forced to an enlargement -- the strip
+    /* FR-043. Narrower than the row needs, the centre is forced to an enlargement -- the strip
        and one panel -- because six panels shrunk past legibility are six panels nobody can
-       read. It is the same enlargement a reader chooses above the floor, not a second
+       read. It is the same enlargement a reader chooses at any width, not a second
        presentation. Which panels are drawn is display; nothing here recomputes. */
-    aboveFloor,
+    roomForTheRow,
   });
 
   /*
@@ -1346,7 +1348,7 @@ export function App() {
    * the pane gives it, which is where a cell is selected while there are no panels to select
    * one on.
    */
-  const horizons =
+  const horizonsContent =
     view.forecast === null ? (
       <div className="row-invitation" data-testid="row-invitation">
         {/* Two panels rather than one heading over both: the picture on the left is the
@@ -1428,6 +1430,36 @@ export function App() {
         {row.skill}
       </>
     );
+
+  /*
+   * FR-043 and FR-013, said in one line and in the pane it is about (spec 018 US6).
+   *
+   * Beat 013 wrote this as two paragraphs above a column of every pane stacked and scrolled.
+   * The paragraphs went to the walkthrough in this beat's first pass and the column went in
+   * its second: what a small window is short of is **width**, so what gives way is the row and
+   * not the layout. The line therefore lives in the horizons pane, which is the pane holding
+   * one horizon instead of six, rather than in a banner over the whole surface.
+   *
+   * The figure it states is a **width**, because that is the figure the row is short of:
+   * six panels at the declared minimum panel width need 1 658 px between them, and a short
+   * window is not what makes a row of six unreadable. The window's own size is deliberately
+   * not printed beside it -- it is neither declared nor computed by anything this project
+   * runs, and a fourth kind of figure invented for a line would be worth less than the words
+   * it saved.
+   */
+  const floorNotice = (
+    <p className="floor-notice" data-testid="viewport-floor-notice" role="note">
+      Needs <Declared>{config.presentation.minimumViewportWidthPx} px</Declared> for the row;
+      showing one horizon.
+    </p>
+  );
+
+  const horizons = (
+    <>
+      {roomForTheRow ? null : floorNotice}
+      {horizonsContent}
+    </>
+  );
 
   /*
    * FR-047 and FR-048. Whatever was last selected, and -- when nothing has been -- what can
@@ -1574,33 +1606,6 @@ export function App() {
   );
 
   /*
-   * FR-043, said in one line (spec 018 FR-007).
-   *
-   * Beat 013 wrote this as two paragraphs: what the row needs and why, and what is being
-   * offered instead and why the strip survives. Both were true and both were an explanation on
-   * the surface, which is the fault this beat exists to remove -- and they were the first thing
-   * a reader at a small window met, which made the fallback read as an apology.
-   *
-   * So the surface states the size, as the declared figure it is, and says what it is doing.
-   * The two paragraphs are in the walkthrough, which is offered here as it is everywhere else,
-   * and docs/narrative-disposition.json records where each went.
-   *
-   * The window's own size is deliberately not printed beside it. It is neither declared nor
-   * computed by anything this project runs, and a fourth kind of figure invented for a banner
-   * would be worth less than the sentence it saved.
-   */
-  const floorNotice = (
-    <p className="banner floor-notice" data-testid="viewport-floor-notice" role="note">
-      Needs{' '}
-      <Declared>
-        {config.presentation.minimumViewportWidthPx} &times;{' '}
-        {config.presentation.minimumViewportHeightPx} px
-      </Declared>
-      ; showing one horizon at a time.
-    </p>
-  );
-
-  /*
    * The panes, and where each goes before a reader moves it (FR-001, Principle X).
    *
    * The provenance tabs share a group, which is what makes them tabs; everything else is its
@@ -1628,10 +1633,27 @@ export function App() {
     { id: 'provenance/manifest', pane: 'provenance', title: 'Manifest', content: manifestPane },
   ];
 
+  /*
+   * What the horizons pane cannot be read below, which is a different figure above the floor
+   * and below it (spec 018 FR-013).
+   *
+   * Above the floor the pane holds the row, so its minimum is the row's: every declared
+   * horizon at the declared minimum panel width, the gaps between them and what the pane costs
+   * around them. That sum **is** the floor's width.
+   *
+   * Below it the pane holds one horizon and the strip, so its minimum is one panel's. Leaving
+   * the row's figure in place there would be the layout manager reserving width for six panels
+   * that are not drawn, which in a 1 366 px window is the whole of the window: the flanking
+   * panes would be squeezed under the width below which they cannot be read, and the
+   * workspace would not lay out at the very size this beat exists to serve.
+   */
   const rowMinimumWidthPx =
     config.horizons.leadHours.length * config.presentation.minimumPanelWidthPx +
     (config.horizons.leadHours.length - 1) * config.presentation.panelGapPx +
     config.presentation.pageGutterPx;
+  const horizonsMinimumWidthPx = roomForTheRow
+    ? rowMinimumWidthPx
+    : config.presentation.minimumPanelWidthPx + config.presentation.pageGutterPx;
 
   const placements: readonly PanePlacement[] = [
     {
@@ -1644,9 +1666,9 @@ export function App() {
       referencePanel: 'controls',
       direction: 'right',
       /* The one pane with no declared width: it takes what the flanking panes leave, and its
-         minimum is the row's own -- every declared horizon at the declared minimum panel
-         width, plus what the pane costs around them. That figure is the floor. */
-      minimumWidth: rowMinimumWidthPx,
+         minimum is the row's own where it holds the row, and one panel's where it holds one
+         horizon and the strip. */
+      minimumWidth: horizonsMinimumWidthPx,
     },
     {
       id: 'selection',
@@ -1674,33 +1696,19 @@ export function App() {
    */
   return (
     <HelpProvider config={config}>
-      {aboveFloor ? (
-        <Workspace
-          config={config}
-          panes={panes}
-          placements={placements}
-          status={status}
-          onRefusal={setWorkspaceRefusal}
-          onReady={onWorkspaceReady}
-        />
-      ) : (
-        <BelowFloor
-          config={config}
-          status={status}
-          notice={floorNotice}
-          controls={controls}
-          horizons={horizons}
-          selection={selectionPane}
-          provenance={
-            <>
-              {runProvenance}
-              {instruments}
-              {truthRecord}
-              {manifestPane}
-            </>
-          }
-        />
-      )}
+      {/*
+        One layout at every viewport (spec 018 FR-013). What a small window is short of is
+        width, so what gives way below the floor is the row -- the centre is forced to one
+        horizon with the strip carrying the other five -- and never the workspace itself.
+      */}
+      <Workspace
+        config={config}
+        panes={panes}
+        placements={placements}
+        status={status}
+        onRefusal={setWorkspaceRefusal}
+        onReady={onWorkspaceReady}
+      />
     </HelpProvider>
   );
 }

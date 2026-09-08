@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { FLOOR, REFERENCE } from './declared-geometry.js';
+import { BELOW_THE_ROW, FLOOR, REFERENCE } from './declared-geometry.js';
 
 /**
  * No explanatory sentence on the surface (spec 018 US3, FR-006, FR-007, SC-005; SRD-v2 §8.1).
@@ -288,7 +288,7 @@ test.describe('the surface carries no explanatory sentence', () => {
   test('below the declared floor, where the surface has more to say and no more room', async ({
     page,
   }) => {
-    await page.setViewportSize({ width: 900, height: 700 });
+    await page.setViewportSize({ width: BELOW_THE_ROW.width, height: BELOW_THE_ROW.height });
     await page.goto('/');
     await expect(page.getByTestId('viewport-floor-notice')).toBeVisible();
     await openEverything(page);

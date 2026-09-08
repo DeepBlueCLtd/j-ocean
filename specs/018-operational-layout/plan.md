@@ -100,6 +100,11 @@ ADR-0014.
 Every figure here came out of the built workspace, at 2 560 × 1 440 with the row built and
 scored unless another window is named.
 
+**And that sentence is the beat's own finding.** Two passes measured only at 2 560 × 1 440 and
+1 920 × 1 080, which are screen sizes and not window sizes, and declared a floor 960 px tall
+that no browser window reaches. Every figure about a *small* window below is now taken at one a
+reader has: the declared floor, and the six real viewports of the matrix.
+
 ### Dead space, before and after
 
 **71.9 per cent → 56.0 per cent.** One instrument, run against beat 017's head and against this
@@ -144,33 +149,64 @@ honest price of it, and they are here rather than hidden inside a chart.
 
 ### The floor, re-measured
 
-| | Beat 013 declared | Beat 018 measures |
-|---|---|---|
-| Floor | 2 038 × 728 | **1 658 × 960** |
-| Of which chrome, in width | 828 px (390 + 390 + 48), unshrinkable | 448 px (2 × 220 at the pane minimum, 2 × 4 sashes) |
-| A horizon panel at 2 560 | 277 px | **280 px** |
-| A horizon panel at the floor | 190 px | 190 px |
-| A 2 000 px window | the fallback | **the six-panel row** |
+| | Beat 013 declared | Beat 018, first pass | Beat 018 measures |
+|---|---|---|---|
+| Floor | 2 038 × 728 | 1 658 × 960 | **1 658 × 740** |
+| Of which chrome, in width | 828 px (390 + 390 + 48), unshrinkable | 448 px | 448 px (2 × 220 at the pane minimum, 2 × 4 sashes) |
+| Of which chrome, in height | — | 136 px (110 status strip, 26 tab strip) | **92 px** (66 status strip, 26 tab strip) |
+| The controls pane's content at 220 px | — | 823 px | **648 px** |
+| A horizon panel at 2 560 | 277 px | 280 px | **280 px** |
+| A horizon panel at the floor | 190 px | 190 px | 190 px |
+| A 2 000 px window | the fallback | the six-panel row | **the six-panel row** |
 
 The width fell because beat 013's floor was built from the widths the flanking columns *were*,
 and a track is that width in every window. The workspace's floor is built from the width below
 which a pane cannot be **read** — `workspace.paneMinimumWidthPx` — and the declared widths are
-shared down proportionally when a window cannot afford them. The height rose from 728 to 960
-for two reasons, both of them real: each panel now carries its own skill figures, and the
-controls pane at 220 px wraps more of its labels than it did at 390.
+shared down proportionally when a window cannot afford them.
 
-Measured from the built workspace by `tests/shell/viewport-floor.spec.ts`, which walks the
-window down until a pane clips or a panel falls below the declared minimum: **1 658 × 959**, and
-declared 1 658 × 960. At that width the flanking panes cost 448 px (2 × 220 at the pane minimum
-and 2 × 4 px sashes), the row needs 1 210 px (6 × 190 px panels, 5 × 10 px gaps and 20 px of
-pane padding), the workspace's chrome costs 136 px of height and the controls pane's own
-content is 823 px at that width — which is the binding figure on the vertical axis.
+**The height is the figure the first pass got wrong, and the mistake was not in the arithmetic.**
+960 was measured honestly from the built workspace; what was never asked is whether a browser
+window is ever 960 px tall, and it is not — a 1080-tall screen gives a window about 900 px of it
+once the browser's own chrome is taken. So the floor was above every real viewport and every
+real reader met the answer below it.
 
-**The full row appears at the declared floor width, 1 658 px**, given the declared 960 px of
-height: `useAboveFloor` is a media query on both, in CSS pixels, so the presentation swaps on
-the crossing and a reader at 200 per cent zoom gets the answer their pixel count deserves. The
-author's window was the case that mattered: a 2 000 px monitor got beat 017's fallback and gets
-the row here.
+What actually forced 960, measured pane by pane at the floor's own width:
+
+| | First pass | Now |
+|---|---|---|
+| The controls pane's own content, at the 220 px it is narrowest | **823 px** | **648 px** |
+| The status strip, which wraps | **110 px** (two rows) | **66 px** (one row) |
+| The dockview tab strip | 26 px | 26 px |
+| The floor's height, which is their sum | 959, declared 960 | **740, declared 740** |
+
+Neither of the two is a computed quantity and neither was a requirement. The controls pane was
+set at the body's line height of 1.5 — a rule for a paragraph somebody reads, where a label, a
+button and a readout are read one at a time — and its groups were separated twice over, by a
+rule and by a gap. The status strip gave 22 rem of its width to an ellipsised 64-character
+digest, which at the floor's width left no room for the statement beside it, so it wrapped and
+took 110 px of a window that has 768. Set as furniture the controls are 648 px and the strip is
+one row, and **no control, label, unit or declared bound left the pane**: the same seven groups
+are there, and the digest is still there, ellipsised at 8 rem instead of 22 with the whole of it
+on the manifest tab where a figure somebody copies belongs.
+
+`presentation.workspace.provenanceFraction` is **not** among the causes, and it is worth saying
+because it was the first suspect. The provenance pane's content is a term list that scrolls, so
+it fills whatever height it is given and never asks for more; the selection pane's content is
+89 px. The controls pane is the only pane on the vertical axis with a floor of its own.
+
+Measured from the built workspace by `tests/shell/viewport-floor.spec.ts`: **1 658 × 740**, and
+declared 1 658 × 740. Walked down by hand at the floor's width with the row scored, the workspace
+holds at 740 and the controls pane clips by 10 px at 730 — which is what makes 740 the floor
+rather than a comfortable number.
+
+**The floor's width is what decides what the centre holds, and its height is not.** Six panels
+at `minimumPanelWidthPx` need width; a short window is short of height, and height is not what
+makes a row of six unreadable. That is measured too: forced to one horizon at 1 658 × 735 the
+horizons pane overflowed by 970 px, where the row it replaced fitted with the controls pane five
+pixels over. So `useRoomForTheRow` is a media query on **width alone**, in CSS pixels, so the
+centre swaps on the crossing and a reader at 200 per cent zoom gets the answer their pixel count
+deserves. The author's window was the case that mattered: a 2 000 px monitor got beat 017's
+fallback and gets the row here.
 
 ### The row, and the curve beneath it
 
@@ -196,16 +232,81 @@ profile pinned, and every disclosure forced open.
 |---|---|---|
 | 2 560 × 1 440 | **nothing**, in every state above but one | — |
 | 2 560 × 1 440, a profile pinned | `selection` → the level list | **list** — *a profile's levels, measured against the model's derived ones*; an Argo profile carries hundreds |
-| 1 658 × 960, the declared floor | `provenance/run` → its own `dl` | **list** — *the run's own figures, one to a line* |
-| 900 × 700, below the floor | the body of panes, one under another | **list** — *the panes, one under another* |
-| 900 × 700, a panel enlarged | the horizon strip, sideways | **list** — *every declared horizon, as controls* |
+| 1 658 × 740, the declared floor | `provenance/run` → its own `dl` | **list** — *the run's own figures, one to a line* |
+| 1 366 × 768, below the width the row needs | `provenance/run` → its own `dl`, and the horizon strip sideways | **list** — *the run's own figures, one to a line*; **list** — *every declared horizon, as controls* |
 
-Nothing scrolls a body of text at any of them, and the below-the-floor presentation was walked
-to the same states as the workspace rather than assumed: the author's own screenshot of beat
-017's head was a window in that presentation, and no test in the tree had anything to say about
-it. `tests/shell/one-view.spec.ts` also fails on a pane that **clips**, which beat 013's test
-could not see at all: `overflow: hidden` produces no scrollbar for a scrollbar test to catch,
-and that is exactly how a surface that does not fit hides.
+Nothing scrolls a body of text at any of them. `tests/shell/one-view.spec.ts` also fails on a
+pane that **clips**, which beat 013's test could not see at all: `overflow: hidden` produces no
+scrollbar for a scrollbar test to catch, and that is exactly how a surface that does not fit
+hides.
+
+**Two rows of this table used to say something else, and what they said was the defect.** They
+were *900 × 700, below the floor → the body of panes, one under another → **list** — the panes,
+one under another*, and the same window with a panel enlarged. Stacking a whole application
+vertically and scrolling it is not a list; it is the page, and calling it a list is how a
+6,584 px column passed a test written to forbid exactly that. The column is deleted, so the rows
+are gone rather than corrected, and 900 × 700 is not a window a reader has anyway.
+
+### What the lower floor costs, said rather than absorbed
+
+At **exactly** the declared floor the skill curve is 109 px tall, and six value-axis labels in
+109 px overlap into a smudge. That is the honest price of a floor 220 px lower than the last
+one, and it is the floor rather than the surface: at 1 920 × 900 — the shortest window in the
+matrix that carries the row — the curve is 169 px and its axis reads cleanly, and at the
+reference viewport it is 403. The row, the panels and every figure are legible at the floor;
+the aid to reading them is cramped there. FR-045 says which of those may give way.
+
+### The matrix, at the sizes a reader has
+
+`tests/shell/viewport-matrix.spec.ts` walks the six viewports declared in
+`tests/shell/declared-geometry.ts`, in five states each — loaded, scored, a cell selected, and
+each of the three provenance tabs it has to select to reach. Every one of them renders the
+**workspace**; none of them scrolls the document on either axis; nothing is clipped.
+
+| Viewport | Workspace or fallback | The centre holds | Document scrolls | Tallest scroll of any element | A list? |
+|---|---|---|---|---|---|
+| 1 366 × 768 | **workspace** | one horizon and the strip | no | **653 px**, sideways — the horizon strip | yes: *every declared horizon, as controls* |
+| 1 536 × 864 | **workspace** | one horizon and the strip | no | **483 px**, sideways — the horizon strip | yes: *every declared horizon, as controls* |
+| 1 920 × 900 | **workspace** | the six-panel row | no | **0 px** | — |
+| 1 920 × 1 080 | **workspace** | the six-panel row | no | **0 px** | — |
+| 2 560 × 900 | **workspace** | the six-panel row | no | **0 px** | — |
+| 2 560 × 1 440 | **workspace** | the six-panel row | no | **0 px** | — |
+
+The second-tallest at 1 366 × 768 is `provenance/run`'s own term list, 43 px. Both are lists a
+reader scans and both say which list on the element; nothing at any of the six scrolls a body of
+text, and nothing at any of the six is clipped.
+
+**The strip's sideways scroll is a decision and not a leftover.** Its slots were `min-width: 0`
+and shared the pane's width equally, so at 1 366 px six of them squeezed until each horizon's two
+skill figures read `0.0` and `-2.` — a truncated figure, which is worse than a scrollbar on a
+list of six controls. A slot may not go below `minimumPanelWidthPx`, which is the width a horizon
+is legible at and the figure the row itself is built from; six of them do not fit a 548 px pane,
+so the strip scrolls, which FR-049 has always allowed it to do.
+
+On this beat's first head, four of those six were the stacked column: 6,515 px in a 428 px box
+at 1 366 × 768, 6,565 in 524 at 1 536 × 864, and 6,584 in 560 at both 1 920 × 900 and
+2 560 × 900. The two that were not are the two the surface had been measured at.
+
+### Two faults the matrix found, both of them older than it
+
+Neither produced a scrollbar, which is why the census measures clipping and not only scroll.
+
+- **The enlarged panel's depth elevation was given its intrinsic height.** `.elevation svg` is
+  `width: 100%` with a viewBox of 100 × 170, and `height: auto` on a replaced element with an
+  intrinsic ratio means *width ÷ ratio*: at the 823 px the aside has in a 1 210 px pane, 1 398 px.
+  It was laid out **879 px below the pane** and painted nowhere, and its depth labels — placed at
+  `yOf(depth)` pixels, in the viewBox's own coordinates — sat in the top eighth of it, naming
+  depths the lines beside them were not at. The drawing fills the box it is given now, on both
+  axes, and the labels are placed as a share of it, which `preserveAspectRatio="none"` makes
+  exact.
+- **The skill curve could be crushed below its own heading and caption.** It is `flex: 1 1 auto`
+  so it can shrink and let the row keep its room, and `min-height: 0` let it shrink to 30 px in a
+  636 px pane — with the caption laid out 17 px below the pane and hidden by the `overflow` that
+  was there to protect the layout. Its minimum is `min-content` now, which is the heading and the
+  caption: the plot contributes nothing to it, because `contain: size` says what the component
+  already assumed — it is measured by a `ResizeObserver` and drawn at whatever size it is given,
+  so the `svg` carrying the last frame's size as attributes must not be what decides the next
+  one.
 
 **One thing the census turned up that the layout manager does, and that a later beat should
 know.** A dockview tab that is not active stays laid out underneath the active one — same
@@ -262,13 +363,16 @@ statement not to be visible until the disclosure is.
 
 **One moved: `configuration`.** Forty others are byte-identical, seed unchanged. The
 configuration digest is over the whole file, and what changed in it is `presentation` alone:
-the reference viewport, the floor, the two pane widths, the gutter, the new `workspace` block
-and — in the pass that rebalanced the row against the curve — `workspace.skillCurveFraction`.
-No computed quantity moved, which is what G-07 exists to say.
+the reference viewport, the floor, the two pane widths, the gutter, the new `workspace` block,
+`workspace.skillCurveFraction` in the pass that rebalanced the row against the curve, and
+`minimumViewportHeightPx` in the pass that brought the floor down from 960 to 740. That third
+pass moved **one figure and nothing else** — the diff on `config/j-ocean.json` is a single line
+— and every other change it made is stylesheet, markup and test. No computed quantity moved,
+which is what G-07 exists to say.
 
 ### The shell tests that lost their subject
 
-Ninety-one shell tests were written against the region grid, and there are **114** now. Their
+Ninety-one shell tests were written against the region grid, and there are **121** now. Their
 claims mostly survived and their selectors mostly did not: `region-controls` became `pane-controls`, `region-centre` became
 `pane-horizons`, `region-detail` became `pane-selection`, and four disclosures became four tabs.
 Those are repointings and are not recorded here. **Eight lost their subject outright**, and each
@@ -284,6 +388,13 @@ is recorded against the claim it made:
 | `addressable` → *distinguishes the four figure kinds by something other than colour* | A monochrome print says which kind a figure is | Moved to `tests/shell/figure-kinds.spec.ts` and given a second half: beat 017 read the **stylesheet**, and a print is made of pixels, so each kind is now photographed through a saturation filter and compared on ink, underline and lean. The stylesheet check is kept beside it; the two fail on different mistakes. |
 | `shell` → *writes nothing to storage, in a whole visit* | NFR-02, measured rather than promised: the storage APIs are replaced before the page loads and any write is recorded | The claim was true only while the surface had no furniture to remember. A reader who drags a sash and comes back to a different arrangement has been given a layout manager and denied the only thing one is for, so the constitution's amended Principle IX allows exactly one thing to persist and the test is narrowed to it: *writes one key and no other storage*. Every part is still measured — one key, and it is the key configuration declares; no cookie, no IndexedDB, no session storage, nothing in the address. What is **inside** that key is `tests/shell/workspace.spec.ts`. |
 | `shell` → *the skill curve is behind a disclosure* | The curve is an aid to reading the figures, not the figures | The disclosure is gone. Beat 013 disclosed it because at the width six panels take it would have been a small picture in a band of empty paper; in the horizons pane it has the row's own width and a **declared** share of the height, ruled, with a value axis and a tick per declared horizon. The claim survives in the share: an aid to reading is smaller than the thing being read, and `viewport-floor.spec` measures the two rectangles. |
+
+**The third pass killed two more, and both died with the stacked column.**
+
+| The test | The claim it made | What happened to it |
+|---|---|---|
+| `one-view` → *holds the same discipline below the declared floor* | The below-the-floor presentation — every pane in one column, the column scrolling — is held to the same census as the workspace, at 900 × 700 | The subject is gone: there is no second presentation to hold. What the test was *believing* is the defect — the column declared itself `data-scrolls="list"`, `data-list="the panes, one under another"`, and the census passed it as a list. The claim survives without its subject and is stronger for it: *is the same workspace below the width the row needs*, at 1 366 × 768, asserting the dock is there and `below-floor-body` is not. |
+| `viewport-floor` → *offers the single-panel presentation, with the strip and the scores* | Below the floor every pane is still present and named, in one column, with `pane-provenance` holding four sections | Half its subject is gone. One horizon and the strip survive and are asserted where they were; `pane-provenance` does not, because the provenance is four tabs at every viewport now rather than four sections stacked below the floor. The test asks for `pane-provenance/run`, which is the tab, and adds what the old claim could not make: the dock is on screen and the stacked column is not. |
 
 The four tests this beat's second pass repointed are repointings and are recorded as such: the
 legend assertion in `shell` → *draws attribution that survives having its colour removed* now

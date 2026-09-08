@@ -93,12 +93,12 @@ export interface HorizonRowInputs {
   readonly onClearMark: () => void;
   readonly markPinned: boolean;
   /**
-   * FR-043. Above the declared floor the centre may hold the row; below it there is no room
-   * for six legible panels, so the centre is forced to an enlargement -- the same enlargement
-   * a reader chooses above the floor, not a presentation of its own. Nothing is recomputed
-   * either way: the fields, the analysis and the scores are the same objects.
+   * FR-043. Where the window has the width six legible panels need, the centre may hold the
+   * row; where it has not, the centre is forced to an enlargement -- the same enlargement a
+   * reader chooses at any width, not a presentation of its own. Nothing is recomputed either
+   * way: the fields, the analysis and the scores are the same objects.
    */
-  readonly aboveFloor: boolean;
+  readonly roomForTheRow: boolean;
   /**
    * What the centre has been asked to hold (FR-049), and how to ask for something else.
    *
@@ -151,7 +151,7 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
    * the shell, which is where a selection is written to the address (FR-056).
    */
   const requested = props.requested;
-  const { content, undeclared } = resolveCentreContent(requested, horizons, !props.aboveFloor);
+  const { content, undeclared } = resolveCentreContent(requested, horizons, !props.roomForTheRow);
   const [showAttribution, setShowAttribution] = useState(false);
   const [showDifference, setShowDifference] = useState(false);
   const [scores, setScores] = useState<ReadonlyMap<number, Score | null> | null>(null);

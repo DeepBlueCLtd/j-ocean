@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { declared, FLOOR, LEADS, REFERENCE, ROW_WIDTH_PX } from './declared-geometry.js';
+import { BELOW_THE_ROW, declared, FLOOR, LEADS, REFERENCE, ROW_WIDTH_PX } from './declared-geometry.js';
 
 /**
  * The viewport floor and the reference viewport, both measured (spec 018 FR-003, FR-011,
@@ -338,34 +338,38 @@ test.describe('the viewport floor', () => {
   });
 
   /**
-   * FR-043, unchanged in what it does and compacted in what it says (spec 018 FR-007).
+   * FR-043 and FR-013, rebuilt (spec 018 US6, T072).
    *
-   * Below the floor the application says the size it needs and offers the single-panel
-   * presentation. Beat 013 said it in two paragraphs, which is an explanation on the surface
-   * and was the first thing a reader at a small window met; those paragraphs are in the
-   * walkthrough now, and `docs/narrative-disposition.json` records the move.
+   * Beat 013's answer below the floor was a presentation of its own — every pane stacked in
+   * one column with a scrollbar down the side — and beat 018's first pass carried it through
+   * unchanged while raising the declared floor to 960 px tall. No browser window is 960 px
+   * tall, so that column was what **every** reader met: 6,584 px of it in a 560 px box.
+   *
+   * It is deleted rather than shortened. What a small window is short of is width — six panels
+   * at `minimumPanelWidthPx` need `minimumViewportWidthPx` between them — so below that the
+   * workspace is still the workspace and the centre carries one horizon with the strip
+   * carrying the other five. Height is not what makes a row of six unreadable, and the query
+   * that decides this is a width query for that reason.
    */
-  test.describe('below the floor', () => {
-    test('says the size it needs, as a declared figure and in one line', async ({ page }) => {
-      await page.setViewportSize({
-        width: presentation.minimumViewportWidthPx - 1,
-        height: presentation.minimumViewportHeightPx,
-      });
+  test.describe('below the width the row needs', () => {
+    test('says the size it needs, as a declared width and in one line', async ({ page }) => {
+      await page.setViewportSize({ width: BELOW_THE_ROW.width, height: BELOW_THE_ROW.height });
       await page.goto('/');
       const notice = page.getByTestId('viewport-floor-notice');
       await expect(notice).toBeVisible();
 
       // The required size is a *declared* figure, in the kind the surface draws declared
-      // figures in (Principle V). A number in a banner with no kind is a number a reader
-      // cannot place.
+      // figures in (Principle V), and it is a **width**: that is the figure the row is short
+      // of, and a height in that line would be naming the wrong shortage.
       const size = notice.locator('.figure.declared', {
-        hasText: `${String(presentation.minimumViewportWidthPx)} × ${String(presentation.minimumViewportHeightPx)} px`,
+        hasText: `${String(presentation.minimumViewportWidthPx)} px`,
       });
       await expect(size).toHaveCount(1);
-      await expect(page.getByTestId('one-view')).toHaveAttribute(
-        'data-presentation',
-        'single-panel',
-      );
+
+      // It is the workspace, and it is in the pane it is about, rather than a banner over the
+      // whole surface: the pane holding one horizon is the pane that is short of width.
+      await expect(page.getByTestId('one-view')).toHaveAttribute('data-presentation', 'workspace');
+      await expect(page.getByTestId('pane-horizons').getByTestId('viewport-floor-notice')).toHaveCount(1);
 
       // And it is a line rather than an argument: the two paragraphs went to the walkthrough.
       const words = await notice.evaluate((element) => {
@@ -383,12 +387,10 @@ test.describe('the viewport floor', () => {
       await expect(page.getByTestId('not-operational')).toBeVisible();
     });
 
-    test('offers the single-panel presentation, with the strip and the scores', async ({
-      page,
-    }) => {
+    test('offers one horizon and the strip, in the workspace', async ({ page }) => {
       test.setTimeout(300_000);
-      await page.setViewportSize({ width: 900, height: 700 });
-      await scoredRowBelowFloor(page);
+      await page.setViewportSize({ width: BELOW_THE_ROW.width, height: BELOW_THE_ROW.height });
+      await scoredRowBelowTheRow(page);
 
       // FR-049 and FR-050: one panel, and the strip carrying all six with what each was worth.
       await expect(page.getByTestId('enlarged-centre')).toBeVisible();
@@ -405,13 +407,17 @@ test.describe('the viewport floor', () => {
       await expect(page.getByTestId(`panel-${String(LEADS[0])}`)).toHaveCount(0);
       await expect(page.getByTestId('panel-score-48')).toContainText('persistence');
 
-      // The controls are still reachable, and so is every other pane.
+      // It is the workspace and not a column: the dock is here, the panes are panes, and the
+      // provenance is still four tabs rather than four sections one under another.
+      await expect(page.getByTestId('workspace-dock')).toBeVisible();
+      await expect(page.getByTestId('below-floor-body')).toHaveCount(0);
       await expect(page.getByTestId('pane-controls').getByTestId('build-row')).toHaveCount(0);
       await expect(page.getByTestId('pane-controls').getByTestId('new-run')).toHaveCount(1);
       await expect(page.getByTestId('pane-selection')).toBeVisible();
-      await expect(page.getByTestId('pane-provenance')).toBeVisible();
+      await expect(page.getByTestId('pane-provenance/run')).toBeVisible();
 
-      // And the page still does not scroll: the fallback is an answer, not a smaller mess.
+      // And the page still does not scroll: the answer below the floor is an answer, not a
+      // smaller mess, and never the page this beat exists to kill.
       const scroll = await page.evaluate(() => ({
         scrollWidth: document.documentElement.scrollWidth,
         clientWidth: document.documentElement.clientWidth,
@@ -422,16 +428,16 @@ test.describe('the viewport floor', () => {
       expect(scroll.scrollHeight).toBeLessThanOrEqual(scroll.clientHeight);
     });
 
-    test('swaps presentation as the window crosses the floor, without a reload', async ({
+    test('swaps what the centre holds as the window crosses the width, without a reload', async ({
       page,
     }) => {
-      await page.setViewportSize({ width: 900, height: 700 });
+      await page.setViewportSize({ width: BELOW_THE_ROW.width, height: BELOW_THE_ROW.height });
       await page.goto('/');
       await expect(page.getByTestId('viewport-floor-notice')).toBeVisible();
 
       // A witness that survives only if the document does: crossing the floor must be a
-      // change of presentation and not a fresh load, or every run and every edit is lost
-      // whenever somebody drags a window edge.
+      // change of what the centre holds and not a fresh load, or every run and every edit is
+      // lost whenever somebody drags a window edge.
       await page.evaluate(() => {
         (window as unknown as { __notReloaded?: boolean }).__notReloaded = true;
       });
@@ -473,8 +479,8 @@ test.describe('the viewport floor', () => {
   });
 });
 
-/** The recorded case scored, below the floor, where the row is one panel and a strip. */
-async function scoredRowBelowFloor(page: Page): Promise<void> {
+/** The recorded case scored, below the width the row needs: one panel and a strip. */
+async function scoredRowBelowTheRow(page: Page): Promise<void> {
   await page.goto('/');
   await expect(page.getByTestId('viewport-floor-notice')).toBeVisible();
   await page.getByTestId('build-row').click();

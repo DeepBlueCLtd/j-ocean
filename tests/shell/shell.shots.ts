@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { declared } from './declared-geometry.js';
+import { BELOW_THE_ROW, declared } from './declared-geometry.js';
 
 /**
  * The documentation site's figures, captured from the real application.
@@ -256,9 +256,14 @@ test('the panes at the declared floor', async ({ page }) => {
 
 test('the answer below the floor', async ({ page }) => {
   test.setTimeout(240_000);
-  // Narrower and shorter than the floor on both axes: a window this instrument cannot be
-  // laid out in, which is the state FR-043 exists to answer.
-  await inOneView(page, 900, 700);
+  /*
+   * The smallest laptop in the matrix: 1 366 x 768, which is narrower than the row needs and
+   * taller than the floor. It was captured at 900 x 700 until beat 018's second pass, and
+   * what it photographed there was the thing that pass deleted -- every pane stacked in one
+   * column with a scrollbar down the side. The answer here is the workspace, with one horizon
+   * in the centre and the strip carrying the other five.
+   */
+  await inOneView(page, BELOW_THE_ROW.width, BELOW_THE_ROW.height);
   await page.goto('/');
   await expect(page.getByTestId('viewport-floor-notice')).toBeVisible();
   await page.getByTestId('build-row').click();
@@ -268,6 +273,26 @@ test('the answer below the floor', async ({ page }) => {
   await page.getByTestId('strip-48').click();
   await expect(page.getByTestId('panel-48')).toBeVisible();
   await page.screenshot({ path: `${IMAGES}013-below-the-floor.png` });
+});
+
+/**
+ * Beat 018's second pass, photographed at the window that was broken.
+ *
+ * 1 920 x 900 is what a 1920 x 1080 screen gives a browser once its own chrome is taken, and
+ * on the first pass's head it was **below the declared floor**: the whole application stacked
+ * into a 6,584 px column scrolling in a 560 px box beneath a fixed banner. It is the
+ * workspace, with the six-panel row, and the figure is the whole viewport for that reason.
+ */
+test('an ordinary browser window', async ({ page }) => {
+  test.setTimeout(240_000);
+  await inOneView(page, 1920, 900);
+  await page.goto('/');
+  await expect(page.getByTestId('viewport-floor-notice')).toHaveCount(0);
+  await page.getByTestId('build-row').click();
+  await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId('score-row').click();
+  await expect(page.getByTestId('panel-score-24')).toContainText('persistence', { timeout: 60_000 });
+  await page.screenshot({ path: `${IMAGES}018-an-ordinary-window.png` });
 });
 
 /**

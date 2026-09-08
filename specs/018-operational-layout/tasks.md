@@ -86,13 +86,20 @@ requirement the tree did not yet meet.
 
 ## The screen a reader actually has (US6, FR-012, FR-013)
 
-- [ ] **T070** `tests/shell/viewport-matrix.spec.ts`: 1366x768, 1536x864, 1920x900, 1920x1080,
+- [x] **T070** `tests/shell/viewport-matrix.spec.ts`: 1366x768, 1536x864, 1920x900, 1920x1080,
       2560x900, 2560x1440 — the workspace renders at each, the row builds and scores, and nothing
       scrolls but a declared list. The tallest scroll of any element is printed as a figure.
-- [ ] **T071** The declared minimum height comes down below the shortest viewport in the matrix,
-      measured from the built workspace rather than chosen. Panes compress; the row takes what is
-      left.
-- [ ] **T072** The below-floor answer becomes the workspace with one horizon and the strip. The
-      stacked `.below-floor-body` column is deleted, not shortened.
-- [ ] **T073** The list/prose test runs at **every** viewport in the matrix, not only the
+- [x] **T071** The declared minimum height comes down below the shortest viewport in the matrix,
+      measured from the built workspace rather than chosen: **1 658 × 740**, against a shortest
+      viewport of 768. What forced 960 was not any figure the layout declares. It was the
+      controls pane's own content at the 220 px it is narrowest — **823 px** of a control surface
+      set at a paragraph's line height with its groups separated twice over — and a status strip
+      that wrapped to two rows because a 64-character digest had 22 rem of it. Set as furniture
+      they are 648 px and one row of 66, with no control, label, unit or declared bound lost.
+- [x] **T072** The below-floor answer becomes the workspace with one horizon and the strip. The
+      stacked `.below-floor-body` column is deleted, not shortened, and the query that decides
+      what the centre holds asks the **width** alone: six panels need width, and forcing one
+      horizon because the window is short was measured to be the wrong medicine — at 1 658 × 735
+      it overflowed the horizons pane by 970 px where the row fitted.
+- [x] **T073** The list/prose test runs at **every** viewport in the matrix, not only the
       reference — the hole through which a 6,584 px scrolling column reached the author.

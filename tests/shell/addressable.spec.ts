@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { declared, LEADS } from './declared-geometry.js';
+import { BELOW_THE_ROW, declared, LEADS } from './declared-geometry.js';
 import { decodePng } from './greyscale.js';
 
 /**
@@ -735,7 +735,7 @@ test.describe('legible without colour, and still under prefers-reduced-motion', 
     await expect(page.getByTestId('cell-breakdown')).toBeVisible();
     still.push(...(await moving('with a cell selected')));
 
-    await page.setViewportSize({ width: 900, height: 700 });
+    await page.setViewportSize({ width: BELOW_THE_ROW.width, height: BELOW_THE_ROW.height });
     await expect(page.getByTestId('viewport-floor-notice')).toBeVisible();
     still.push(...(await moving('below the declared floor')));
 
@@ -779,10 +779,12 @@ test.describe('the disclaimer', () => {
     await loaded(page);
     await within('at the declared minimum viewport');
 
-    // The FR-043 fallback, where there is least room and most to say.
-    await page.setViewportSize({ width: 900, height: 700 });
+    // The smallest laptop in the matrix, which is below the width the row needs: least room
+    // and most to say. It was 900 x 700 until beat 018's second pass, which is not a window
+    // anybody has -- and the answer it was asserting against was a column that scrolled.
+    await page.setViewportSize({ width: BELOW_THE_ROW.width, height: BELOW_THE_ROW.height });
     await expect(page.getByTestId('viewport-floor-notice')).toBeVisible();
-    await within('in the single-panel fallback');
+    await within('below the width the row needs');
   });
 
   /**

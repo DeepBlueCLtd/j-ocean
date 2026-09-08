@@ -607,7 +607,7 @@
       "matter": "All 6 declared horizons side by side, each at the declared minimum of 190 px, want a viewport of at least 2038 x 728 px once the controls column, the detail column and the page gutter have taken theirs. That figure was measured from the built layout, not chosen.",
       "restatedAs": "declared horizons side by side, each at the declared minimum of",
       "reclaimedIn": "018-operational-layout",
-      "note": "The below-the-floor answer was itself two paragraphs of prose, which is the fault this beat exists to fix, and it was the first thing a reader at a small window met -- which made the fallback read as an apology. The surface now states the size as the declared figure it is, in one line, and the explanation is the walkthrough's, reachable from that same presentation. The figures in the walkthrough's version are read from configuration, so the sentence cannot go stale as the floor moves -- and it has moved: 2038 x 728 became 1658 x 960 when the panes stopped being fixed tracks."
+      "note": "The below-the-floor answer was itself two paragraphs of prose, which is the fault this beat exists to fix, and it was the first thing a reader at a small window met -- which made the fallback read as an apology. The surface now states the size as the declared figure it is, in one line, and the explanation is the walkthrough's, reachable from that same presentation. The figures in the walkthrough's version are read from configuration, so the sentence cannot go stale as the floor moves -- and it has moved twice: 2038 x 728 became 1658 x 960 when the panes stopped being fixed tracks, and the height came down to 740 when the first 960 turned out to be taller than any browser window a reader has."
     },
     {
       "id": "floor-notice-strip",
@@ -616,9 +616,9 @@
       "kind": "walkthrough",
       "destination": "walkthrough:step-6",
       "matter": "So this is one horizon at a time instead. The strip carries all 6 and what each was worth, because comparison across horizons is the lesson; choosing one in the strip swaps the panel beneath it. Widen the window past the figure above and the full row returns without a reload.",
-      "restatedAs": "Below it the application shows one horizon at a time. The strip carries all of them and what each was worth, because comparison across horizons is the lesson; choosing one in the strip swaps the panel beneath it. Widen the window past the figure above and the full workspace returns without a reload.",
+      "restatedAs": "Narrower than that, the workspace is unchanged and its centre shows one horizon at a time. The strip carries all of them and what each was worth, because comparison across horizons is the lesson; choosing one in the strip swaps the panel beneath it. Widen the window past the figure above and the row returns without a reload.",
       "reclaimedIn": "018-operational-layout",
-      "note": "Restated for the workspace: what returns above the floor is the workspace and not only the row. The record keeps the words the surface had and names the words that are there now."
+      "note": "Restated twice for the workspace. The first pass said what returns above the floor is the workspace and not only the row; the second says what gives way below it is the row and not the workspace, because the answer down there stopped being a second arrangement of every pane and became this one with one horizon in the centre. The record keeps the words the surface had and names the words that are there now."
     },
     {
       "id": "workspace-arrangement",
