@@ -603,6 +603,16 @@ Each of the three outcomes was planted and watched, and then removed:
   tab" state these declare themselves lists and do not say which list …
   `provenance/manifest / pre[data-testid="manifest"]`*
 
+And once more against the defect itself rather than a plant, because the overlap census exists to
+catch a thing the overflow census was green on. The old stylesheet was put back and its 93 px of
+overflow **excused** with an exemption — the excuse a threshold, or an exemption nobody read,
+would have given it — and the overlap census failed anyway, on the words:
+
+> in the horizons pane, `figcaption.figure-label` *"Weight carried by observations in each c"* is
+> painted over `dt` *"Influence radius"*: 63 x 10 px of them intersect … over
+> `p[data-testid="row-invitation-statement"]` *"Panels at, once the row is built."*: 47 x 9 px …
+> `span.scale` *"01.00"* is painted over `dt` *"Observations used"*: 24 x 4 px
+
 #### The floor, and the digest that moved
 
 `presentation.minimumViewportHeightPx` is **748**, and the tables above are corrected to it: the
