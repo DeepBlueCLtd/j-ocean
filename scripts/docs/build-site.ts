@@ -123,6 +123,36 @@ ${options.body}
 `;
 }
 
+/**
+ * A heading's anchor, so that a section of this site can be linked to.
+ *
+ * Beat 016 needs one: the application links to the legend of the four figure kinds, which is a
+ * section rather than a page, and a link to the top of a long page is a link that asks the
+ * reader to search. The slug is the heading's own words, lowercased, with everything that is
+ * not a letter, a digit or a space turned into a hyphen -- the shape a reader would guess.
+ */
+export function anchorFor(heading: string): string {
+  return heading
+    .replace(/<[^>]*>/g, '')
+    .replace(/&[a-z]+;/gi, ' ')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/** Every `h2` and `h3` gets its anchor, so the sections of a page are addressable. */
+function withAnchors(html: string): string {
+  const seen = new Map<string, number>();
+  return html.replace(/<(h[23])>([\s\S]*?)<\/\1>/g, (whole, tag: string, inner: string) => {
+    const base = anchorFor(inner);
+    if (base === '') return whole;
+    const count = (seen.get(base) ?? 0) + 1;
+    seen.set(base, count);
+    const id = count === 1 ? base : `${base}-${String(count)}`;
+    return `<${tag} id="${id}">${inner}</${tag}>`;
+  });
+}
+
 function readPages(directory: string, hrefPrefix: string): Page[] {
   if (!existsSync(directory)) return [];
   return readdirSync(directory)
@@ -131,7 +161,12 @@ function readPages(directory: string, hrefPrefix: string): Page[] {
       const slug = name.replace(/\.md$/, '');
       const source = relative(ROOT, join(directory, name));
       const { front, markdown } = splitFrontMatter(readFileSync(join(directory, name), 'utf8'), source);
-      return { slug, href: `${hrefPrefix}${slug}.html`, front, body: marked.parse(markdown) as string };
+      return {
+        slug,
+        href: `${hrefPrefix}${slug}.html`,
+        front,
+        body: withAnchors(marked.parse(markdown) as string),
+      };
     });
 }
 

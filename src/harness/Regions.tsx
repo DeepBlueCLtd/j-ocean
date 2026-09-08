@@ -1,5 +1,6 @@
 import { useLayoutEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import type { Configuration } from '../config/schema.js';
+import { REGIONS, type RegionId } from './panels.js';
 
 /**
  * The four regions (SRD-v2 FR-41, FR-44 to FR-48; ADR-0012).
@@ -24,7 +25,40 @@ import type { Configuration } from '../config/schema.js';
  * Every width below arrives from `presentation` in configuration as a custom property. Nothing
  * about the geometry is a literal here or in `index.css`; the fallbacks in the stylesheet exist
  * only so it reads on its own.
+ *
+ * **The four regions are named in one place.** Beat 016 moved the list to `panels.ts`, because
+ * every panel declares which region it is in and a second list of regions would be the first
+ * thing to drift. `RegionSection` takes a `RegionId`, so a section for a region nothing
+ * declares does not compile, and the class and the test id are derived from the name rather
+ * than written beside it.
  */
+
+/**
+ * One of the four regions. There is no way to draw a fifth: the type admits only the names in
+ * `REGIONS`, and both presentations below build their sections from it.
+ */
+function RegionSection({
+  id,
+  scrolls,
+  children,
+}: {
+  readonly id: RegionId;
+  readonly scrolls?: boolean;
+  readonly children: ReactNode;
+}) {
+  return (
+    <section
+      className={`region ${id}`}
+      data-testid={`region-${id}`}
+      {...(scrolls === true ? { 'data-scrolls': 'true' } : {})}
+    >
+      {children}
+    </section>
+  );
+}
+
+/** Every region the layout draws, in the order it draws them. Read by tests and by G-08. */
+export { REGIONS };
 
 export interface RegionsProps {
   readonly config: Configuration;
@@ -106,12 +140,12 @@ export function Regions({ config, statement, controls, centre, scores, detail }:
         disclosures beneath the controls and a reader who opens all of them has asked for more
         than a column holds. The statement above the scroller does not move when they do.
       */}
-      <section className="region controls" data-testid="region-controls">
+      <RegionSection id="controls">
         {statement}
         <div className="controls-scroll" data-testid="controls-scroll" data-scrolls="true">
           {controls}
         </div>
-      </section>
+      </RegionSection>
 
       {/*
         The centre and the scores are one grid, which is what makes FR-046 structural: the
@@ -119,18 +153,14 @@ export function Regions({ config, statement, controls, centre, scores, detail }:
         without the browser having placed it there.
       */}
       <div className="centre-stack" data-testid="centre-stack" data-scrolls="true">
-        <section className="region centre" data-testid="region-centre">
-          {centre}
-        </section>
-        <section className="region scores" data-testid="region-scores">
-          {scores}
-        </section>
+        <RegionSection id="centre">{centre}</RegionSection>
+        <RegionSection id="scores">{scores}</RegionSection>
       </div>
 
       {/* FR-47. Selecting fills this and moves nothing: its width is declared, not fitted. */}
-      <section className="region detail" data-testid="region-detail" data-scrolls="true">
+      <RegionSection id="detail" scrolls>
         {detail}
-      </section>
+      </RegionSection>
     </main>
   );
 }
@@ -183,24 +213,16 @@ export function BelowFloor(props: BelowFloorProps) {
       </section>
 
       <div className="below-floor-body" data-testid="below-floor-body" data-scrolls="true">
-        <section className="region centre" data-testid="region-centre">
-          {props.centre}
-        </section>
-        <section className="region scores" data-testid="region-scores">
-          {props.scores}
-        </section>
-        <section className="region detail" data-testid="region-detail">
-          {props.detail}
-        </section>
+        <RegionSection id="centre">{props.centre}</RegionSection>
+        <RegionSection id="scores">{props.scores}</RegionSection>
+        <RegionSection id="detail">{props.detail}</RegionSection>
         {/*
           Last rather than first, and that is the one thing this arrangement gives up: above
           the floor the causes are the first column a reader meets. Below it the payload has
           to come first, because a reader who has been told the window is too small needs to
           see what they are being offered instead before they are offered controls for it.
         */}
-        <section className="region controls" data-testid="region-controls">
-          {props.controls}
-        </section>
+        <RegionSection id="controls">{props.controls}</RegionSection>
       </div>
     </main>
   );

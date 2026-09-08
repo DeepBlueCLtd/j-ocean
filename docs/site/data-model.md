@@ -59,8 +59,13 @@ disclosure, the horizons on the row, the domains on the domain choice — each i
 typography, next to the thing it declares. What left the application is this paragraph, which
 is a fact about the tree rather than a figure of the run.
 
+Grid, timestep, reduced gravity, instrument noise, forecast horizons. No component in the tree
+holds a literal for any of them, so changing the ocean means editing configuration, not code —
+and a configuration that does not validate stops the page rather than quietly substituting a
+default.
+
 *Was on the application page, in the disclosure headed “What has been declared” (beat 001).
-Moved here by beat 014.*
+Moved here by beat 014, and joined by the walkthrough's seventh step when beat 016 retired it.*
 
 ## RunManifest
 
@@ -189,8 +194,13 @@ The figures themselves — which domain, which source, how many instants, how ma
 how much overlap — are still in the application, because the domain choice changes every one of
 them while a reader works.
 
+A real HYCOM subset and real Argo profiles, regenerated from a digest-verified download by a
+build gate. Nothing here was written by hand; a file that had been would fail the build. The
+harness did not author the thing it is marked against.
+
 *Was on the application page, in the disclosure headed “The record this run is scored against”
-(beat 002). Moved here by beat 014.*
+(beat 002). Moved here by beat 014, and joined by the walkthrough's ninth step when beat 016
+retired it.*
 
 ## The observation record
 
@@ -535,6 +545,16 @@ canvas says nothing to a reader who cannot see it, and nothing to a test either.
 ## The figure kinds
 
 Not a type but a discipline, and the surface enforces it typographically.
+
+Every number on the page is typed by where it came from, and the four kinds never change
+appearance between panels: **declared** — a value in configuration, validated before anything
+ran; **computed** — produced by the model or the analysis on this visit; **derived** — read off
+a committed artefact the build regenerates; **host time** — how long the machinery took, never
+simulation time.
+
+This legend was carried by the walkthrough's first step until beat 016 retired it. It is here
+rather than in a panel's help because it explains the whole surface and not one panel, and the
+application links to it from the head of its controls column.
 
 <dl class="entries">
 <dt><span class="declared">Declared</span></dt>

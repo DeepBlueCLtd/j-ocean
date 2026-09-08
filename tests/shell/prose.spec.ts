@@ -16,8 +16,7 @@ import { expect, test, type Page } from '@playwright/test';
  * | Not counted | Why |
  * |---|---|
  * | Inside `not-operational` | FR-003, FR-058: the one sentence the application owes a reader who arrived without context |
- * | Inside a help disclosure (`[data-help]`) | FR-052, and the destination of eight paragraphs beat 016 has yet to build |
- * | Inside the walkthrough's card | It is opened from the help button and renders only then; FR-052 replaces it in beat 016 |
+ * | Inside a panel's help (`[data-help]`) | FR-052: it renders only when a reader presses that panel's control, and it is the destination of the eight paragraphs beat 014 sent to beat 016 |
  * | Carries a figure | It *names a figure*: `.declared`, `.computed`, `.derived`, `.host-time` and `.unmeasured` are the kinds |
  * | `.region-empty` | FR-048: a region with nothing in it says what would appear there |
  * | `.banner` | Principle VI: the harness reporting that it lost, in the failing instrument's own words |
@@ -58,7 +57,6 @@ async function proseBlocks(page: Page): Promise<Block[]> {
       const element = node as HTMLElement;
       if (element.closest('[data-testid="not-operational"]') !== null) continue;
       if (element.closest('[data-help]') !== null) continue;
-      if (element.closest('.walkthrough-card') !== null) continue;
       if (element.closest('label, summary, button') !== null) continue;
       if (exempt.some((name) => element.classList.contains(name))) continue;
       if (element.matches(figure) || element.querySelector(figure) !== null) continue;

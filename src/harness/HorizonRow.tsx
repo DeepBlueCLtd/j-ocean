@@ -13,6 +13,7 @@ import { profileFromInterfaceDepth } from '../model/profile.js';
 import type { Footprint } from './footprint.js';
 import { markersFrom, marksOf, trackValueRange } from './footprint.js';
 import { Counterfactuals } from './Counterfactuals.js';
+import { PanelHead } from './Help.js';
 import { ObservationHover } from './ObservationHover.js';
 import { scoreEveryHorizon } from './scoring-run.js';
 import { SkillInset, type SkillCurve } from './SkillInset.js';
@@ -432,7 +433,7 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
   const controls = (
     <>
       <div className="control-group">
-        <h3>Issue time</h3>
+        <PanelHead panel="controls/issue-time" />
         <div className="issue-control" data-testid="issue-control">
           <label htmlFor="issue-time">Issued</label>
           <input
@@ -508,7 +509,7 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
       />
 
       <div className="control-group">
-        <h3>Editing what was measured</h3>
+        <PanelHead panel="controls/editing-what-was-measured" />
         <div className="row-controls">
           <button
             type="button"
@@ -533,7 +534,7 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
       {/* The row's own display toggles. They drive all six panels at once, so they are causes
           rather than panel-local controls and FR-044 puts them here rather than at a panel. */}
       <div className="control-group">
-        <h3>The row</h3>
+        <PanelHead panel="controls/row-display" />
         <div className="row-controls">
           <button type="button" onClick={scoreAll} data-testid="score-row" disabled={scores !== null}>
             {scores === null ? 'Score every horizon against truth' : 'Scored'}
@@ -574,8 +575,14 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
           </p>
         )}
 
-        {/* What was measured, counted. The flagged count is on the surface because FR-24 says
-            what was rejected is part of what the harness did, not a footnote in a log. */}
+      </div>
+
+      {/* What was measured, counted. The flagged count is on the surface because FR-24 says
+          what was rejected is part of what the harness did, not a footnote in a log. Beat 016
+          gives it a head of its own: it is a consequence of the toggles above rather than one
+          of them, and §7 owes the observation footprint a named explanation. */}
+      <div className="control-group" data-testid="footprint-panel">
+        <PanelHead panel="controls/observation-footprint" />
         <p className="aside" data-testid="footprint-summary">
           Drawn over every panel:{' '}
           <span className="computed" data-testid="footprint-track-count">

@@ -72,8 +72,13 @@ site for an `Observation`. The application still reports what the instruments pr
 visit, beside the toggles that change it; what left the application is the explanation of why
 there is only one route.
 
+Only here. One module turns the truth record into observations — ownship surface samples, XBT
+drops, external Argo profiles — and the model has no other route to it. A build gate fails if
+anything else imports truth, which is what makes the skill figures mean anything at all.
+
 *Was on the application page, in the disclosure headed “What the instruments measured”
-(beat 004). Moved here by beat 014.*
+(beat 004). Moved here by beat 014, and joined by the walkthrough's eighth step when beat 016
+retired it.*
 
 ## What the initialisation takes from the truth, and what it does not
 

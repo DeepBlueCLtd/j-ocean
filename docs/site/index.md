@@ -19,6 +19,28 @@ references it computes itself, scored against a truth record it did not author.<
 <span class="note">The application, built from <code>main</code>. Nothing to install.</span>
 </p>
 
+## What you are looking at
+
+j-ocean is a teaching harness: a small, real ocean model, the simulated instruments that
+measure it, and an honest account of what each measurement was worth. It forecasts nothing you
+should act on.
+
+*Was the walkthrough's first step, on the application page (beat 013). The walkthrough retired
+in beat 016 and the application now explains each panel at that panel; this is the sentence
+that was about all of them at once, so it is here.*
+
+## The four regions
+
+One column for every cause: which ocean, when the forecast was issued, which instruments the
+analysis was allowed to see, and whether quality control was running. Change any of them and
+every panel and every score answers where they are, without you moving.
+
+Beside it the payload — one panel per declared horizon — with each panel's skill directly
+beneath it in its own column, and, on the right, whatever you last selected. The layout is
+divided by **what changes when** rather than by subject, which is the whole of ADR-0012.
+
+*Was the walkthrough's second step (beat 013), retired in beat 016.*
+
 ## What it is for
 
 Three things, in order of how much they matter:

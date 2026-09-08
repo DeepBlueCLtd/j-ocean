@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { checkArtefactDrift } from '../../scripts/gates/check-artefact-drift.js';
+import { checkHelpCoverage } from '../../scripts/gates/check-help-coverage.js';
 import { checkHostTime } from '../../scripts/gates/check-host-time.js';
 import { checkModelImports } from '../../scripts/gates/check-model-imports.js';
 import { checkAttributionSource } from '../../scripts/gates/check-attribution-source.js';
@@ -132,6 +133,70 @@ describe('the gates fail on their planted violations', () => {
     expect(output).toContain('src/analysis/optimal-interpolation.ts');
   });
 
+  /**
+   * G-08, AT-14, and the pairing in both directions.
+   *
+   * The two failures the plan names are a panel that gained a layer and not an explanation,
+   * and an explanation that outlived the panel it described. The first is the one people
+   * expect; the second is the one that actually happens, because deleting a panel is a thing
+   * somebody does deliberately and deleting its help is a thing they forget.
+   */
+  it('G-08 catches a panel declaring a region nothing explains, naming both', () => {
+    const { code, output } = spawnGate(
+      'check-help-coverage',
+      'scripts/gates/fixtures/help-coverage-unexplained',
+    );
+    expect(code).not.toBe(0);
+    expect(output).toContain('centre/attribution');
+    expect(output).toContain('the hatched channel');
+    expect(output).toContain('nothing explains it');
+  });
+
+  it('G-08 catches an explanation whose panel does not exist, naming the orphan', () => {
+    const { code, output } = spawnGate(
+      'check-help-coverage',
+      'scripts/gates/fixtures/help-coverage-orphan',
+    );
+    expect(code).not.toBe(0);
+    expect(output).toContain('src/harness/help/centre-horizon-row.tsx');
+    expect(output).toContain('centre/horizon-row');
+    expect(output).toContain('an explanation of something nobody can see');
+  });
+
+  /** FR-053 prefers absence to a stub, so an entry a reader would open and find empty fails. */
+  it('G-08 catches an entry with nothing in it', () => {
+    const { code, output } = spawnGate(
+      'check-help-coverage',
+      'scripts/gates/fixtures/help-coverage-stub',
+    );
+    expect(code).not.toBe(0);
+    expect(output).toContain('is empty');
+    expect(output).toContain('prefers no control at all to a stub');
+  });
+
+  /** The clause that stops the gate passing trivially on a list nobody has kept up. */
+  it('G-08 catches the layout drawing a panel nothing declares', () => {
+    const { code, output } = spawnGate(
+      'check-help-coverage',
+      'scripts/gates/fixtures/help-coverage-undeclared',
+    );
+    expect(code).not.toBe(0);
+    expect(output).toContain('src/harness/Planted.tsx');
+    expect(output).toContain('centre/horizon-panel');
+    expect(output).toContain('does not declare');
+  });
+
+  /**
+   * And the other half of that: a tree that declares nothing fails rather than passing. Every
+   * pairing check above is satisfied by an empty list -- nothing declared is nothing
+   * unexplained -- so the absence has to be the failure.
+   */
+  it('G-08 fails a tree with no declarations at all, rather than passing trivially', () => {
+    const { code, output } = spawnGate('check-help-coverage', CLEAN);
+    expect(code).not.toBe(0);
+    expect(output).toContain('declares no panels at all');
+  });
+
   it('the vocabulary gate catches a word on the hashed list, without quoting it back', () => {
     const { code, output } = spawnGate('check-vocabulary', 'scripts/gates/fixtures/vocabulary-hashed');
     expect(code).not.toBe(0);
@@ -202,6 +267,7 @@ describe('the gates pass what they should pass', () => {
       checkTruthBoundary(REPO_ROOT),
       checkAttributionSource(REPO_ROOT),
       checkSurfaceInvariance(REPO_ROOT),
+      checkHelpCoverage(REPO_ROOT),
       checkArtefactDrift([]),
     ]) {
       expect(result.violations, `${result.gate} must pass the tree`).toEqual([]);
@@ -218,6 +284,9 @@ describe('the gates pass what they should pass', () => {
     // For G-07 the number is quantities rather than files, and the reasoning is the same: a
     // record with nothing in it would compare nothing and pass.
     expect(checkSurfaceInvariance(REPO_ROOT).scanned).toBeGreaterThan(0);
+    // For G-08 the number is panels and explanations, for the same reason: a tree that
+    // declared nothing would compare nothing.
+    expect(checkHelpCoverage(REPO_ROOT).scanned).toBeGreaterThan(0);
   });
 
   /**

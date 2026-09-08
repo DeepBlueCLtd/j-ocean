@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Score } from '../scoring/scorer.js';
+import { PanelHelp } from './Help.js';
 import { FieldView, type Marker } from './FieldView.js';
 import type { Footprint } from './footprint.js';
 import { NeedleElevation } from './NeedleElevation.js';
@@ -106,7 +107,12 @@ export function Panel(props: PanelProps) {
       data-testid={`panel-${String(leadHours)}`}
       data-lead-hours={String(leadHours)}
     >
-      <header>
+      {/* FR-052: the help control is at the panel's top right, beside the control that
+          enlarges it, and it opens this panel's own explanation rather than a tour that begins
+          three panels away. It follows the panel into the enlarged centre, because the panel is
+          the same panel; choosing another horizon in the strip closes it, because that one is
+          not (see Help.tsx). */}
+      <header data-panel="centre/horizon-panel">
         <h3>
           <span className="declared" data-testid={`panel-lead-${String(leadHours)}`}>
             +{leadHours} h
@@ -121,6 +127,7 @@ export function Panel(props: PanelProps) {
         >
           {enlarged ? 'Shrink' : 'Enlarge'}
         </button>
+        <PanelHelp panel="centre/horizon-panel" instance={String(leadHours)} />
       </header>
 
       {/* Enlarged, the field and everything that describes it are two columns of one body;

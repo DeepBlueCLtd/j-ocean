@@ -1,0 +1,37 @@
+{
+  "record": "Planted: an entry whose content is empty, which FR-053 prefers absence to (spec 016 T013).",
+  "panels": [
+    {
+      "id": "centre/attribution",
+      "region": "centre",
+      "heading": "Where the answer came from",
+      "features": [
+        "the influence radius"
+      ]
+    },
+    {
+      "id": "controls/issue-time",
+      "region": "controls",
+      "heading": "Issue time",
+      "features": [
+        "lead time and issue time"
+      ]
+    },
+    {
+      "id": "scores",
+      "region": "scores",
+      "heading": "What each forecast was worth",
+      "features": [
+        "skill against a reference"
+      ]
+    },
+    {
+      "id": "controls/observation-footprint",
+      "region": "controls",
+      "heading": "What was measured",
+      "features": [
+        "the observation footprint"
+      ]
+    }
+  ]
+}

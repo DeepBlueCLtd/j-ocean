@@ -16,4 +16,8 @@ watched failing (PR-04) and so that `tests/gates/gates.test.ts` can keep watchin
 | `truth-boundary-model/` | G-02 | the model importing it — which beat 003 actually did, until this gate was written |
 | `truth-boundary-constructor/` | G-02 | a second place that can name the `Observation` brand |
 | `surface-invariance/` | G-07 | `analysis.correlationLengthScaleKilometres` changed from 60 to 45, which moves the analysis field and everything downstream of it |
-| `clean/` | all | no violation, and the navigational use of the word for a vessel's path, which must pass |
+| `help-coverage-unexplained/` | G-08 | a panel declaring a region nothing explains — AT-14's own case |
+| `help-coverage-orphan/` | G-08 | a help entry that outlived the panel it described, which is the failure that actually happens |
+| `help-coverage-stub/` | G-08 | an entry a reader would open and find empty; FR-053 prefers no control at all |
+| `help-coverage-undeclared/` | G-08 | the layout drawing a panel the declarations do not know about |
+| `clean/` | all | no violation, and the navigational use of the word for a vessel's path, which must pass. G-08 is the exception: it **fails** here, because a tree that declares no panels satisfies every pairing check trivially, so the absence has to be the failure rather than a skip |

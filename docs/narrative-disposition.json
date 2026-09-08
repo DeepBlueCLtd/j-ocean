@@ -1,13 +1,18 @@
 {
-  "record": "Where every piece of narrative that was on the application page went (SRD-v2 FR-42 and §7; spec 014 FR-002). One entry per piece of matter: where it was, the words themselves, what kind of matter it is, and where it went. The words are carried here rather than only in a diff, so that a piece bound for a help entry beat 016 has not built yet is in the repository rather than lost. Held by tests/docs/disposition.test.ts; §7 of j-ocean-ui-srd.md and docs/site/disposition.md are generated from it by scripts/docs/build-disposition.ts.",
-  "beat": "014-narrative-to-the-site",
+  "record": "Where every piece of narrative that was on the application page went (SRD-v2 FR-42 and §7; spec 014 FR-002, spec 016 FR-007). One entry per piece of matter: where it was, the words themselves, what kind of matter it is, and where it went. Beat 014 emptied the page; beat 016 built the panel help those entries were owed to and retired the walkthrough, so every one of its steps has an entry here too. The words are carried here rather than only in a diff, because “we tidied the page” and “we deleted the explanation” look identical from the outside. Held by tests/docs/disposition.test.ts; §7 of j-ocean-ui-srd.md and docs/site/disposition.md are generated from it by scripts/docs/build-disposition.ts.",
+  "beat": "016-panel-help",
   "kinds": {
     "stays": "The reader drives it, or reads a live figure from it. It stays, compacted, in the region that owns it, and the destination is one of the four regions of beat 013.",
     "site": "It states no live figure at all. It goes to a section of a page under docs/site/, and the test holds that section against these words.",
-    "help": "It explains a panel that stays. It goes to that panel's help entry, which beat 016 builds; until then it lives here and the test reports the destination as owed."
+    "help": "It explains a panel that stays. It goes to that panel's help entry, and the test renders that entry and holds the words against it. Beat 016 built these.",
+    "dropped": "It said something the surface now says better, or says for itself. It is not carried anywhere, and the reason is recorded here rather than left to be inferred from its absence."
   },
-  "regions": ["controls", "centre", "scores", "detail"],
-  "owedTo": "016-panel-help",
+  "regions": [
+    "controls",
+    "centre",
+    "scores",
+    "detail"
+  ],
   "entries": [
     {
       "id": "not-operational",
@@ -135,7 +140,6 @@
       "matter": "Nothing is selected. Two things can appear here: a cell's attribution breakdown, from clicking a cell on any field; and a measurement's own profile beside the model's derived one, with the measured levels kept as a ghost, from hovering or clicking its mark.",
       "note": "FR-048."
     },
-
     {
       "id": "declared-aside",
       "wasAt": "The controls region, the disclosure headed What has been declared",
@@ -338,14 +342,15 @@
       "matter": "Observations arriving late rather than not at all. Withholding is its special case, and beat 010 built that.",
       "restatedAs": "Observations arriving late rather than not at all. Withholding is its special case, and beat 010 built that"
     },
-
     {
       "id": "help-profile-editor",
       "wasAt": "The controls region, beneath Editing what was measured",
       "fromBeat": "010",
       "kind": "help",
       "destination": "help:controls/editing-what-was-measured",
-      "matter": "A profile is edited where it was measured: enlarge a panel, click a needle, and the measurement fills the detail region with its levels draggable and the measured profile kept behind them as a ghost."
+      "matter": "A profile is edited where it was measured: enlarge a panel, click a needle, and the measurement fills the detail region with its levels draggable and the measured profile kept behind them as a ghost.",
+      "builtIn": "016-panel-help",
+      "feature": "editing a profile"
     },
     {
       "id": "help-redraw-track",
@@ -353,7 +358,9 @@
       "fromBeat": "010",
       "kind": "help",
       "destination": "help:controls/editing-what-was-measured",
-      "matter": "Enlarge a panel and drag a waypoint. The instruments resample truth where you put it, through the same instruments and the same noise streams."
+      "matter": "Enlarge a panel and drag a waypoint. The instruments resample truth where you put it, through the same instruments and the same noise streams.",
+      "builtIn": "016-panel-help",
+      "feature": "redrawing the track"
     },
     {
       "id": "help-manifest-import",
@@ -361,7 +368,9 @@
       "fromBeat": "011",
       "kind": "help",
       "destination": "help:controls/manifest",
-      "matter": "Paste one and this visit becomes that run — rebuilt from its seed and its edits, not restored. The schema, the format version, the configuration digest and the domain are all checked before anything is provisioned, so a refused import leaves the run you have alone."
+      "matter": "Paste one and this visit becomes that run — rebuilt from its seed and its edits, not restored. The schema, the format version, the configuration digest and the domain are all checked before anything is provisioned, so a refused import leaves the run you have alone.",
+      "builtIn": "016-panel-help",
+      "feature": "importing a manifest"
     },
     {
       "id": "help-build-the-row",
@@ -369,7 +378,9 @@
       "fromBeat": "013",
       "kind": "help",
       "destination": "help:centre/horizon-row",
-      "matter": "Building them means integrating the analysis forward four days, which takes a couple of seconds, so it happens when you ask: Build the horizon row is in the controls."
+      "matter": "Building them means integrating the analysis forward four days, which takes a couple of seconds, so it happens when you ask: Build the horizon row is in the controls.",
+      "builtIn": "016-panel-help",
+      "feature": "building the row"
     },
     {
       "id": "help-influence-radius",
@@ -377,7 +388,9 @@
       "fromBeat": "005",
       "kind": "help",
       "destination": "help:centre/attribution",
-      "matter": "An observation across a front influences the far side exactly as much as its own, which the flow would not."
+      "matter": "An observation across a front influences the far side exactly as much as its own, which the flow would not.",
+      "builtIn": "016-panel-help",
+      "feature": "the influence radius"
     },
     {
       "id": "help-no-scores-table",
@@ -385,7 +398,9 @@
       "fromBeat": "013",
       "kind": "help",
       "destination": "help:scores",
-      "matter": "There is no scores table anywhere else: a table would ask you to match a row label against a panel heading at every glance."
+      "matter": "There is no scores table anywhere else: a table would ask you to match a row label against a panel heading at every glance.",
+      "builtIn": "016-panel-help",
+      "feature": "skill against a reference"
     },
     {
       "id": "help-anomaly-about-its-own-mean",
@@ -393,7 +408,9 @@
       "fromBeat": "006",
       "kind": "help",
       "destination": "help:scores",
-      "matter": "A reduced-gravity model determines departures from a mean and not the mean itself, so every field is compared as an anomaly about its own. The offsets are published rather than absorbed."
+      "matter": "A reduced-gravity model determines departures from a mean and not the mean itself, so every field is compared as an anomaly about its own. The offsets are published rather than absorbed.",
+      "builtIn": "016-panel-help",
+      "feature": "anomalies about their own mean"
     },
     {
       "id": "help-breakdown-is-of-a-cell",
@@ -401,7 +418,179 @@
       "fromBeat": "005",
       "kind": "help",
       "destination": "help:detail/attribution-breakdown",
-      "matter": "A breakdown is an instrument of a selected cell, never a per-panel summary — that was specified first and was wrong."
+      "matter": "A breakdown is an instrument of a selected cell, never a per-panel summary — that was specified first and was wrong.",
+      "builtIn": "016-panel-help",
+      "feature": "a cell's breakdown"
+    },
+    {
+      "id": "step-what-you-are-looking-at",
+      "wasAt": "The walkthrough, step 1: What you are looking at",
+      "fromBeat": "013",
+      "step": 1,
+      "kind": "site",
+      "destination": "docs/site/index.md#What you are looking at",
+      "matter": "j-ocean is a teaching harness: a small, real ocean model, the simulated instruments that measure it, and an honest account of what each measurement was worth. It forecasts nothing you should act on.",
+      "note": "It is about the whole surface rather than about a panel, so it is not a help entry. The application still carries the statement of FR-02 without interaction (FR-058); this is the longer answer to what the thing is."
+    },
+    {
+      "id": "step-figure-typography",
+      "wasAt": "The walkthrough, step 1: the legend of the four figure kinds",
+      "fromBeat": "013",
+      "step": 1,
+      "kind": "site",
+      "destination": "docs/site/data-model.md#The figure kinds",
+      "matter": "Every number on the page is typed by where it came from, and the four kinds never change appearance between panels: declared — a value in configuration, validated before anything ran; computed — produced by the model or the analysis on this visit; derived — read off a committed artefact the build regenerates; host time — how long the machinery took, never simulation time.",
+      "note": "Spec 016 US5 scenario 3. It explains the whole surface and not one panel, so it is on the site and the application links to it from the head of the controls column."
+    },
+    {
+      "id": "step-everything-you-can-change",
+      "wasAt": "The walkthrough, step 2: Everything you can change",
+      "fromBeat": "013",
+      "step": 2,
+      "kind": "site",
+      "destination": "docs/site/index.md#The four regions",
+      "matter": "One column for every cause: which ocean, when the forecast was issued, which instruments the analysis was allowed to see, and whether quality control was running. Change any of them and every panel and every score answers where they are, without you moving.",
+      "note": "A description of the layout, which is a thing to read once rather than at the moment of confusion."
+    },
+    {
+      "id": "step-control-at-its-panel",
+      "wasAt": "The walkthrough, step 2, the note beneath it",
+      "fromBeat": "013",
+      "step": 2,
+      "kind": "dropped",
+      "destination": "dropped",
+      "matter": "A control that acts on one panel alone is not here; it is at that panel.",
+      "reason": "Beat 016 makes it true rather than said. Every panel that has something to explain now carries its own control at its own top right, and a sentence promising that a surface behaves this way is worth less than the surface behaving this way."
+    },
+    {
+      "id": "step-row-not-slider",
+      "wasAt": "The walkthrough, step 3: The forecast, at every horizon at once",
+      "fromBeat": "013",
+      "step": 3,
+      "kind": "help",
+      "destination": "help:centre/horizon-row",
+      "feature": "building the row",
+      "matter": "One panel per declared horizon, all visible together rather than behind a slider — a forecast is a shape over lead time, and you cannot see a shape one frame at a time."
+    },
+    {
+      "id": "step-two-axes",
+      "wasAt": "The walkthrough, step 3, second paragraph",
+      "fromBeat": "013",
+      "step": 3,
+      "kind": "help",
+      "destination": "help:controls/issue-time",
+      "feature": "lead time and issue time",
+      "matter": "Two axes, not one: lead time runs across the row, and issue time is a control on the left. Moving the issue time earlier gives the analysis fewer observations and is the clearest way to watch skill change."
+    },
+    {
+      "id": "step-building-costs",
+      "wasAt": "The walkthrough, step 3, the note beneath it",
+      "fromBeat": "013",
+      "step": 3,
+      "kind": "dropped",
+      "destination": "dropped",
+      "matter": "Building the row integrates four days forward, so it happens when you ask.",
+      "reason": "The same fact is in help:centre/horizon-row already, in the sentence beat 014 sent there: “Building them means integrating the analysis forward four days, which takes a couple of seconds, so it happens when you ask.” Two sentences for one fact is the duplication this beat exists to remove, and the walkthrough's is the shorter of the two."
+    },
+    {
+      "id": "step-what-each-was-worth",
+      "wasAt": "The walkthrough, step 4: What each forecast was worth",
+      "fromBeat": "013",
+      "step": 4,
+      "kind": "help",
+      "destination": "help:scores",
+      "feature": "skill against a reference",
+      "matter": "Each panel's skill sits directly beneath that panel, in its own column, rather than in a table you would have to match against a heading. A raw error is meaningless alone, so there is never one here without two references the harness computes itself. Zero means no better than the reference; negative means worse, and it is reported rather than tuned. Read the six columns left to right and the decay is there without a curve being plotted."
+    },
+    {
+      "id": "step-selected-cell",
+      "wasAt": "The walkthrough, step 5: Whatever you last selected",
+      "fromBeat": "013",
+      "step": 5,
+      "kind": "help",
+      "destination": "help:detail/attribution-breakdown",
+      "feature": "a cell's breakdown",
+      "matter": "Click a cell and this region fills with that cell's own breakdown: how much of the answer there came from observations, from the advected background, and from climatology."
+    },
+    {
+      "id": "step-selected-mark",
+      "wasAt": "The walkthrough, step 5, second half",
+      "fromBeat": "013",
+      "step": 5,
+      "kind": "help",
+      "destination": "help:detail/attribution-breakdown",
+      "feature": "a measurement's own profile",
+      "matter": "Click a measurement's mark and it fills with that profile beside the model's derived one. Filling it moves nothing else on the surface, which is the point of it having a region of its own."
+    },
+    {
+      "id": "step-which-run",
+      "wasAt": "The walkthrough, step 6: Which run this is",
+      "fromBeat": "013",
+      "step": 6,
+      "kind": "dropped",
+      "destination": "dropped",
+      "matter": "A run is a seed and the state it grew into. The seed here is the declared one, so what you see is the recorded case — the same run described in the documentation, reproducible by anyone.",
+      "reason": "The run disclosure publishes the root seed and says whether this is the recorded case, both as live figures with their kind on them. A paragraph restating them beside them would be the second source for one fact that FR-055 exists to forbid, arriving through the door marked help."
+    },
+    {
+      "id": "step-nothing-persists",
+      "wasAt": "The walkthrough, step 6, second paragraph",
+      "fromBeat": "013",
+      "step": 6,
+      "kind": "help",
+      "destination": "help:controls/manifest",
+      "feature": "importing a manifest",
+      "matter": "Nothing persists between visits: no storage, no cookie, no run in the URL. Reload and this run is rebuilt from the seed rather than restored.",
+      "restatedAs": "Nothing persists between visits: no storage, no cookie, no run in the address.",
+      "note": "The application has no run in its address until beat 017 makes the surface addressable, and the help entry says “address” rather than “URL” because the rest of this surface does."
+    },
+    {
+      "id": "step-decided-in-advance",
+      "wasAt": "The walkthrough, step 7: Everything that was decided in advance",
+      "fromBeat": "013",
+      "step": 7,
+      "kind": "site",
+      "destination": "docs/site/data-model.md#What has been declared",
+      "matter": "Grid, timestep, reduced gravity, instrument noise, forecast horizons. No component in the tree holds a literal for any of them, so changing the ocean means editing configuration, not code — and a configuration that does not validate stops the page rather than quietly substituting a default.",
+      "note": "It joins the paragraph beat 014 sent to the same section, which it was always the longer form of."
+    },
+    {
+      "id": "step-truth-reaches-model",
+      "wasAt": "The walkthrough, step 8: How truth reaches the model",
+      "fromBeat": "013",
+      "step": 8,
+      "kind": "site",
+      "destination": "docs/site/architecture.md#How truth reaches the model",
+      "matter": "Only here. One module turns the truth record into observations — ownship surface samples, XBT drops, external Argo profiles — and the model has no other route to it. A build gate fails if anything else imports truth, which is what makes the skill figures mean anything at all."
+    },
+    {
+      "id": "step-record-scored-against",
+      "wasAt": "The walkthrough, step 9: The record it is scored against",
+      "fromBeat": "013",
+      "step": 9,
+      "kind": "site",
+      "destination": "docs/site/data-model.md#The record this run is scored against",
+      "matter": "A real HYCOM subset and real Argo profiles, regenerated from a digest-verified download by a build gate. Nothing here was written by hand; a file that had been would fail the build. The harness did not author the thing it is marked against."
+    },
+    {
+      "id": "step-taking-the-run-with-you",
+      "wasAt": "The walkthrough, step 10: Taking the run with you",
+      "fromBeat": "013",
+      "step": 10,
+      "kind": "help",
+      "destination": "help:controls/manifest",
+      "feature": "importing a manifest",
+      "matter": "The manifest holds everything needed to rebuild this run and none of its state: replay is re-computation, not the restoration of a snapshot. Export it, import it in another browser, and the digests should match — that comparison is what caught an analysis that meant two different things."
+    },
+    {
+      "id": "step-deliberately-does-not-do",
+      "wasAt": "The walkthrough, step 11: What it deliberately does not do",
+      "fromBeat": "013",
+      "step": 11,
+      "kind": "site",
+      "destination": "docs/site/deferred.md#Deferred, and what would trigger it",
+      "matter": "Four capabilities are assessed, deferred, and cheap to adopt. Each has a written trigger, and a test measures the triggers on every run — so this list fails when it becomes wrong instead of going stale."
     }
-  ]
+  ],
+  "helpBuiltIn": "016-panel-help"
 }
