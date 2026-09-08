@@ -163,6 +163,33 @@ to a pane that exists.
 
 ---
 
+### User Story 6 - It works on the screen a reader actually has (Priority: P1)
+
+A reader on an ordinary browser window — 1920 x 900, 1536 x 864, 2560 x 900 — gets the docked
+workspace. Not a fallback, and never a stacked column of every pane scrolled vertically.
+
+**Why this priority**: this is the defect that survived the first pass. The workspace was
+measured at 1440 and 1200 pixels tall, which are heights no browser has, and the declared
+minimum height of 960 put **every real screen** below the floor and into a 6,584 px scrolling
+column -- longer than the 5,757 px page SRD-v2 was written to kill. A requirement measured only
+where it passes is not measured.
+
+**Independent Test**: a matrix over real viewport sizes, each asserting the workspace renders
+and nothing scrolls but a declared list.
+
+**Acceptance Scenarios**:
+
+1. **Given** any of 1366x768, 1536x864, 1920x900, 1920x1080, 2560x900, 2560x1440, **When** the
+   application renders, **Then** it is the docked workspace and not the below-floor answer.
+2. **Given** any of those, **When** the row is built and scored, **Then** no element scrolls
+   except a declared list, and the document does not scroll.
+3. **Given** the below-floor answer, **When** it renders, **Then** it is the workspace with one
+   horizon in the centre and the strip -- never a vertical stack of panes with a scrollbar.
+4. **Given** the declared minimum, **When** it is stated, **Then** it is a **width** figure:
+   six panels at their declared minimum need width. Height is not what makes a row unreadable.
+
+---
+
 ### Edge Cases
 
 - **Below the declared minimum.** The author assumes at least 2k. The FR-43 answer stays, because
@@ -203,6 +230,12 @@ to a pane that exists.
   be green.
 - **FR-011**: The declared reference viewport MUST be raised to the author's stated floor of at
   least 2k, measured from the built workspace.
+- **FR-012**: The workspace MUST render, without scrolling anything but a declared list, at every
+  viewport in a declared matrix of **real** browser sizes -- at minimum 1366x768, 1536x864,
+  1920x900, 1920x1080, 2560x900 and 2560x1440. A viewport height an ordinary browser has MUST NOT
+  put a reader below the floor.
+- **FR-013**: The below-floor answer MUST be the workspace with one horizon and the strip. It MUST
+  NOT be a vertical stack of panes, and it MUST NOT scroll a page.
 
 ### Key Entities
 
@@ -225,6 +258,9 @@ to a pane that exists.
   not-operational statement.
 - **SC-006**: Every figure's kind survives a greyscale rendering, measured on rendered pixels.
 - **SC-007**: G-07's digests are unchanged but for declared presentation figures.
+- **SC-008**: At every viewport in the declared matrix the workspace renders and nothing scrolls
+  but a declared list. The tallest scroll of any element, at any of them, is reported as a figure.
+- **SC-009**: The declared minimum height is smaller than the shortest viewport in the matrix.
 
 ## Assumptions
 

@@ -83,3 +83,16 @@ requirement the tree did not yet meet.
 - [x] **T064** The record made true: `## Measured` filled in from measurements taken on this
       tree, the ADR and the beat's note corrected to them, and the persistence amendment cited
       against Principle **IX**, which is where the prohibition it bounds is written.
+
+## The screen a reader actually has (US6, FR-012, FR-013)
+
+- [ ] **T070** `tests/shell/viewport-matrix.spec.ts`: 1366x768, 1536x864, 1920x900, 1920x1080,
+      2560x900, 2560x1440 — the workspace renders at each, the row builds and scores, and nothing
+      scrolls but a declared list. The tallest scroll of any element is printed as a figure.
+- [ ] **T071** The declared minimum height comes down below the shortest viewport in the matrix,
+      measured from the built workspace rather than chosen. Panes compress; the row takes what is
+      left.
+- [ ] **T072** The below-floor answer becomes the workspace with one horizon and the strip. The
+      stacked `.below-floor-body` column is deleted, not shortened.
+- [ ] **T073** The list/prose test runs at **every** viewport in the matrix, not only the
+      reference — the hole through which a 6,584 px scrolling column reached the author.
