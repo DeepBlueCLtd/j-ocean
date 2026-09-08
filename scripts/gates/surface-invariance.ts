@@ -5,6 +5,7 @@ import { weightsAt } from '../../src/analysis/attribution.js';
 import { sha256Bytes } from '../../src/config/digest.js';
 import { loadConfiguration, type LoadedConfiguration } from '../../src/config/load.js';
 import type { Configuration } from '../../src/config/schema.js';
+import { beginAdvance, stepsPerAdvance } from '../../src/harness/advance.js';
 import { footprintOf, type Footprint } from '../../src/harness/footprint.js';
 import { scoreEveryHorizon } from '../../src/harness/scoring-run.js';
 import { climatologyReferenceOver } from '../../src/instruments/climatology-reference.js';
@@ -49,6 +50,14 @@ import { REPO_ROOT } from './gate-lib.js';
  * convenient. Where the shell reaches for a literal rather than a declared value, this file
  * says so at the point it copies it.
  *
+ * **A mirror is not the thing, and the advance is where that cost something.** This file
+ * reproduced the shell's twelve-hour advance as a loop of its own, so the digest below was of
+ * a path no reader can take: the shell drove the model chunked and behind a measuring probe,
+ * and that path was never walked here. A probe that advanced the run and then left its chunk
+ * out of the count went four beats undetected because of it. The advance is now
+ * `src/harness/advance.ts` and both callers ask that module, as `scoreEveryHorizon` did for
+ * the row's scores in beat 013. Any block below that can be lifted the same way should be.
+ *
  * **What `--root` means here.** It is the root the *declared configuration* is read from, so
  * that a fixture can plant one changed coefficient and be watched moving the figures. The
  * data artefacts are always read from the repository, never from `--root`: G-01 already holds
@@ -88,13 +97,6 @@ export interface Quantity {
   /** One short sentence naming the module and function that computed it. */
   readonly producer: string;
 }
-
-/**
- * How far the shell integrates when a reader asks. Twelve hours, and a literal in
- * `App.tsx` (`ADVANCE_HOURS`) rather than a declared value — copied here as a literal so
- * that the record moves if that one moves.
- */
-const ADVANCE_HOURS = 12;
 
 /**
  * The lead time `App.tsx` scores the run itself at. Also a literal there: `RunView` is built
@@ -399,20 +401,23 @@ export function quantitiesOfRecordedCase(root: string): readonly Quantity[] {
   });
 
   // ---- App.tsx integrate ---------------------------------------------------------------
-  // Chunked exactly as the shell chunks it. The chunking is there so the page answers a
-  // reader mid-integration (NFR-04); it must not change a single step, and this is where that
-  // would show.
-  const stepsPerAdvance = Math.round((ADVANCE_HOURS * 3600) / config.clock.timestepSeconds);
-  const chunk = config.model.chunkSteps;
-  let done = 0;
-  while (done < stepsPerAdvance) {
-    const steps = Math.min(chunk, stepsPerAdvance - done);
-    run.advance(steps);
-    done += steps;
-  }
+  // Through `beginAdvance`, which is the shell's own advance rather than a copy of it.
+  //
+  // Until beat 018's operational pass this block was a transcription -- `Run.advance` in a
+  // loop, written here beside the shell's loop and asserted against nothing -- and that is
+  // exactly how a control that advanced sixteen hours and forty-eight minutes under a
+  // twelve-hour label passed this gate. The chunking is there so the page answers a reader
+  // mid-integration (NFR-04); it must not change a single step, and driving it from the
+  // module the shell drives is what makes this the place that would show.
+  const advanceSteps = stepsPerAdvance(config);
+  beginAdvance({
+    run,
+    chunkSteps: config.model.chunkSteps,
+    targetStep: run.steps + advanceSteps,
+  }).runToTarget();
   add(
     'state.afterDeclaredAdvance.bytes',
-    `stateBytes in src/model/grid.ts, after Run.advance took the ${String(stepsPerAdvance)} steps of the shell's twelve-hour advance.`,
+    `stateBytes in src/model/grid.ts, after beginAdvance in src/harness/advance.ts drove the run the ${String(advanceSteps)} steps of the shell's twelve-hour advance, in chunks of ${String(config.model.chunkSteps)}.`,
     stateBytes(run.state),
   );
 

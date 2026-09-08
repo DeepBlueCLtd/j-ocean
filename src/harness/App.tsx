@@ -41,6 +41,12 @@ import type { ArtefactTruthSource } from '../truth/artefact-truth-source.js';
 import type { FieldContainer } from '../truth/container.js';
 import { drawRootSeed } from './seed-provisioning.js';
 import { measure, overBudget } from './timing.js';
+import {
+  ADVANCE_HOURS,
+  beginAdvance,
+  projectedHorizonMs,
+  stepsPerAdvance as stepsPerAdvanceOf,
+} from './advance.js';
 import { Computed, Declared, HostTime } from './figures.js';
 import { Walkthrough } from './Walkthrough.js';
 import { HelpProvider, PanelCorner, PanelHead } from './Help.js';
@@ -66,9 +72,6 @@ import {
  * came from a run that exists, or from configuration that was validated before it did.
  */
 
-/** How far the shell integrates when a reader asks. Twelve hours, in declared timesteps. */
-const ADVANCE_HOURS = 12;
-
 /**
  * Principle V: declared, computed and derived are typographically distinct, always.
  *
@@ -85,6 +88,12 @@ interface RunView {
   readonly steps: number;
   readonly instant: string;
   readonly lastStepMs: number | null;
+  /**
+   * The step count the advance a reader asked for is going to, or null when none is
+   * outstanding. A refused advance keeps it, which is what makes "Integrate anyway" finish
+   * the twelve hours rather than start a second twelve from wherever the probe left the run.
+   */
+  readonly advanceToStep: number | null;
   readonly results: ModelResults;
   readonly initialisation: InitialisationReport;
   readonly integrating: boolean;
@@ -177,6 +186,15 @@ export function App() {
   const [view, setView] = useState<RunView | null>(null);
   const [record, setRecord] = useState<Record002 | null>(null);
   const [overBudgetNotice, setOverBudgetNotice] = useState<{ projectedMs: number } | null>(null);
+  /**
+   * What the last completed advance did, for the live region beside the control that asked
+   * for it. Null until one completes, and cleared when another starts or the run is replaced:
+   * an announcement of an advance that is no longer the run's is a second source for a fact
+   * FR-55 keeps to one.
+   */
+  const [advanceReport, setAdvanceReport] = useState<{ steps: number; instant: string } | null>(
+    null,
+  );
   /**
    * SRD-v1 FR-11, built here because it had never been built: the shell read
    * `domains.defaultId` and nothing offered the bland domain the requirement calls a
@@ -397,6 +415,7 @@ export function App() {
         steps: run.steps,
         instant: run.clock.instantIso(),
         lastStepMs: null,
+        advanceToStep: null,
         results: publishResults(state, parameters, run.stability),
         initialisation: report,
         integrating: false,
@@ -430,66 +449,104 @@ export function App() {
     }
   }, [buildRun, record?.domainId]);
 
-  const stepsPerAdvance =
-    loaded === null ? 0 : Math.round((ADVANCE_HOURS * 3600) / loaded.config.clock.timestepSeconds);
+  const stepsPerAdvance = loaded === null ? 0 : stepsPerAdvanceOf(loaded.config);
 
   /**
-   * FR-009 and NFR-04: integration is chunked to the declared chunk size and yields between
-   * chunks, so the page answers a reader who clicks something while it runs. A single
-   * synchronous loop over 1 280 steps would freeze the tab, which NFR-04 exists to forbid.
+   * The advance a reader asks for (FR-008, FR-009, NFR-04).
+   *
+   * ## What this used to do, and what it cost
+   *
+   * It advanced one chunk in order to time it, *then* asked whether the budget allowed the
+   * rest — and on a refusal it kept those steps and counted none of them. Proceeding then
+   * advanced a whole `stepsPerAdvance` from wherever the probe had left the run, so a click,
+   * a refusal and an "Integrate anyway" moved the run **252 steps: sixteen hours and
+   * forty-eight minutes** under a control labelled twelve. The probe's chunk was a mutation
+   * the shell made and never told anybody about.
+   *
+   * The chunk is not thrown away, because throwing it away would do the same work twice and
+   * would drop the yield NFR-04 asks for. It is *counted*: `advance.ts` holds an advance as
+   * the step the run is going **to**, `view.advanceToStep` carries that target across the
+   * reader's decision, and resuming finishes the remainder. Twelve hours, once, whichever way
+   * a reader gets there.
+   *
+   * ## Why the first chunk runs in a timeout
+   *
+   * A chunk blocks the main thread while it runs, the first one exactly as much as the rest.
+   * Setting `integrating` and then measuring in the same task paints nothing: the busy state
+   * arrives on screen after the work it describes is over, which is how a control could stay
+   * enabled and unbusy at every sample through an integration a reader watched happen. So the
+   * state is committed first and every chunk, the measured one included, runs after a yield.
    */
   const integrate = useCallback(
     (force: boolean) => {
       if (loaded === null || view === null || view.integrating) return;
 
-      const chunk = loaded.config.model.chunkSteps;
-      const measured = measure(() => {
-        view.run.advance(Math.min(chunk, stepsPerAdvance));
-      });
-      const perStep = measured.elapsedMs / Math.min(chunk, stepsPerAdvance);
-      const longestHorizonHours = Math.max(...loaded.config.horizons.leadHours);
-      const projectedMs =
-        perStep * ((longestHorizonHours * 3600) / loaded.config.clock.timestepSeconds);
+      const config = loaded.config;
+      const run = view.run;
+      // Where this advance ends. A target the reader already has is finished rather than
+      // replaced, so pressing the control again while a refusal stands makes progress toward
+      // the twelve hours it names and can never overshoot them.
+      const targetStep = view.advanceToStep ?? run.steps + stepsPerAdvance;
+      if (run.steps >= targetStep) return;
+      const advance = beginAdvance({ run, chunkSteps: config.model.chunkSteps, targetStep });
 
-      // FR-008: a run whose projected time for the longest declared horizon exceeds the
-      // declared budget says so with both figures and does not integrate until told to.
-      if (!force && overBudget(projectedMs, loaded.config.budget.frameBudgetMs)) {
-        setOverBudgetNotice({ projectedMs });
-        setView({ ...view, steps: view.run.steps, instant: view.run.clock.instantIso(), lastStepMs: perStep });
-        return;
-      }
       setOverBudgetNotice(null);
+      setAdvanceReport(null);
+      setView({ ...view, integrating: true, advanceToStep: targetStep });
 
-      let done = Math.min(chunk, stepsPerAdvance);
-      setView({ ...view, integrating: true, lastStepMs: perStep });
-      const continueRun = (): void => {
-        const remaining = stepsPerAdvance - done;
-        if (remaining <= 0) {
-          setView((current) =>
-            current === null
-              ? current
-              : {
-                  ...current,
-                  integrating: false,
-                  steps: current.run.steps,
-                  instant: current.run.clock.instantIso(),
-                },
-          );
+      const settle = (integrating: boolean, perStepMs: number): void => {
+        setView((current) =>
+          // A reader who provisions a new run mid-advance gets the new run: this advance is
+          // over the run it began on, and writing its step count into a run that replaced it
+          // would report the old trajectory under the new seed.
+          current === null || current.run !== run
+            ? current
+            : {
+                ...current,
+                integrating,
+                lastStepMs: perStepMs,
+                steps: run.steps,
+                instant: run.clock.instantIso(),
+                advanceToStep: run.steps < targetStep ? targetStep : null,
+              },
+        );
+      };
+
+      const nextChunk = (): void => {
+        const timing = measure(() => advance.takeChunk());
+        const chunk = timing.value;
+        const perStepMs = timing.elapsedMs / chunk.steps;
+
+        // FR-008: a run whose projected time for the longest declared horizon exceeds the
+        // declared budget says so with both figures and does not integrate until told to.
+        // The chunk it measured that on has been taken and is counted; what is left of the
+        // advance waits for the reader.
+        if (chunk.first && !force) {
+          const projectedMs = projectedHorizonMs(perStepMs, config);
+          if (overBudget(projectedMs, config.budget.frameBudgetMs)) {
+            setOverBudgetNotice({ projectedMs });
+            settle(false, perStepMs);
+            return;
+          }
+        }
+
+        if (chunk.stepsRemaining > 0) {
+          settle(true, perStepMs);
+          // Yielding to the event loop is what keeps the page responsive.
+          setTimeout(nextChunk, 0);
           return;
         }
-        view.run.advance(Math.min(chunk, remaining));
-        done += Math.min(chunk, remaining);
-        setView((current) =>
-          current === null
-            ? current
-            : { ...current, steps: current.run.steps, instant: current.run.clock.instantIso() },
-        );
-        // Yielding to the event loop is what keeps the page responsive.
-        setTimeout(continueRun, 0);
+
+        settle(false, perStepMs);
+        // FR-002 and the author's report: the run's own figures move on the provenance tab,
+        // which may not be the tab in view, so the advance says what it did where it was
+        // asked for. Figures, not a sentence (FR-007).
+        setAdvanceReport({ steps: stepsPerAdvance, instant: run.clock.instantIso() });
       };
-      setTimeout(continueRun, 0);
+
+      setTimeout(nextChunk, 0);
     },
-    [loaded, view, stepsPerAdvance, overBudget],
+    [loaded, view, stepsPerAdvance],
   );
 
   /**
@@ -569,6 +626,8 @@ export function App() {
           return;
         }
         setImportWarning(codeVersionWarning(manifest, { codeVersion: CODE_VERSION }));
+        setOverBudgetNotice(null);
+        setAdvanceReport(null);
         setView(built);
       } catch (error) {
         setImportFailure(
@@ -584,6 +643,7 @@ export function App() {
     const built = buildRun(drawRootSeed(), false);
     if (built !== null) {
       setOverBudgetNotice(null);
+      setAdvanceReport(null);
       setView(built);
     }
   }, [buildRun]);
@@ -940,6 +1000,7 @@ export function App() {
                 setDomainFailure(null);
                 setChosenDomainId(domain.id);
                 setOverBudgetNotice(null);
+                setAdvanceReport(null);
                 setMark(null);
               }}
             />
@@ -956,7 +1017,12 @@ export function App() {
 
       {row.controls}
 
-      <div className="control-group" data-testid="run-controls">
+      {/*
+        `aria-busy` on the group and not on the button alone: while an advance runs, the
+        controls in here act on a run that is moving, and a reader who cannot see the disabled
+        state is told the same thing the greyed button tells everybody else.
+      */}
+      <div className="control-group" data-testid="run-controls" aria-busy={view.integrating}>
         <PanelHead panel="controls/run" />
         <div className="row-controls">
           <button
@@ -967,7 +1033,7 @@ export function App() {
           >
             Integrate {ADVANCE_HOURS} hours
           </button>
-          <button type="button" onClick={newRun} data-testid="new-run">
+          <button type="button" onClick={newRun} data-testid="new-run" disabled={view.integrating}>
             New run
           </button>
           {view.forecast === null && (
@@ -984,14 +1050,53 @@ export function App() {
               <Declared>{Math.max(...config.horizons.leadHours)} h</Declared>) is{' '}
               <HostTime>{overBudgetNotice.projectedMs.toFixed(0)} ms</HostTime>, which exceeds
               the declared frame budget of{' '}
-              <Declared>{config.budget.frameBudgetMs} ms</Declared>. Nothing has been
-              integrated beyond the first chunk. The page is saying so rather than freezing.
+              <Declared>{config.budget.frameBudgetMs} ms</Declared>. The chunk it was
+              measured on counts toward the twelve hours; nothing beyond it has been
+              integrated. The page is saying so rather than freezing.
             </p>
             <button type="button" onClick={() => { integrate(true); }} data-testid="proceed-anyway">
               Integrate anyway
             </button>
           </div>
         )}
+
+        {/*
+          What the advance did, said where the advance was asked for (the author's report:
+          "it let it run for a couple of seconds, but got no confirmation that it had
+          completed"). The run's own figures do move -- `steps` and `instant`, on the run tab
+          -- and the tab a reader is looking at may be one of the other three.
+
+          It is a live region and it is painted nowhere, for a measured reason rather than a
+          preference: the controls pane's own content height at the floor's width **is** the
+          declared floor -- 656 px of content under 92 px of chrome, declared 748 -- so a line
+          of visible confirmation costs 19 px of a budget with none left, and the only way to
+          buy it is to re-declare `presentation.minimumViewportHeightPx`. That is a declared
+          value, and this change moves none. So the announcement goes into the accessibility
+          tree, where it costs no layout, and the figures stay where FR-55 keeps them.
+
+          Figures and their kinds, not a sentence: FR-007 counts what is left when every
+          figure's own text is removed, and what is left here is five words.
+        */}
+        <p
+          className="announcement"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          data-testid="advance-report"
+        >
+          {view.integrating && view.advanceToStep !== null ? (
+            <>
+              Integrating {ADVANCE_HOURS} hours:{' '}
+              <Computed>{view.steps - (view.advanceToStep - stepsPerAdvance)}</Computed> of{' '}
+              <Computed>{stepsPerAdvance}</Computed> steps
+            </>
+          ) : advanceReport === null ? null : (
+            <>
+              Integrated {ADVANCE_HOURS} hours: <Computed>{advanceReport.steps}</Computed> steps,
+              valid at <Computed>{advanceReport.instant}</Computed>
+            </>
+          )}
+        </p>
       </div>
     </>
   );

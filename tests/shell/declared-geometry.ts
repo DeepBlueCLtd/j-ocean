@@ -50,6 +50,15 @@ export interface DeclaredGeometry {
     };
   };
   readonly horizons: { readonly leadHours: number[] };
+  /**
+   * The run's own clock. The advance a reader asks for is a whole number of these steps, so a
+   * test that holds the control to what its label says needs the timestep the label is in.
+   */
+  readonly clock: { readonly epoch: string; readonly timestepSeconds: number };
+  /** NFR-04: how far an integration goes before it yields to the event loop. */
+  readonly model: { readonly chunkSteps: number };
+  /** FR-008: what a frame may cost before the surface asks before integrating. */
+  readonly budget: { readonly frameBudgetMs: number };
 }
 
 export const declared = JSON.parse(readFileSync(CONFIG_PATH, 'utf8')) as DeclaredGeometry;

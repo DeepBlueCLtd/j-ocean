@@ -39,6 +39,33 @@ async function openDisclosure(page: Page, testId: string): Promise<void> {
   });
 }
 
+/**
+ * What the advance control says it does, and what that is in the run's own units.
+ *
+ * The hours are read off the control's label rather than written down here: the claim under
+ * test is that the run ends up where the surface said it would, so the surface has to be the
+ * one saying it. The timestep is declared, like every other figure these tests measure
+ * against.
+ */
+async function advanceTheControlOffers(page: Page): Promise<{
+  readonly label: string;
+  readonly hours: number;
+  readonly steps: number;
+  readonly instantAfter: (fromMs: number, advances: number) => string;
+}> {
+  const label = ((await page.getByTestId('advance').textContent()) ?? '').trim();
+  const match = /(\d+(?:\.\d+)?)\s*hours?/.exec(label);
+  expect(match, `the advance control does not say how far it advances: "${label}"`).not.toBeNull();
+  const hours = Number(match?.[1]);
+  return {
+    label,
+    hours,
+    steps: Math.round((hours * 3600) / declared.clock.timestepSeconds),
+    instantAfter: (fromMs, advances) =>
+      new Date(fromMs + advances * hours * 3_600_000).toISOString(),
+  };
+}
+
 test.describe('the shell', () => {
   test('loads from a static server making no external request', async ({ page, baseURL }) => {
     const foreign: string[] = [];
@@ -96,6 +123,203 @@ test.describe('the shell', () => {
     // Principle V: the figure is host time and says so, in a kind of its own.
     await expect(page.getByTestId('step-time').locator('.host-time')).toBeVisible();
     await expect(page.getByTestId('instant')).not.toHaveText(startInstant ?? '');
+  });
+
+  /**
+   * The control does what it says, whichever way a reader reaches the end of it (FR-008,
+   * FR-009; spec 018 US3).
+   *
+   * ## The defect this was written for
+   *
+   * The author pressed *Integrate 12 hours*, was shown the over-budget notice, pressed
+   * *Integrate anyway*, and the run advanced **16 h 48 min**. `integrate` advanced a chunk in
+   * order to time it, *then* asked whether the budget allowed the rest, and on a refusal it
+   * kept those 72 steps and counted none of them; proceeding took a fresh 180 from where the
+   * probe had left the run. 72 + 180 = 252 steps at 240 s. Two presses landed on 33 h 36 min.
+   *
+   * Nothing in the suite asked what the run had actually advanced. The existing integration
+   * test asserted `steps` was *not* `0` and the instant had *changed*, with a comment saying
+   * the exact count comes from configuration so the test waits rather than asserting a
+   * literal. That is the shape of the hole: a figure derived from configuration can be
+   * derived in the test as well as in the shell, and a control 40 per cent wrong satisfies
+   * "not zero".
+   *
+   * ## How far it should have gone, read off the control itself
+   *
+   * The hours come from the button's own label and the timestep from the declared clock, so
+   * this is not a test of 180 steps: it is a test that the run stands where the control said
+   * it would put it. Change the label and the assertion changes with it; change the advance
+   * and the assertion does not.
+   */
+  test('advances exactly what its label says, through the refusal and again after it', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    // Served a frame budget no machine can meet, the way G-05 and one-view.spec reach this
+    // notice: the refusal is the state under test, not this host's step time.
+    await page.route(CONFIG_REQUEST, async (route) => {
+      const response = await route.fetch();
+      const config = JSON.parse(await response.text()) as { budget: { frameBudgetMs: number } };
+      config.budget.frameBudgetMs = 0.000_001;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(config),
+      });
+    });
+
+    await page.goto('/');
+    await expect(page.getByTestId('pane-controls')).toBeVisible();
+    const advance = await advanceTheControlOffers(page);
+    await expect(page.getByTestId('steps')).toHaveText('0');
+    const start = Date.parse((await page.getByTestId('instant').textContent()) ?? '');
+
+    // The press. The probe is measured, the budget refuses, and what it was measured on is a
+    // chunk of the advance rather than a mutation nobody counted.
+    await page.getByTestId('advance').click();
+    await expect(page.getByTestId('over-budget')).toBeVisible({ timeout: 30_000 });
+    const refused = Number(await page.getByTestId('steps').textContent());
+    expect(refused, 'the probe took no step, so nothing was measured').toBeGreaterThan(0);
+    expect(
+      refused,
+      'the refusal integrated the whole advance, which is not what "nothing beyond the first ' +
+        'chunk" says',
+    ).toBeLessThan(advance.steps);
+    expect(refused).toBe(declared.model.chunkSteps);
+
+    // "Integrate anyway": the advance finishes where it was going, not a whole advance past it.
+    await page.getByTestId('proceed-anyway').click();
+    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 60_000 });
+    await expect(
+      page.getByTestId('steps'),
+      `pressing ${advance.label} once and proceeding did not advance ${String(advance.steps)} steps`,
+    ).toHaveText(String(advance.steps));
+    await expect(page.getByTestId('instant')).toHaveText(advance.instantAfter(start, 1));
+
+    // The completion is announced where the advance was asked for, with the figures.
+    const report = page.getByTestId('advance-report');
+    await expect(report).toHaveAttribute('role', 'status');
+    await expect(report).toContainText(String(advance.steps));
+    await expect(report).toContainText(advance.instantAfter(start, 1));
+
+    // And again. Two presses of a twelve-hour control are twenty-four hours; this landed on
+    // 504 steps -- 33 h 36 min -- until the probe's chunk was counted.
+    await page.getByTestId('advance').click();
+    await expect(page.getByTestId('over-budget')).toBeVisible({ timeout: 30_000 });
+    await page.getByTestId('proceed-anyway').click();
+    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 60_000 });
+    await expect(
+      page.getByTestId('steps'),
+      'two presses did not land on two advances',
+    ).toHaveText(String(2 * advance.steps));
+    await expect(page.getByTestId('instant')).toHaveText(advance.instantAfter(start, 2));
+  });
+
+  /**
+   * The same claim on the path where the budget says nothing, which is the path a fast enough
+   * machine takes and the one a refusal test can never reach.
+   */
+  test('advances exactly what its label says when the budget is not exceeded', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await page.route(CONFIG_REQUEST, async (route) => {
+      const response = await route.fetch();
+      const config = JSON.parse(await response.text()) as { budget: { frameBudgetMs: number } };
+      // A budget no step time can exceed, so the notice cannot appear and the advance runs
+      // straight through its chunks.
+      config.budget.frameBudgetMs = 1_000_000;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(config),
+      });
+    });
+
+    await page.goto('/');
+    await expect(page.getByTestId('pane-controls')).toBeVisible();
+    const advance = await advanceTheControlOffers(page);
+    const start = Date.parse((await page.getByTestId('instant').textContent()) ?? '');
+
+    await page.getByTestId('advance').click();
+    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 60_000 });
+    await expect(page.getByTestId('over-budget')).toHaveCount(0);
+    await expect(page.getByTestId('steps')).toHaveText(String(advance.steps));
+    await expect(page.getByTestId('instant')).toHaveText(advance.instantAfter(start, 1));
+
+    await page.getByTestId('advance').click();
+    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 60_000 });
+    await expect(page.getByTestId('steps')).toHaveText(String(2 * advance.steps));
+    await expect(page.getByTestId('instant')).toHaveText(advance.instantAfter(start, 2));
+  });
+
+  /**
+   * NFR-04's other half: while it runs, the surface says so and the control cannot be pressed
+   * again.
+   *
+   * The author measured `aria-busy` absent and the button enabled at every sample of a run
+   * they watched take seconds. `view.integrating` did disable the button, and it was set in
+   * the same task as the chunk it described: the main thread was blocked by the work before
+   * the browser could paint the state that says the work is happening. Every chunk runs after
+   * a yield now, the measured one included, so the busy state is on screen for the whole of
+   * it -- which is what this samples.
+   */
+  test('cannot be pressed again while it integrates, and says it is working', async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.route(CONFIG_REQUEST, async (route) => {
+      const response = await route.fetch();
+      const config = JSON.parse(await response.text()) as { budget: { frameBudgetMs: number } };
+      config.budget.frameBudgetMs = 1_000_000;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(config),
+      });
+    });
+    await page.goto('/');
+    await expect(page.getByTestId('pane-controls')).toBeVisible();
+
+    // Sampled from inside the page, between the chunks the integration yields on: an
+    // assertion driven from the test process cannot see a state that lasts a tenth of a
+    // second.
+    const samples = await page.evaluate(async () => {
+      const read = (): { busy: boolean; disabled: boolean; says: string } => ({
+        busy:
+          document.querySelector('[data-testid="run-controls"]')?.getAttribute('aria-busy') ===
+          'true',
+        disabled:
+          (document.querySelector('[data-testid="advance"]') as HTMLButtonElement | null)
+            ?.disabled ?? false,
+        says: document.querySelector('[data-testid="advance-report"]')?.textContent ?? '',
+      });
+      const taken: { busy: boolean; disabled: boolean; says: string }[] = [];
+      (document.querySelector('[data-testid="advance"]') as HTMLButtonElement).click();
+      for (let i = 0; i < 400; i += 1) {
+        const state = read();
+        taken.push(state);
+        if (!state.busy && i > 0) break;
+        await new Promise((resolve) => { setTimeout(resolve, 0); });
+      }
+      return taken;
+    });
+
+    const busy = samples.filter((sample) => sample.busy);
+    expect(
+      busy.length,
+      'no sample caught the integration in progress, so nothing on the surface reports it',
+    ).toBeGreaterThan(0);
+    expect(
+      busy.filter((sample) => !sample.disabled),
+      'the advance control was pressable while it was integrating',
+    ).toEqual([]);
+    expect(
+      busy.filter((sample) => !sample.says.includes('Integrating')),
+      'the live region said nothing while the run was integrating',
+    ).toEqual([]);
+
+    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 60_000 });
+    await expect(page.getByTestId('run-controls')).toHaveAttribute('aria-busy', 'false');
+    await expect(page.getByTestId('advance-report')).toContainText('Integrated');
   });
 
   /**

@@ -137,7 +137,11 @@ body {
 /* A trailing margin on the last control group is a few pixels of content the pane cannot show
    and a reader cannot reach, and at the floor those pixels are the difference between "fits"
    and "does not". */
-.controls > *:last-child, .control-group > *:last-child { margin-bottom: 0; }
+.controls > *:last-child, .control-group > *:last-child,
+/* The live region below is out of flow and painted nowhere, so the control before it is still
+   the last thing in the pane. Without this the rule above stopped applying to it and the
+   controls pane grew 3 px -- which, at the floor, is the difference this comment describes. */
+.control-group > *:has(+ .announcement) { margin-bottom: 0; }
 
 /* A control surface is not prose, and it is measured as furniture rather than set as text
    (spec 018 T071). The pane's own content was **823 px tall at the 220 px it is narrowest**,
@@ -1309,6 +1313,24 @@ button[disabled]:hover { background: #fff; color: var(--ink); }
 /* The marks as text. Visually hidden, not display:none: it is in the accessibility tree,
    because a canvas is not. */
 .mark-list {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  margin: 0;
+  padding: 0;
+}
+
+/* A live region the surface announces through, and paints nowhere.
+
+   The controls pane's own content at the floor's width is 656 px and the declared floor is
+   that plus 92 px of chrome, so a visible line of confirmation costs 19 px of a height budget
+   with nothing left in it. The announcement is in the accessibility tree instead, hidden the
+   same way the mark lists are -- 1 px square under `clip-path: inset(50%)`, never
+   `display: none`, because a region that is not in the tree announces nothing. */
+.announcement {
   position: absolute;
   width: 1px;
   height: 1px;

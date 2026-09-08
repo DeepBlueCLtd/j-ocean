@@ -640,3 +640,118 @@ and recorded here rather than fixed quietly. What did go is the field's **second
 figure carried *Weight carried by observations, per cell* over the field's own *Weight carried by
 observations in each cell*, which was invisible only for as long as the stylesheet was laying the
 field's label out sideways.
+
+### The sixth pass: a control that advanced sixteen hours and forty-eight minutes
+
+The author pressed *Integrate 12 hours* at 1 792 × 880, was shown the over-budget notice, pressed
+*Integrate anyway*, and reported the only thing the surface let them see: *"it let it run for a
+couple of seconds, but got no confirmation that it had completed."* Read off the run's own
+figures, the missing confirmation was the smaller half.
+
+| | Steps | Valid at | |
+|---|---|---|---|
+| before | 0 | 2013-09-01T00:00:00.000Z | step time not yet measured |
+| after the press | 72 | 2013-09-01T04:48:00.000Z | the over-budget notice, and 1.042 ms/step |
+| after *Integrate anyway* | **252** | **2013-09-01T16:48:00.000Z** | **16 h 48 min under a control labelled 12** |
+| pressed a second time | **504** | 2013-09-02T09:36:00.000Z | 33 h 36 min for two presses of twelve hours |
+
+**The probe kept the steps it never counted.** `integrate` advanced a chunk in order to time it,
+*then* asked whether the projected time for the longest declared horizon was inside the frame
+budget. On a refusal it returned — leaving those 72 steps applied — and *Integrate anyway* then
+began a fresh `done = 0` and took a whole `stepsPerAdvance` from wherever the probe had left the
+run. 72 + 180 = 252 steps at the declared 240 s timestep. `chunkSteps` is 72 and the advance is
+180, so the arithmetic is exactly a chunk over on every refused advance.
+
+The chunk is counted now rather than thrown away: throwing it away would do the same work twice
+and drop the yield NFR-04 asks for. `src/harness/advance.ts` holds an advance as the step the run
+is going **to**, `view.advanceToStep` carries that target across the reader's decision, and
+resuming finishes the remainder. Measured, on the same window:
+
+| | Steps | Valid at |
+|---|---|---|
+| press, refuse, proceed | **180** | **2013-09-01T12:00:00.000Z** |
+| and again | **360** | **2013-09-02T00:00:00.000Z** |
+| one press with the budget met, and a second | 180, then 360 | the same two instants |
+
+Pressing *Integrate 12 hours* again while a refusal is standing continues the advance it refused
+rather than adding another twelve hours to it, so no sequence of presses can put the run past
+where the last press said it would be.
+
+#### The gate never drove the shell's path
+
+G-07 digests `state.afterDeclaredAdvance.bytes`, and it produced that state by calling
+`Run.advance(180)` in `scripts/gates/surface-invariance.ts` — a **second implementation** of the
+advance, written beside the shell's and asserted against nothing. The shell drove the model
+chunked and behind a measuring probe. That path was digested by nothing, which is how a control
+40 per cent wrong passed nine gates and 131 shell tests.
+
+So the fix is to the class and not to the instance: the drive is `src/harness/advance.ts`, and the
+shell and the gate both call it, the way `scoreEveryHorizon` became the row's own arithmetic in
+beat 013. What it catches that it did not: a change to how far an advance goes, or to how it is
+chunked, now moves the gate's digest, because the gate is running the shell's code. Beside it,
+`tests/harness/advance.test.ts` asks the half a digest of one path cannot — that **every** way a
+reader can reach the end of an advance lands on the same bytes: chunked, refused-in-the-middle
+and resumed, and one straight call to `Run.advance(180)`. A digest holds a path against
+yesterday; that test holds the paths against each other.
+
+**No digest moved.** All 41 quantities are byte-identical, `state.afterDeclaredAdvance.bytes`
+included, because the gate's own walk was taking the correct 180 steps already — the defect was
+in the shell alone. The record's one changed line is that quantity's *producer* sentence, which
+now names the module both callers go through.
+
+#### The missing assertion, and where the hole was
+
+`shell.spec.ts` → *integrates the run and reports the step time as host time* asserted that
+`steps` was **not** `0` and that the instant had **changed**, with a comment saying the exact
+count comes from configuration so the test waits for the integration to stop rather than
+asserting a literal. That is the shape of the hole: a figure derived from configuration can be
+derived in the test as well as in the shell, and a control 40 per cent wrong satisfies *not zero*.
+Three tests replace the omission, and the hours they check against are read off the **button's own
+label** rather than written down, so the claim is that the run stands where the control said it
+would put it.
+
+#### Confirming completion, and why it is painted nowhere
+
+Nothing announced the end of an advance. The two `aria-live` regions on the surface carry
+*Selection…* and the layout manager's *Manifest opened*; the figures that do move — `steps` and
+`instant` — are on the run tab, and a reader may be looking at one of the other three.
+
+The announcement is a live region in the run controls, `role="status"`, saying *Integrated 12
+hours: **180** steps, valid at **2013-09-01T12:00:00.000Z*** in the provenance-typed figure
+components, and *Integrating 12 hours: **72** of **180** steps* while it runs. It carries five
+words once its figures are removed, against FR-007's eight.
+
+**It is painted nowhere, and that is a measured decision rather than a preference.** The controls
+pane's own content at the floor's width is 656 px and the declared floor is that plus 92 px of
+chrome. A visible line of confirmation is 19 px of a budget with nothing left in it, and the only
+way to buy it is to re-declare `presentation.minimumViewportHeightPx` — a declared value, and this
+pass moves none. So the announcement goes into the accessibility tree, hidden the way the mark
+lists are, where it costs no layout. One 3 px consequence had to be paid for anyway and is
+recorded: an out-of-flow element added after the last control stopped `*:last-child` applying to
+that control, the pane grew to 659 px, and both `viewport-floor.spec.ts` and the floor's census in
+`one-view.spec.ts` failed on it. The rule now names the control before a live region too.
+
+#### A busy state that could not be seen
+
+The author measured `aria-busy` absent and `advance` enabled at every sample. `view.integrating`
+*did* disable the button — and it was set in the same task as the chunk it described, so the main
+thread was blocked by the work before the browser could paint the state that says the work is
+happening. Every chunk runs after a yield now, the measured one included; the group carries
+`aria-busy` and both `advance` and *New run* are disabled while it runs. `shell.spec.ts` samples
+it from inside the page between chunks, because an assertion driven from the test process cannot
+see a state that lasts a tenth of a second, and requires that no sample caught the control
+pressable while the surface said it was busy.
+
+#### Two more things the drive path does that the control does not say
+
+- **The step time in the status strip is the *first* chunk of the last press**, not the last
+  chunk and not the advance's. It is why the strip read 1.042 ms/step after the probe and
+  0.464 ms/step after proceeding: the same run, two measurements of the same work, and nothing on
+  the surface says which chunk either belongs to. Left as it was — it is a host-time figure and
+  marked as one — and recorded here.
+- **A run provisioned mid-advance would have been written over by the advance it replaced.** The
+  chunk loop closes over the run it began on and commits `steps` and `instant` from it, so a *New
+  run* pressed between two chunks would have reported the old trajectory's step count under the
+  new seed. The control is disabled while an advance runs, and the commit refuses a view whose run
+  is not the one it began on: two answers, because the disabled control is a promise about a
+  reader and the guard is a property of the code.
