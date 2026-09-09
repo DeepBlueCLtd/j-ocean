@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { holdsOneView, settled } from './census.js';
+import { advanceThroughTheBudget, holdsOneView, settled } from './census.js';
 import { BELOW_THE_ROW, FLOOR, REFERENCE, VIEWPORT_MATRIX, declared } from './declared-geometry.js';
 import { decodePng } from './greyscale.js';
 
@@ -448,7 +448,7 @@ test.describe('a walkthrough of the workspace', () => {
     ).toEqual(['the scrim', 'the scrim', 'the scrim']);
 
     // And the lit pane really works: the control the run is advanced by is in it.
-    await page.getByTestId('advance').click();
+    await advanceThroughTheBudget(page);
     await expect(page.getByTestId('step-time')).not.toContainText('not yet measured', {
       timeout: 60_000,
     });

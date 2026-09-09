@@ -13,8 +13,9 @@
       "id": "controls/run",
       "region": "controls",
       "heading": "Run",
-      "features": [],
-      "nothingToExplain": "Four buttons that each say on their own face what they will do, and what each does is drawn on the panes the moment it is pressed. What a run is belongs to the disclosure that publishes its seed."
+      "features": [
+        "the frame budget"
+      ]
     },
     {
       "id": "controls/run-provenance",

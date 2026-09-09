@@ -262,6 +262,24 @@ and nothing scrolls but a declared list.
   distinguishable without colour. Escape MUST close it and return focus to the control that
   opened it, and a click on the dim MUST close it too. Any dimension or colour the mask needs
   MUST be declared in `presentation.workspace` (Principle X).
+- **FR-015**: The census MUST hold that **nothing a reader has to see or reach is painted outside
+  the box that clips it**. It MUST walk the interactive elements and the text-bearing elements of
+  every pane, intersect each with the clip rectangle of every clipping ancestor up to the
+  viewport, and fail when a control or a figure is wholly or substantially outside it, naming the
+  control and the ancestor that clipped it. An ancestor a reader can **scroll** is not a clip: what
+  is below the fold of a list is reached by a wheel. Asking whether a pane's own content fits the
+  pane is not enough and is the hole this closes — content clipped by an ancestor *of* the pane
+  measures as fitting everywhere and is painted nowhere a reader can reach.
+- **FR-016**: The censuses MUST run at the reader's declared font size as well as at every
+  viewport in the matrix, in the states already censused and in the **over-budget** state, which
+  none had visited. The over-budget question MUST be a modal decision drawn against the viewport
+  and not a notice laid out in a pane: centred, sized to its content up to a declared maximum, so
+  that no pane's width can hide its controls. It MUST print the projected time and the declared
+  budget, both with their provenance and **neither truncated**; move focus into itself when it
+  opens; decline on Escape — integrating nothing beyond the chunk already measured — and return
+  focus to the control it was opened from; reflow no pane; animate nothing in any media state; and
+  be legible in greyscale. What explains the frame budget rather than deciding it MUST be in panel
+  help (FR-007), recorded in `docs/narrative-disposition.json`.
 
 ### Key Entities
 
@@ -292,6 +310,14 @@ and nothing scrolls but a declared list.
   move and a window resize; opening and advancing the walkthrough changes no region's rectangle
   to the pixel and grows the page on neither axis; and the margin between the lit and the dimmed
   surface through a greyscale rendering is reported as a figure.
+- **SC-011**: The clip census fails, by the control's name and the ancestor's, on a control
+  painted outside its clipping ancestor. Watched failing on the over-budget notice at a 28 px
+  root font before it was repaired, where the pane-content census reported nothing.
+- **SC-012**: At every viewport in the matrix and at root font sizes of 16, 20 and 24 px, the
+  arrival state and the over-budget state hold the scroll, overlap and clip censuses; the
+  over-budget decision's two controls are wholly inside the window; neither of its figures is
+  truncated; and opening it moves no pane's rectangle by a pixel. Which combinations of viewport,
+  font size and state run, and which do not, is stated in the plan.
 
 ## Assumptions
 

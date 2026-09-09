@@ -300,28 +300,45 @@ export const configurationSchema = z
         /** The draggable divider between two panes, as the layout manager draws it. */
         sashWidthPx: z.number().int().nonnegative(),
         /*
-         * The walkthrough's mask (spec 018 FR-014, Principle X).
+         * The mask and the card placed against it (spec 018 FR-014, FR-016, Principle X).
          *
-         * The mask is geometry and ink, so its four figures are declared here beside the
-         * other furniture rather than written into the stylesheet. Nothing here is computed
-         * and nothing here is a forecast quantity: what a step lights is measured from the
-         * pane at the moment it is shown, and these say only how dark the rest is and where
-         * the card goes beside it.
+         * The mask is geometry and ink, so its figures are declared here beside the other
+         * furniture rather than written into the stylesheet. Nothing here is computed and
+         * nothing here is a forecast quantity: what a step lights is measured from the pane at
+         * the moment it is shown, and these say only how dark the rest is and where the card
+         * goes beside it.
          */
         /**
-         * How far the scrim dims everything a step is not about.
+         * How far the surface dims what a reader is being asked to look away from.
+         *
+         * One figure and not two. The walkthrough's scrim dims everything a step is not about,
+         * and the over-budget decision dims the whole workspace behind it; those are the same
+         * claim about the same ink, and beat 015's lesson is that two rules written for one
+         * claim are two rules that drift. It was `walkthroughMaskOpacity` while the walkthrough
+         * was the only thing that dimmed anything.
          *
          * A share of the ink and not a colour of its own, so the dim is luminance: the claim
-         * is that a monochrome print still says which pane is lit, and a scrim declared as a
-         * hue would be the second palette this surface has refused twice.
+         * is that a monochrome print still says what is lit, and a scrim declared as a hue
+         * would be the second palette this surface has refused twice.
          */
-        walkthroughMaskOpacity: z.number().gt(0).lt(1),
+        maskOpacity: z.number().gt(0).lt(1),
         /** The card's own width, which is also what its placement is worked out from. */
         walkthroughCardWidthPx: z.number().int().positive(),
         /** The least room a card is placed in. Below this a card is a scrollbar with a sentence in it. */
         walkthroughCardMinimumHeightPx: z.number().int().positive(),
         /** Between the lit pane's edge and the card, so the card is beside it and not on it. */
         walkthroughCardGapPx: z.number().int().nonnegative(),
+        /**
+         * The widest a modal decision may be drawn (FR-016).
+         *
+         * A cap and not a width: the dialog is as wide as its own figures need and no wider,
+         * up to this. It is declared because it is the one dimension that decides whether a
+         * figure wraps, and the requirement on this dialog is that neither figure is ever
+         * truncated. What it is emphatically not is a **pane's** width -- the notice it
+         * replaced was laid out in the controls pane, and at a large declared font its
+         * `Integrate anyway` was painted below the foot of the pane with no way to reach it.
+         */
+        modalWidthPx: z.number().int().positive(),
         /** Where the arrangement is kept. Geometry and pane identity only; see workspace.ts. */
         storageKey: z.string().min(1),
         /**
@@ -369,7 +386,7 @@ export const configurationSchema = z
       centreChromeHeightPx: z.number().int().positive(),
       /**
        * Beat 018, fifth pass. The room a field's own label and colour scale take beneath the
-       * picture, in CSS pixels.
+       * picture, **in the reader's own text size**.
        *
        * The pre-row centre draws a square picture in a box whose height and width are both
        * decided by the pane, and the square has to be the smaller of the two less whatever the
@@ -379,11 +396,21 @@ export const configurationSchema = z
        * holds it honest: a reserve too small puts the label over the caption below it and the
        * overlap census fails by name.
        *
-       * Measured from the built surface: the label and its colour scale are 46.4 px tall at
-       * every viewport in the declared matrix, and 66.8 px in a column of 230 px or narrower,
-       * where the label wraps to a second line. 72 declares the wrapped case.
+       * **Root ems and no longer pixels, which is beat 018's eighth pass.** The thing being
+       * reserved for is *text*, and text is the one length on this surface the reader sets:
+       * every part of that label -- its font size, its colour scale, the margin above it -- is
+       * written in `rem`, so a reserve in pixels is right at exactly one declared font size and
+       * short at every larger one. Measured at a 24 px root font it was 7 px short, and the
+       * picture spilled its own box by that much at three viewports of six -- which is what the
+       * new font axis in `tests/shell/reader-font.spec.ts` was added to find. 4.5 rem is 72 px
+       * at the 16 px default, so nothing moves for a reader who has not changed it.
+       *
+       * Measured from the built surface at that default: the label and its colour scale are
+       * 46.4 px tall at every viewport in the declared matrix, and 66.8 px in a column of
+       * 230 px or narrower, where the label wraps to a second line. 4.5 rem declares the
+       * wrapped case.
        */
-      fieldLabelHeightPx: z.number().int().positive(),
+      fieldLabelHeightRem: z.number().positive(),
       /**
        * The half-range the panels draw interface-depth anomalies against. Drawn raw, at a
        * limit that showed any structure at all, six panels were a uniform red; the scorer

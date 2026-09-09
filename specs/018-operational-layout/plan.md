@@ -436,7 +436,8 @@ The fourth pass moves the same digest and no other, for the same reason: `presen
 gains the mask's four figures — `walkthroughMaskOpacity`, `walkthroughCardWidthPx`,
 `walkthroughCardMinimumHeightPx` and `walkthroughCardGapPx` — because a dimension or a colour the
 surface needs is declared and never a literal in a stylesheet (Principle X). A mask computes
-nothing, so nothing computed moved.
+nothing, so nothing computed moved. (The first of those is `maskOpacity` in the tree: the eighth
+pass gave the over-budget decision the same dim, and one claim about the ink gets one figure.)
 
 ### The shell tests that lost their subject
 
@@ -615,12 +616,15 @@ would have given it — and the overlap census failed anyway, on the words:
 
 #### The floor, and the digest that moved
 
-`presentation.minimumViewportHeightPx` is **748**, and the tables above are corrected to it: the
+`presentation.minimumViewportHeightPx` is **748** — **752** in the tree, re-measured by the
+eighth pass when the run panel gained a help control — and the tables above are corrected to it: the
 8 px is the controls pane's own bottom padding, which the floor's measurement had left out. They
 were right about everything except that omission, and the sentence that used to say the workspace
 holds at 740 says 748.
 
-`presentation.fieldLabelHeightPx` is **72**, and it is new. A container query can ask the box
+`presentation.fieldLabelHeightPx` is **72**, and it is new. (It is `fieldLabelHeightRem`, **5**,
+in the tree: the eighth pass found that a reserve in pixels for a label written in `rem` is right
+at exactly one declared font size and short at every larger one.) A container query can ask the box
 how wide and how tall it is; it cannot ask how tall the words under the picture came out, so the
 room the field's label needs is declared like every other length in this layout (Principle X).
 Measured: the label and its scale are **46.4 px** at every viewport in the matrix and **66.8 px**
@@ -904,12 +908,159 @@ route a reader takes is the route the test takes — press, be refused on the fr
 *Integrate anyway* — rather than routing the budget out of the way, because the budget is a figure
 the strip prints and a test that changes it is measuring a strip nobody has.
 
-#### A finding this pass did not fix
+#### A finding this pass did not fix, and should have
 
 **At the floor, the over-budget notice does not fit the controls pane.** Measured at 1 658 × 748
 with the row scored, the pane's content is **1 012 px in a 656 px box** while the notice stands:
 a paragraph of five lines and a second button, in the pane whose content height is the floor. No
 census had visited that state either — this pass added the integrating and integrated states and
-found it on the way past — and it is left standing because fixing it is a change to what FR-008's
-notice says and where, which is its own pass. The notice clears the moment a reader answers it,
-either way.
+found it on the way past — and it was left standing because fixing it is a change to what FR-008's
+notice says and where, which is its own pass.
+
+**That was the wrong call and the eighth pass says so plainly.** Recording is the right posture
+for a numeric question under FR-40; it is the wrong posture for a **control a reader cannot
+reach**. What was filed here as a figure about a box was the author, one visit later, unable to
+press *Integrate anyway* — and the sentence *"the notice clears the moment a reader answers it"*
+assumes a reader who can see the answer. It should have been fixed when it was measured. The
+eighth pass fixes it and closes the instrument gap that let it be reported as a number instead of
+a defect.
+
+### The eighth pass: the reader's font, and a decision a pane could hide
+
+> *"I clicked 'Integrate 12 hours' — the popup showed within the 'Controls' pane, but it's too
+> tall for me to see the 'Integrate anyway' button. It used to be a floating modal — that seems
+> like a better UI for this interaction."*
+
+#### The mechanism, in one table
+
+The notice's **height** scales with the reader's declared font. The pane's **width** does not. So
+its paragraph wraps to more and more lines in a column that is getting shorter at the same time.
+Measured at the author's own window, 950 × 875, with a 310 px controls pane:
+
+| Root font | The controls pane's box | `proceed-anyway`'s bottom | Room under it, in the pane |
+|---|---|---|---|
+| 16 px | 724 | 403 | 321 |
+| 20 px | 615 | 464 | 151 |
+| 24 px | 523 | 510 | **39** |
+| 28 px | 445 | 654 | **−183, out of sight** |
+
+At 28 px the control is painted 183 px below the foot of the pane, behind an ancestor with
+`overflow: hidden`, with no scrollbar anywhere to reach it. SRD-v2's edge cases name this case —
+*"deep browser zoom, or a large declared font"* — and **nothing had ever tested it**: every
+viewport in the matrix was censused, every state but this one was censused, and the reader's font
+was the one dimension of a `rem`-throughout layout that nobody had ever varied.
+
+#### What the modal cost
+
+A native `<dialog>` opened with `showModal()`: the top layer, focus containment and Escape come
+from the platform rather than from a second implementation of each. `src/harness/OverBudget.tsx`
+is 150 lines, most of them the reason; `.modal` in the stylesheet is 30. The dim is the surface's
+**one** dim — `presentation.workspace.maskOpacity`, which is what `walkthroughMaskOpacity` was
+renamed to when a second thing started using it, because two rules written for one claim are two
+rules that drift (beat 015's lesson about the strip). Measured at 950 × 875, the case that was
+broken:
+
+| Root font | The dialog | Centred at | `Integrate anyway` | Room under it, in the window |
+|---|---|---|---|---|
+| 16 px | 420 × 214 | 265, 330 | 285–426 × 490–528 | 347 |
+| 20 px | 420 × 260 | 265, 307 | 289–438 × 506–548 | 327 |
+| 24 px | **420 × 330** | **265, 273** | **293–449 × 533–579** | **296** |
+| 28 px | 420 × 380 | 265, 247 | 298–461 × 552–601 | 274 |
+| 32 px | 420 × 429 | 265, 223 | 302–472 × 570–621 | 254 |
+
+The width is `min(presentation.workspace.modalWidthPx, 100vw − 2 × pageGutterPx)` and the height
+is the content's own, capped at the window. **No pane's rectangle moves by a pixel** when it opens
+or closes, at every viewport in the matrix and at 20 px and 24 px — asserted, the way the
+walkthrough's mask and the relabelled advance are asserted, and measured across the *close* rather
+than the open, because the advance's own first chunk changes the run's figures and the status strip
+is sized from them.
+
+The words are a decision now and not a paragraph. Three sentences that explained what a frame
+budget is went to `controls/run`'s help — the panel that had declared it had nothing to explain,
+which was true until one of its buttons started asking a question — and
+`docs/narrative-disposition.json` carries all three with where they went. Escape declines, which
+integrates nothing beyond the chunk already measured and counted, and returns focus to the advance;
+pressing the advance again resumes the *same* target, so declining and then proceeding lands on
+**twelve hours and 180 steps** and not on twenty-four.
+
+#### The clip check, and the numbers it catches
+
+The census asked whether a **pane's** content fits the pane. That is a question about one element,
+and it is the question that missed this: the notice's own pane had grown to hold it and it was the
+pane's **ancestor** that clipped it, so every element measured as fitting while a control was
+painted outside the visible box. So there is a fifth check, and it walks the interactive elements
+and the text-bearing elements of every pane out through the ancestors that actually clip them —
+respecting `position`, because a fixed card is not clipped by the pane it is drawn over — and
+intersects each with each ancestor's box. An ancestor a reader can **scroll** is not a clip: the
+rectangle is moved into the scroller's own box, as a wheel would move it, and the walk goes on
+from there, so an item below the fold of a list is judged by whether the *list* is on screen.
+
+**Watched failing on the defect, before it was fixed.** At 1 366 × 768 with a 28 px root font, on
+the tree as it stood:
+
+```
+controls/button[data-testid="proceed-anyway"] "Integrate anyway"
+  100% outside div[data-testid="pane-controls"].pane-content.controls
+  [own 566..604, clip 26..535]
+horizons/span.scale "0 1.00"
+  100% outside div.dv-split-view-container.dv-vertical.dv-separator-border
+  [own 481..507, clip 0..467]
+```
+
+The second is the ancestor case in its pure form — a colour scale outside a **dockview** container
+— and the pane-content census reported nothing about the horizons pane at all there. It also
+caught two false readings of its own on the way, both worth recording because both were the check
+being wrong rather than the surface: the run provenance list's items, reported unreachable at
+every viewport because a vertical scroller was treated as a clip; and 83 per cent of the manifest,
+reported unreachable because the `<pre>` is its **own** scroller and the walk started at its
+parent.
+
+#### What the font axis found, and what it cost to fix
+
+At 16 px nothing moved. At 20 px and 24 px, on arrival and over budget, the surface had four
+defects and all four are fixed:
+
+| At | What | Why | Now |
+|---|---|---|---|
+| 1 366 × 768, 24 px | the analysed field's own heading ran **52 px** outside its box, and its help control was painted on the pane's heading | `.row-invitation-prose` had a floor of `16rem` — 384 px of a 527 px pane at 24 px — so the picture beside it got 110 px, narrower than its heading | the floor is `min(16rem, 45%)`: a floor that starves its neighbour is a claim on the whole pane, and a heading may wrap (`min-width: 0`) |
+| 1 366 × 768, 24 px | the term list beside it ran **8 px** past its box | the label column's floor is `minmax(8rem, 12rem)` — 192 px of a 237 px list at 24 px | `minmax(min(8rem, 40%), 12rem)` |
+| 1 920 × 900 and 2 560 × 900, 24 px | the square picture spilled its figure by **7 px** | `presentation.fieldLabelHeightPx` reserved 72 **pixels** for a label written entirely in `rem`: right at one font size and short at every larger one. Measured, the label needs 52.8 px at 16, 91.5 at 20 and 109.8 at 24 | `fieldLabelHeightRem`, **5**, which is 80 px at the 16 px default and 120 at 24 |
+| 1 658 × 748, the floor | the controls pane's content ran **3 px** past it | the run panel now offers help, and a help control is 3 px taller than the label beside it | `presentation.minimumViewportHeightPx` re-measured: **752**, against the 752 the built workspace needs and the 768 of the shortest viewport in the matrix |
+
+#### Which combinations run, and which do not
+
+The full product is six viewports × three font sizes × eight states, and every state after the row
+is built costs a minute of integration and scoring. So it is sampled, and the sample is named:
+
+- **16 px, every viewport, every state.** `viewport-matrix.spec.ts`, unchanged: arrival, scored, a
+  cell selected, each of the four provenance tabs, integrating and integrated.
+- **20 px and 24 px, every viewport, the arrival state and the over-budget state.** These are the
+  two states the reader's font can reach before they have chosen anything. Both are cheap —
+  neither builds the row — so both run at all six viewports rather than at a sampled few.
+- **28 px, the narrowest viewport, the decision alone.** Past the size that broke it, asserting the
+  dialog's two controls through the same clip census.
+
+**What the sample leaves out, said plainly, because it is the larger of the two findings.** With
+the row built and scored, this surface does not hold at 20 px or 24 px. Measured at 1 920 × 900
+with a 24 px root font: the controls pane's content runs **299 px** below the pane and the horizons
+pane's **101 px** below its own, with **34** elements past their boxes, **16** pairs of text
+painted on top of each other and **30** controls and figures painted outside what clips them —
+among them *Integrate 12 hours*, *New run* and *Show the attribution*. That is the same class of
+defect as the one repaired above, three panes wide, and it is a beat of its own: making a control
+surface, an enlarged panel's aside and a horizon strip hold at half again the declared text size is
+a redesign and not a fix. It is recorded here as a finding **and** it is a finding with an
+instrument behind it now, which is the difference between this note and the one above it.
+
+One further finding, off the matrix. The author's own window is **950 × 875** — 708 px narrower
+than `minimumViewportWidthPx`, and narrower than any viewport in the declared matrix. The
+workspace says so on screen (*needs 1 658 px for the row; showing one horizon*) and the decision
+holds there at every font size measured above, but the horizons pane does not: at 24 px the pre-row
+heading breaks a word to a line and the field's colour scale is clipped. Whether the declared
+matrix should reach below 1 366 px wide is the author's to say, and it is not something this pass
+should decide by widening a test until it passed.
+
+**Digests.** One moved: `configuration`, and only `configuration`. Four declared presentation
+figures changed — `workspace.maskOpacity` (renamed from `walkthroughMaskOpacity`),
+`workspace.modalWidthPx` (new, 420), `fieldLabelHeightRem` (5, replacing `fieldLabelHeightPx` 72)
+and `minimumViewportHeightPx` (752, from 748) — and the other 40 of G-07's quantities are
+byte-identical.

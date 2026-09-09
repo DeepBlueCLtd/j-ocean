@@ -507,7 +507,7 @@ body {
   inset: 0;
   z-index: 39;
   background: var(--ink);
-  opacity: var(--walkthrough-mask-opacity, 0.62);
+  opacity: var(--mask-opacity, 0.62);
   clip-path: polygon(
     evenodd,
     0 0, 100% 0, 100% 100%, 0 100%, 0 0,
@@ -924,9 +924,15 @@ body {
   display: flex;
   flex-direction: column;
 }
+/* The term list beside the picture. Its floor is 16 rem *or* its share of the pane, whichever
+   is smaller, and the second half of that is beat 018's eighth pass. A floor in `rem` grows
+   with the reader's declared font while the pane does not: at a 24 px root font 16 rem is
+   384 px of a 527 px pane, and the picture beside it was squeezed to 110 px -- narrower than
+   its own heading, which then ran 52 px outside the box. A floor that starves its neighbour is
+   not a floor, it is a claim on the whole pane. */
 .row-invitation > .row-invitation-prose {
   flex: 1 1 16rem;
-  min-width: 16rem;
+  min-width: min(16rem, 45%);
   min-height: 0;
   overflow: hidden;
 }
@@ -1002,9 +1008,15 @@ h2 {
   border-bottom: 1px solid var(--rule);
 }
 
+/* A term list: labels in one column, figures in the other.
+
+   The label column's floor is 8 rem *or* a share of the list, whichever is smaller. A floor in
+   `rem` alone grows with the reader's declared font while the box does not: at a 24 px root
+   font 8 rem is 192 px of a 237 px list, and what would not fit was the figure. A label column
+   that cannot give way is a label column that pushes the figures out of the box. */
 dl {
   display: grid;
-  grid-template-columns: minmax(8rem, 12rem) 1fr;
+  grid-template-columns: minmax(min(8rem, 40%), 12rem) 1fr;
   gap: 0.35rem 1rem;
   margin: 0;
 }
@@ -1133,6 +1145,81 @@ pre {
 
 .banner.warn { border-color: var(--alarm); }
 .banner p { margin: 0 0 0.6rem; }
+
+/* A modal decision (spec 018 FR-016; the author's report).
+
+   The over-budget decision was a `.banner.warn` at the foot of the controls pane and the
+   author could not reach its own button: *"the popup showed within the 'Controls' pane, but
+   it's too tall for me to see the 'Integrate anyway' button."* The mechanism is that the
+   notice's **height** goes up with the reader's declared font while the pane's **width** does
+   not, so its paragraph wraps to more lines in a column that is getting shorter at the same
+   time. Measured at 950 x 875 with a 310 px controls pane, the room under the control was
+   347 px at a 16 px root font, 225 px at 20, 39 px at 24, and at 28 the control was painted
+   183 px below the foot of the pane behind an ancestor with `overflow: hidden` -- out of
+   sight, and with no scrollbar anywhere to reach it.
+
+   So the box is not laid out in a pane at all. A `<dialog>` opened with `showModal()` is in
+   the browser's top layer, positioned against the **viewport**: no pane's width decides what
+   a reader sees of it, and no pane moves when it opens. The width is `min(the declared cap,
+   the window less two gutters)` and the height is the content's own, capped at the window so
+   that a dialog which somehow outgrows the screen scrolls itself rather than hiding a control
+   -- and `tests/shell/census.ts` asks, at three declared font sizes, whether anything on the
+   surface is painted outside the box that clips it.
+
+   Nothing animates, in any media state, so `prefers-reduced-motion` has nothing to turn off.
+   The dim is the surface's one dim -- `--mask-opacity`, the same declared share of the ink the
+   walkthrough's scrim uses -- because two rules written for one claim are two rules that
+   drift, which is beat 015's lesson about the strip. It is luminance and not a hue, so a
+   monochrome rendering still separates the decision from the workspace behind it. */
+.modal {
+  width: min(var(--modal-width, 420px), calc(100vw - 2 * var(--page-gutter, 20px)));
+  max-width: none;
+  max-height: calc(100dvh - 2 * var(--page-gutter, 20px));
+  overflow: auto;
+  margin: auto;
+  border: 2px solid var(--ink);
+  background: #fff;
+  color: var(--ink);
+  padding: 0.9rem 1.1rem;
+  font: inherit;
+  box-shadow: 0 6px 24px rgb(16 23 29 / 18%);
+}
+
+.modal::backdrop {
+  background: var(--ink, #10171d);
+  opacity: var(--mask-opacity, 0.62);
+}
+
+.modal.over-budget { border-color: var(--alarm); }
+
+.modal h4 {
+  margin: 0 0 0.6rem;
+  font-size: 0.95rem;
+}
+
+/* The figures the decision is between, one to a line, each with its label above it.
+
+   A label above rather than beside is what makes "never truncated" hold without a width to
+   defend: at a large declared font a two-column term list puts a long label and a figure into
+   a box that has to give somewhere, and what gives is the figure. Down the page there is
+   nothing to squeeze. `overflow-wrap: anywhere` on the label and never on the figure: a label
+   may break where it must, and a figure that breaks is two figures. */
+/* `grid-template-columns` named and not inherited from the term-list rule above. That rule is
+   `minmax(8rem, 12rem) 1fr`, which is right for a pane's term list and wrong here: at a 24 px
+   root font its first column takes 288 px of a 363 px box and leaves the figure 63 px to
+   overflow out of. One column, one line each. */
+.modal-figures { margin: 0 0 0.8rem; display: grid; grid-template-columns: 1fr; gap: 0.5rem; }
+.modal-figures > div { display: grid; gap: 0.1rem; min-width: 0; }
+.modal-figures dt {
+  font-size: 0.68rem;
+  color: var(--host);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  overflow-wrap: anywhere;
+}
+.modal-figures dd { margin: 0; font-size: 1rem; }
+
+.modal-choice { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 
 button[disabled] { opacity: 0.5; cursor: default; }
 button[disabled]:hover { background: #fff; color: var(--ink); }
@@ -1515,8 +1602,12 @@ h3 { font-size: 0.95rem; margin: 1.25rem 0 0.35rem; }
   gap: 0.5rem;
 }
 
+/* `min-width: 0`, so a heading in a narrow pane wraps rather than pushing itself and the help
+   control out of the box. A flex item's floor is its min-content width by default, which for a
+   heading is its longest word -- and at a large declared font that word can be wider than the
+   column the pane gave the panel. */
 .panel-head > h2,
-.panel-head > h3 { margin: 0 0 0.1rem; }
+.panel-head > h3 { margin: 0 0 0.1rem; min-width: 0; overflow-wrap: anywhere; }
 
 .control-group .panel-head > h3 {
   font-size: 0.66rem;

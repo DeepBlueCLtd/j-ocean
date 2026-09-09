@@ -177,6 +177,60 @@ export function unreviewableExemptions(): readonly string[] {
   return EXEMPT.filter((one) => !reasoned(one)).map((one) => one.what);
 }
 
+/**
+ * Something painted outside its clipping ancestor that a reader is not meant to reach anyway.
+ *
+ * Held to the same bar as `EXEMPT`, in a list of its own because it excuses a different
+ * finding: not "this box is bigger than itself" but "this thing is painted where nobody can
+ * see it". The two questions have different answers -- a visually hidden list overflows *and*
+ * is out of sight, and only the second is a reason it does not matter.
+ */
+export interface Reachable {
+  /** What it is, in the surface's own words. */
+  readonly what: string;
+  /** The element, or an ancestor of it. */
+  readonly matches: string;
+  /** Why a reader not seeing this is not a fault. */
+  readonly because: string;
+}
+
+export const REACHABLE: readonly Reachable[] = [
+  {
+    what: "the status strip's digest, ellipsised",
+    matches: '[data-testid="status-digest"]',
+    because:
+      'a 64-character digest capped at 8 rem, on purpose and since it arrived: what a reader ' +
+      'does with this figure is compare two visits, and a prefix compares as well as the ' +
+      'whole. The end of it is genuinely not painted, which is why it is here rather than ' +
+      'passing unnoticed, and the whole of it is on the manifest tab, which is where a figure ' +
+      'somebody copies belongs. The overflow census carries the same exemption for the same ' +
+      'measured reason.',
+  },
+  {
+    what: "the layout manager's tab strip, scrolled",
+    matches: '.dv-tabs-container',
+    because:
+      'the four provenance tabs need more width than the strip has at the narrower viewports, ' +
+      'and the strip scrolls as one on the layout manager\'s own scrollbar -- measured, a ' +
+      'wheel over it brings the Manifest tab fully inside the box. A tab out of sight in a ' +
+      'strip that scrolls is reached the way any list item is reached, so the same exemption ' +
+      'the overflow census carries applies here for the same measured reason.',
+  },
+];
+
+const reachableReasoned = (one: Reachable): boolean =>
+  one.matches.trim() !== '' && (one.because.match(/[a-z]/gi) ?? []).length >= MINIMUM_LETTERS;
+
+/** Every out-of-sight exemption that excuses anything. */
+export function reachableApply(): readonly Reachable[] {
+  return REACHABLE.filter(reachableReasoned);
+}
+
+/** Every out-of-sight exemption that is not reviewable, by name. */
+export function unreviewableReachable(): readonly string[] {
+  return REACHABLE.filter((one) => !reachableReasoned(one)).map((one) => one.what);
+}
+
 /** What the census decided about an element that overflows its box. There is no fourth. */
 export type Verdict = 'a declared list' | 'exempt' | 'a defect';
 
@@ -215,6 +269,35 @@ export interface Clipped {
   readonly worst: string;
 }
 
+/**
+ * How much of a control or a line of text has to survive its clipping ancestors before the
+ * census calls it reachable.
+ *
+ * A share and not a margin in pixels, because what matters is whether the thing is *there*: a
+ * button with a tenth of itself showing is a button a reader cannot read the label of, at any
+ * size. One is impossible to hold -- sub-pixel rounding takes a fraction off almost every box
+ * -- and a half is the point past which the thing is more absent than present.
+ */
+export const VISIBLE_MINIMUM = 0.5;
+
+/** An element painted, wholly or substantially, outside the box that clips it. */
+export interface OutsideClip {
+  readonly pane: string;
+  /** The control or the text, by tag, test id and classes. */
+  readonly what: string;
+  /** Its words, so a failure names the control a reader was looking for. */
+  readonly text: string;
+  readonly kind: 'a control' | 'text';
+  /** The ancestor that took the most off it, and how it clips. */
+  readonly clippedBy: string;
+  readonly clipRect: { readonly top: number; readonly bottom: number; readonly left: number; readonly right: number };
+  readonly ownRect: { readonly top: number; readonly bottom: number; readonly left: number; readonly right: number };
+  /** How much of the element's own area survives every clip, from 0 to 1. */
+  readonly visible: number;
+  readonly verdict: 'reachable' | 'exempt' | 'a defect';
+  readonly exemption: string | null;
+}
+
 export interface Measured {
   readonly page: {
     readonly scrollWidth: number;
@@ -225,11 +308,12 @@ export interface Measured {
   readonly overflowing: readonly Overflowing[];
   readonly overlaps: readonly Overlap[];
   readonly clipped: readonly Clipped[];
+  readonly outside: readonly OutsideClip[];
 }
 
 export async function measure(page: Page): Promise<Measured> {
   return page.evaluate(
-    ({ cards, listKind, exemptions, overflowTolerance, overlapTolerance }) => {
+    ({ cards, listKind, exemptions, reachable, overflowTolerance, overlapTolerance, visibleMinimum }) => {
       const root = document.documentElement;
 
       /** A word count of what is left when every figure's own text is taken out. */
@@ -372,8 +456,12 @@ export async function measure(page: Page): Promise<Measured> {
         return new DOMRect(left, top, right - left, bottom - top);
       };
 
+      /* Inside a pane, and inside a modal decision. The modal is not laid out with the panes --
+         it is in the top layer, against the viewport -- but it carries words a reader has to
+         read, and two of them printed on top of each other would be as unreadable there as
+         anywhere else. */
       const runs: { element: Element; pane: string; text: string; rects: DOMRect[] }[] = [];
-      for (const element of Array.from(document.querySelectorAll<HTMLElement>('[data-pane-id] *'))) {
+      for (const element of Array.from(document.querySelectorAll<HTMLElement>('[data-pane-id] *, .modal *'))) {
         if (element.closest(cards) !== null) continue;
         let own = '';
         const rects: DOMRect[] = [];
@@ -414,6 +502,13 @@ export async function measure(page: Page): Promise<Measured> {
           const other = runs[j];
           if (one === undefined || other === undefined) continue;
           if (one.element.contains(other.element) || other.element.contains(one.element)) continue;
+          /* A modal is drawn **over** the workspace on purpose -- that is what the top layer is
+             -- so its words landing on the words behind it is the feature and not the fault.
+             What is asked of it is that its own words do not land on each other, which is the
+             same question asked of every pane. */
+          if ((one.element.closest('.modal') === null) !== (other.element.closest('.modal') === null)) {
+            continue;
+          }
           let wide = 0;
           let tall = 0;
           for (const a of one.rects) {
@@ -471,6 +566,280 @@ export async function measure(page: Page): Promise<Measured> {
         }
       }
 
+      /* ---- 4. Nothing a reader has to see or reach is painted outside the box that clips it.
+
+         Check 3 asks whether a **pane's** content fits the pane. That is a question about one
+         element, and it is the question that missed the defect this check was written for: the
+         over-budget notice was 1,012 px of content in a controls pane that had grown to hold
+         it, inside a dockview part 656 px tall with `overflow: hidden`. Every element measured
+         as fitting its own box and as fitting the pane's; the pane did not fit its *ancestor*,
+         and `Integrate anyway` was painted 356 px below the bottom of the window with no
+         scrollbar anywhere to reach it. A control a reader cannot see or reach is the defect,
+         whichever box did the clipping.
+
+         So this walks up from each control and each line of text through the ancestors that
+         actually clip it -- respecting `position`, because a fixed card is not clipped by the
+         pane it is drawn over -- and intersects the element with each of their boxes. An
+         ancestor a reader can scroll is not counted: content inside a scroller is reached by
+         scrolling, which is what a scroller is. What is left is content behind `overflow:
+         hidden`, or outside the window, which is reached by nothing. ---- */
+
+      const viewport = { left: 0, top: 0, right: root.clientWidth, bottom: root.clientHeight };
+
+      /** Whether this element establishes a containing block for fixed and absolute descendants. */
+      const anchors = (style: CSSStyleDeclaration): boolean =>
+        style.transform !== 'none' ||
+        style.filter !== 'none' ||
+        style.perspective !== 'none' ||
+        style.willChange.includes('transform') ||
+        style.willChange.includes('filter') ||
+        /paint|layout|strict|content/.test(style.contain);
+
+      interface Clipper {
+        what: string;
+        box: typeof viewport;
+        clipsX: boolean;
+        clipsY: boolean;
+        scrollsX: boolean;
+        scrollsY: boolean;
+      }
+
+      /**
+       * Every box that clips this element, nearest first, with the window last.
+       *
+       * It starts at the element and not at its parent, and that is not a detail: the manifest
+       * is a `<pre>` whose own text is its child, and it is its **own** declared scroller. Left
+       * out of its own walk, its text was measured where the scroller had put it and judged
+       * against the pane -- 83 per cent of a manifest reported unreachable while a reader can
+       * read all of it with a wheel.
+       */
+      const clippersOf = (element: Element): Clipper[] => {
+        const found: Clipper[] = [];
+        let position = getComputedStyle(element).position;
+        for (let at: Element | null = element; at !== null; at = at.parentElement) {
+          const style = getComputedStyle(at);
+          const anchored = anchors(style);
+          const positioned = style.position !== 'static' || anchored;
+          /* A fixed element is laid out in the window, so only an ancestor that anchors it
+             clips it; an absolute one is clipped only by a positioned ancestor. Everything
+             else is clipped by every overflowing ancestor above it -- and an element always
+             clips its own content, whatever its position. */
+          const holds =
+            at === element
+              ? true
+              : position === 'fixed'
+                ? anchored
+                : position === 'absolute'
+                  ? positioned
+                  : true;
+          if (holds) {
+            const box = at.getBoundingClientRect();
+            const clipsX = style.overflowX !== 'visible';
+            const clipsY = style.overflowY !== 'visible';
+            /* An axis a reader can scroll is an axis on which nothing is out of reach: what is
+               below the fold of a list comes up on a wheel. It is the same fact check 2 exempts
+               a declared list for, and it has to be known here as well, or every item below the
+               fold of every list on the surface is reported as unreachable. */
+            const scrollsX =
+              (style.overflowX === 'auto' || style.overflowX === 'scroll') &&
+              at.scrollWidth - at.clientWidth > 1;
+            const scrollsY =
+              (style.overflowY === 'auto' || style.overflowY === 'scroll') &&
+              at.scrollHeight - at.clientHeight > 1;
+            if (clipsX || clipsY) {
+              found.push({
+                what: nameOf(at),
+                box: { left: box.left, top: box.top, right: box.right, bottom: box.bottom },
+                clipsX,
+                clipsY,
+                scrollsX,
+                scrollsY,
+              });
+            }
+            /* Above an ancestor that contains it, the element travels with that ancestor, so
+               it is that ancestor's positioning that decides what clips next. */
+            position = style.position;
+          }
+        }
+        /* The window itself. The page does not scroll -- check 1 says so -- so anything
+           painted outside it is out of sight for the same reason. */
+        found.push({
+          what: 'the window',
+          box: viewport,
+          clipsX: true,
+          clipsY: true,
+          scrollsX: false,
+          scrollsY: false,
+        });
+        return found;
+      };
+
+      const areaOf = (rects: DOMRect[]): number =>
+        rects.reduce((sum, one) => sum + one.width * one.height, 0);
+
+      const outside: {
+        pane: string;
+        what: string;
+        text: string;
+        kind: 'a control' | 'text';
+        clippedBy: string;
+        clipRect: { top: number; bottom: number; left: number; right: number };
+        ownRect: { top: number; bottom: number; left: number; right: number };
+        visible: number;
+        verdict: 'reachable' | 'exempt' | 'a defect';
+        exemption: string | null;
+      }[] = [];
+
+      const CONTROLS =
+        'a[href], button, input, select, textarea, summary, [role="button"], [tabindex]:not([tabindex="-1"])';
+
+      /* One walk over both populations: every control, and every element with words of its
+         own. A control is measured by its border box -- half a button is half a control -- and
+         text by the rectangles of its own lines, which is what the overlap census measures for
+         the same reason: a block's box is the grid cell it sits in. */
+      const candidates = new Map<Element, 'a control' | 'text'>();
+      for (const element of Array.from(document.querySelectorAll<HTMLElement>(CONTROLS))) {
+        candidates.set(element, 'a control');
+      }
+      for (const element of Array.from(document.querySelectorAll<HTMLElement>('*'))) {
+        if (candidates.has(element)) continue;
+        for (const node of Array.from(element.childNodes)) {
+          if (node.nodeType === Node.TEXT_NODE && (node.textContent ?? '').trim() !== '') {
+            candidates.set(element, 'text');
+            break;
+          }
+        }
+      }
+
+      for (const [element, kind] of candidates) {
+        if (!painted(element, null)) continue;
+        const rects: DOMRect[] = [];
+        if (kind === 'a control') {
+          const box = element.getBoundingClientRect();
+          if (box.width >= 1 && box.height >= 1) rects.push(box);
+        } else {
+          for (const node of Array.from(element.childNodes)) {
+            if (node.nodeType !== Node.TEXT_NODE) continue;
+            if ((node.textContent ?? '').trim() === '') continue;
+            const range = document.createRange();
+            range.selectNode(node);
+            for (const rect of Array.from(range.getClientRects())) {
+              if (rect.width >= 1 && rect.height >= 1) rects.push(rect);
+            }
+          }
+        }
+        if (rects.length === 0) continue;
+        const own = areaOf(rects);
+        if (own < 1) continue;
+
+        /*
+         * How much of it a reader can put on screen, as a share of itself.
+         *
+         * A share carried through the walk rather than one comparison at the end, because the
+         * two things an ancestor can do to a rectangle are different in kind. An axis it clips
+         * and cannot scroll **takes** part of the rectangle: that share is lost, and the
+         * ancestor that took the most is the one to name. An axis it can scroll takes nothing
+         * -- it only decides *where* the rectangle is -- so the rectangle is moved into the
+         * scroller's own box, as a wheel would move it, and the walk goes on from there. That
+         * way an item below the fold of a list is judged by whether the **list** is on screen,
+         * which is the only honest question to ask about it.
+         */
+        const clippers = clippersOf(element);
+        let kept = rects.map((one) => new DOMRect(one.x, one.y, one.width, one.height));
+        let visible = 1;
+        let worstBy = '';
+        let worstBox = viewport;
+        let worstTook = 0;
+        for (const clipper of clippers) {
+          const before = areaOf(kept);
+          const cutX = clipper.clipsX && !clipper.scrollsX;
+          const cutY = clipper.clipsY && !clipper.scrollsY;
+          if (cutX || cutY) {
+            const next: DOMRect[] = [];
+            for (const rect of kept) {
+              const left = cutX ? Math.max(rect.left, clipper.box.left) : rect.left;
+              const right = cutX ? Math.min(rect.right, clipper.box.right) : rect.right;
+              const top = cutY ? Math.max(rect.top, clipper.box.top) : rect.top;
+              const bottom = cutY ? Math.min(rect.bottom, clipper.box.bottom) : rect.bottom;
+              if (right - left > 0 && bottom - top > 0) {
+                next.push(new DOMRect(left, top, right - left, bottom - top));
+              }
+            }
+            kept = next;
+            const took = before - areaOf(kept);
+            if (before > 0) visible *= areaOf(kept) / before;
+            if (took > worstTook) {
+              worstTook = took;
+              worstBy = clipper.what;
+              worstBox = { ...clipper.box };
+            }
+          }
+          if (kept.length === 0) break;
+          const scrollX = clipper.clipsX && clipper.scrollsX;
+          const scrollY = clipper.clipsY && clipper.scrollsY;
+          if (scrollX || scrollY) {
+            /* Scrolled into view: the lines are taken together, because a wheel moves them
+               together, and placed inside the scroller's box on the axis it scrolls. */
+            const one = kept.reduce(
+              (box, rect) => ({
+                left: Math.min(box.left, rect.left),
+                top: Math.min(box.top, rect.top),
+                right: Math.max(box.right, rect.right),
+                bottom: Math.max(box.bottom, rect.bottom),
+              }),
+              { left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity },
+            );
+            if (scrollX) {
+              one.left = clipper.box.left;
+              one.right = Math.min(clipper.box.right, clipper.box.left + (one.right - one.left));
+            }
+            if (scrollY) {
+              one.top = clipper.box.top;
+              one.bottom = Math.min(clipper.box.bottom, clipper.box.top + (one.bottom - one.top));
+            }
+            kept = [new DOMRect(one.left, one.top, one.right - one.left, one.bottom - one.top)];
+          }
+        }
+        if (kept.length === 0) visible = 0;
+        if (visible >= 1 - 1e-6) continue;
+
+        const union = rects.reduce(
+          (box, one) => ({
+            left: Math.min(box.left, one.left),
+            top: Math.min(box.top, one.top),
+            right: Math.max(box.right, one.right),
+            bottom: Math.max(box.bottom, one.bottom),
+          }),
+          { left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity },
+        );
+        const excused = reachable.find(
+          (one) => element.matches(one.matches) || element.closest(one.matches) !== null,
+        );
+        outside.push({
+          pane: paneOf(element),
+          what: nameOf(element),
+          text: (element.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 60),
+          kind,
+          clippedBy: worstBy,
+          clipRect: {
+            top: Math.round(worstBox.top),
+            bottom: Math.round(worstBox.bottom),
+            left: Math.round(worstBox.left),
+            right: Math.round(worstBox.right),
+          },
+          ownRect: {
+            top: Math.round(union.top),
+            bottom: Math.round(union.bottom),
+            left: Math.round(union.left),
+            right: Math.round(union.right),
+          },
+          visible: Math.round(visible * 1000) / 1000,
+          verdict:
+            visible >= visibleMinimum ? 'reachable' : excused !== undefined ? 'exempt' : 'a defect',
+          exemption: excused === undefined ? null : `${excused.what}: ${excused.because}`,
+        });
+      }
+
       return {
         page: {
           scrollWidth: root.scrollWidth,
@@ -481,6 +850,7 @@ export async function measure(page: Page): Promise<Measured> {
         overflowing,
         overlaps,
         clipped,
+        outside,
       };
     },
     {
@@ -492,8 +862,14 @@ export async function measure(page: Page): Promise<Measured> {
         axis: one.axis,
         because: one.because,
       })),
+      reachable: reachableApply().map((one) => ({
+        what: one.what,
+        matches: one.matches,
+        because: one.because,
+      })),
       overflowTolerance: OVERFLOW_TOLERANCE_PX,
       overlapTolerance: OVERLAP_TOLERANCE_PX,
+      visibleMinimum: VISIBLE_MINIMUM,
     },
   );
 }
@@ -533,6 +909,17 @@ export function judgeOneView(measured: Measured, state: string): number {
           )
           .join(' | ') || 'nothing'
       }`,
+  );
+  console.log(
+    `    ${state}: painted outside what clips it: ${
+      measured.outside
+        .map(
+          (one) =>
+            `${one.pane}/${one.what} ${String(Math.round(one.visible * 100))}% visible inside ` +
+            `${one.clippedBy} [${one.verdict}]`,
+        )
+        .join(' | ') || 'nothing'
+    }`,
   );
 
   expect(
@@ -593,6 +980,32 @@ export function judgeOneView(measured: Measured, state: string): number {
   ).toEqual([]);
 
   /*
+   * Nothing a reader has to reach is painted outside the box that clips it (spec 018 FR-016).
+   *
+   * The check above asks whether a pane's content fits the pane, and that is why it reported
+   * nothing on the day *Integrate anyway* was 356 px below the foot of the window: the pane had
+   * grown to hold the notice, and it was the pane's own **ancestor** that clipped it. This one
+   * names the control and the ancestor that cut it off, because "something is clipped
+   * somewhere" is not a report anybody can act on.
+   */
+  const unreachable = measured.outside.filter((one) => one.verdict === 'a defect');
+  expect(
+    unreachable.map(
+      (one) =>
+        `${one.pane} / ${one.what} (${one.kind}${one.text === '' ? '' : `, "${one.text}"`}) is ` +
+        `painted ${String(Math.round((1 - one.visible) * 100))}% outside ${one.clippedBy}: it ` +
+        `runs ${String(one.ownRect.top)}..${String(one.ownRect.bottom)} down and ` +
+        `${String(one.ownRect.left)}..${String(one.ownRect.right)} across, and the clip is ` +
+        `${String(one.clipRect.top)}..${String(one.clipRect.bottom)} by ` +
+        `${String(one.clipRect.left)}..${String(one.clipRect.right)}`,
+    ),
+    `in the "${state}" state something a reader has to see or reach is painted outside the box ` +
+      'that clips it. An element that fits its own box and its own pane can still be painted ' +
+      'outside an ancestor of the pane, where there is no scrollbar to reach it and no ' +
+      'overflow for an overflow census to find',
+  ).toEqual([]);
+
+  /*
    * Nothing is painted on top of anything else. The author found this by looking at the
    * surface -- "the Horizons panel has text overwriting other text" -- on a tree whose
    * overflow census was green, which is the whole argument for asking it separately.
@@ -620,6 +1033,62 @@ export function judgeOneView(measured: Measured, state: string): number {
  * holds every chunking to the same bytes -- and gives the census somewhere to stand.
  */
 export const CONFIG_REQUEST = /j-ocean.*\.json$/;
+
+/**
+ * Press the advance and see it through, whether or not the budget stops to ask.
+ *
+ * The over-budget question was a banner in the controls pane until beat 018's eighth pass, and
+ * a test that pressed the advance and then pressed something else went on working whether the
+ * question was up or not. What the surface was letting through was a reader clicking past a
+ * question it had just asked, with the advance suspended behind it. It is a modal now, so the
+ * question is answered before anything else happens -- here, the way a reader who wants the
+ * advance would answer it.
+ *
+ * Asked *if it is asked* rather than waited for, because whether the projected time exceeds the
+ * declared budget depends on how fast the machine running the suite is. The tests that are
+ * **about** the refusal serve themselves a budget no machine can meet; these are the ones that
+ * merely need a run with some host time in it.
+ */
+export async function advanceThroughTheBudget(page: Page, timeout = 120_000): Promise<void> {
+  await page.getByTestId('advance').click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="over-budget"]') !== null ||
+      document.querySelector<HTMLButtonElement>('[data-testid="advance"]')?.disabled === false,
+    undefined,
+    { timeout },
+  );
+  if ((await page.getByTestId('over-budget').count()) > 0) {
+    await page.getByTestId('proceed-anyway').click();
+  }
+  await expect(page.getByTestId('advance')).toBeEnabled({ timeout });
+}
+
+/**
+ * The reader's own declared font size, set the way a reader sets it (spec 018 FR-016).
+ *
+ * Not an injected stylesheet and not a page zoom. `Page.setFontSizes` is the browser's own
+ * default text size -- the preference under *Appearance* -- so what changes is the root font
+ * size, which is what every `rem` on this surface is measured in and what the reader actually
+ * has a control for. A stylesheet planted by a test would be a different mechanism producing a
+ * similar picture, and it is the mechanism that is the subject: SRD-v2's edge cases name *"deep
+ * browser zoom, or a large declared font"*, and nothing had ever tested either.
+ */
+export async function readerFontSize(page: Page, px: number): Promise<void> {
+  const client = await page.context().newCDPSession(page);
+  await client.send('Page.setFontSizes', { fontSizes: { standard: px, fixed: px } });
+}
+
+/**
+ * The reader's font sizes the censuses are run at, beside the 16 px default (spec 018 FR-016).
+ *
+ * Two sizes and not a sweep. 20 px and 24 px are half again and half as much again as the
+ * default, which is the range a reader reaches with two or three presses of the browser's own
+ * text-size control; below 20 nothing on this surface has ever moved, and above 24 the
+ * question stops being *does the layout hold* and becomes *what should a workspace of seven
+ * panes do on a screen that now holds a third of what it did*, which is a different beat.
+ */
+export const READER_FONTS: readonly number[] = [20, 24];
 
 /** Yield after every step, so the integrating state has gaps a census can be taken in. */
 export async function yieldEveryStep(page: Page): Promise<void> {

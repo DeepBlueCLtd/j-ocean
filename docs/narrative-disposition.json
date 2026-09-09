@@ -728,6 +728,38 @@
       "destination": "horizons",
       "matter": "The scorer's own verdict on this horizon, in the scorer's words: better than persistence by 0.0 per cent; worse than climatology by 208.8 per cent.",
       "note": "Beat 018, FR-008 and US4. It did not leave the surface and it stopped being the first thing on it: it is the first line inside *Where this figure came from*, one disclosure away, byte for byte as the scorer produced it and never truncated or reworded. It had been a two-line sentence drawn over the very figures that say the same thing, which made a reader read prose to find two numbers already beneath it -- the readout-written-as-prose the author's review named. Principle VI is unmoved: a losing score is visible as a figure in every state of the panel, because the skill against each reference is printed as it computes and a negative one is printed negative."
+    },
+    {
+      "id": "over-budget-projection",
+      "wasAt": "The run controls, the notice shown when the projected time exceeds the declared budget",
+      "fromBeat": "003",
+      "kind": "stays",
+      "destination": "controls",
+      "matter": "The projected time to integrate the longest declared horizon, against the declared frame budget, with the choice to integrate anyway.",
+      "note": "Beat 018's eighth pass. It stays, and it stopped being a paragraph and stopped being laid out in a pane. It is a modal decision opened from the run controls -- two readouts and two buttons -- because a notice inside the controls pane is as tall as the reader's declared font makes it and as narrow as the pane is: at 950 x 875 with a 24 px root font there were 39 px under *Integrate anyway*, and at 28 px the control was painted 183 px below the foot of the pane with no scrollbar anywhere to reach it. Both figures keep their kind and neither is ellipsised."
+    },
+    {
+      "id": "over-budget-chunk-counts",
+      "wasAt": "The run controls, the second sentence of the over-budget notice",
+      "fromBeat": "003",
+      "kind": "help",
+      "destination": "help:controls/run",
+      "feature": "the frame budget",
+      "matter": "The chunk it was measured on counts toward the twelve hours; nothing beyond it has been integrated.",
+      "restatedAs": "The chunk it was measured on counts toward the advance you asked for; nothing beyond it has been integrated.",
+      "builtIn": "018-operational-layout",
+      "note": "Beat 018's eighth pass, FR-007. A decision prompt leads with the figures and the choice; this sentence answers *what has already happened*, which is an explanation of how the advance is chunked and not part of the decision. The hours are no longer restated: the control's own label says how far an advance goes, and help that repeated it would be the second source FR-055 forbids."
+    },
+    {
+      "id": "over-budget-not-freezing",
+      "wasAt": "The run controls, the last sentence of the over-budget notice",
+      "fromBeat": "003",
+      "kind": "help",
+      "destination": "help:controls/run",
+      "feature": "the frame budget",
+      "matter": "The page is saying so rather than freezing.",
+      "builtIn": "018-operational-layout",
+      "note": "Beat 018's eighth pass, FR-007. It explains why the question is asked at all, which is the panel's business and not the prompt's. The panel had declared that it had nothing to explain -- four buttons that each say on their own face what they will do -- and that was true until one of them stopped and asked a question."
     }
   ],
   "helpBuiltIn": "016-panel-help",

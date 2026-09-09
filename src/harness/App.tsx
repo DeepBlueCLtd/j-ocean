@@ -50,6 +50,7 @@ import {
 import { Computed, Declared, HostTime } from './figures.js';
 import { useLongOperations } from './working.js';
 import { Walkthrough } from './Walkthrough.js';
+import { OverBudget } from './OverBudget.js';
 import { HelpProvider, PanelCorner, PanelHead } from './Help.js';
 import { THE_ROW, type CentreContent } from './CentreContent.js';
 import {
@@ -187,6 +188,14 @@ export function App() {
   const [view, setView] = useState<RunView | null>(null);
   const [record, setRecord] = useState<Record002 | null>(null);
   const [overBudgetNotice, setOverBudgetNotice] = useState<{ projectedMs: number } | null>(null);
+  /**
+   * The advance's own control, so the over-budget decision can put focus back on it.
+   *
+   * A modal takes focus when it opens, and a reader who declines it and is left at the top of
+   * the document has been moved without being told. It goes back to the control the decision
+   * was opened from (spec 018 FR-016).
+   */
+  const advanceControl = useRef<HTMLButtonElement | null>(null);
   /**
    * What the last completed advance did, for the live region beside the control that asked
    * for it. Null until one completes, and cleared when another starts or the run is replaced:
@@ -1065,6 +1074,7 @@ export function App() {
           */}
           <button
             type="button"
+            ref={advanceControl}
             onClick={() => { integrate(false); }}
             data-testid="advance"
             className="reserving"
@@ -1090,22 +1100,11 @@ export function App() {
           )}
         </div>
 
-        {overBudgetNotice !== null && (
-          <div className="banner warn" data-testid="over-budget">
-            <p>
-              The projected time to integrate the longest declared horizon (
-              <Declared>{Math.max(...config.horizons.leadHours)} h</Declared>) is{' '}
-              <HostTime>{overBudgetNotice.projectedMs.toFixed(0)} ms</HostTime>, which exceeds
-              the declared frame budget of{' '}
-              <Declared>{config.budget.frameBudgetMs} ms</Declared>. The chunk it was
-              measured on counts toward the twelve hours; nothing beyond it has been
-              integrated. The page is saying so rather than freezing.
-            </p>
-            <button type="button" onClick={() => { integrate(true); }} data-testid="proceed-anyway">
-              Integrate anyway
-            </button>
-          </div>
-        )}
+        {/* The over-budget decision is not here. It is a modal dialog, drawn against the
+            viewport rather than laid out in this pane, because a pane's width decided how tall
+            the notice was and at a large declared font its own control went below the foot of
+            the pane. See `OverBudget.tsx`; it is rendered beside the workspace, at the end of
+            this file, so that opening it moves nothing in the dock. */}
       </div>
     </>
   );
@@ -1900,6 +1899,22 @@ export function App() {
         onRefusal={setWorkspaceRefusal}
         onReady={onWorkspaceReady}
       />
+      {/*
+        The over-budget decision (FR-008; spec 018 FR-016), beside the workspace and not in a
+        pane of it. A modal dialog is laid out against the viewport in the browser's top layer,
+        so no pane's width decides what a reader can see of it and opening it moves no pane --
+        which is what the notice this replaces could not say. Mounted only while the decision
+        is open, so the dialog's own effect is its opening.
+      */}
+      {overBudgetNotice !== null && (
+        <OverBudget
+          config={config}
+          projectedMs={overBudgetNotice.projectedMs}
+          returnFocusTo={advanceControl}
+          onProceed={() => { integrate(true); }}
+          onDecline={() => { setOverBudgetNotice(null); }}
+        />
+      )}
     </HelpProvider>
   );
 }

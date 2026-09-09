@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { decodePng, type Pixels } from './greyscale.js';
 import { FLOOR } from './declared-geometry.js';
+import { advanceThroughTheBudget } from './census.js';
 
 /**
  * The four figure kinds, measured on rendered pixels (spec 018 FR-008, SC-006; SRD-v1 FR-07,
@@ -108,9 +109,9 @@ function signatureOf(kind: string, pixels: Pixels): Signature {
 async function everyKindOnScreen(page: Page): Promise<void> {
   await page.goto('/');
   await expect(page.getByTestId('pane-controls')).toBeVisible();
-  // Host time arrives with a measured step.
-  await page.getByTestId('advance').click();
-  await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 60_000 });
+  // Host time arrives with a measured step. Through the budget's question if it is asked:
+  // this machine's step time decides whether it is, and the modal has to be answered.
+  await advanceThroughTheBudget(page);
   // A derived level arrives with a measured profile beside the model's own.
   await page.getByTestId('build-row').click();
   await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 120_000 });

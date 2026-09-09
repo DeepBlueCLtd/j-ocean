@@ -156,8 +156,8 @@ tables that disagree the first time an entry is edited.
 <!-- generated from docs/narrative-disposition.json by scripts/docs/build-disposition.ts -->
 
 Generated from `docs/narrative-disposition.json`, which is held by `tests/docs/disposition.test.ts`.
-74 pieces of matter: 14 stay in a region,
-28 went to the site, 21 are a panel's own
+77 pieces of matter: 15 stay in a region,
+28 went to the site, 23 are a panel's own
 help, built in beat 016-panel-help, 5 are the
 walkthrough's, reclaimed in beat 018-operational-layout, and 6
 were **dropped with a recorded reason** rather than carried anywhere. Every destination is
@@ -240,6 +240,9 @@ step that renders them, or a reason.
 | The centre region, the surface-measurement entry of the legend beneath the row | the track's own range | **Dropped**, with a reason: Beat 018. The clause named what the two figures beside it already are: the entry reads *surface measurement, dark for warm, over 18.1 to 24.3 degrees C*, and both ends are computed figures with their kind on them. A phrase that restates the figures next to it is the second source for one fact that FR-055 forbids, in four words. |
 | The centre region, the dashed entry of the legend beneath the row | so it did not inform it | **Dropped**, with a reason: Beat 018. The consequence of the clause before it -- *dashed: measured after the forecast was initialised* -- and a legend entry that argues from its own label is explaining rather than labelling. The mark itself still says it in full: clicking one opens the selection pane, which reads *taken after this forecast was initialised, so it did not inform it*, at the mark the reader asked about. |
 | Each horizon panel, above that panel's own skill figures | The scorer's own verdict on this horizon, in the scorer's words: better than persistence by 0.0 per cent; worse than climatology by 208.8 per cent. | Stays, in the **horizons** pane |
+| The run controls, the notice shown when the projected time exceeds the declared budget | The projected time to integrate the longest declared horizon, against the declared frame budget, with the choice to integrate anyway. | Stays, in the **controls** pane |
+| The run controls, the second sentence of the over-budget notice | The chunk it was measured on counts toward the twelve hours; nothing beyond it has been integrated. | Help, at the panel: `help:controls/run`, under *the frame budget* |
+| The run controls, the last sentence of the over-budget notice | The page is saying so rather than freezing. | Help, at the panel: `help:controls/run`, under *the frame budget* |
 
 <!-- end generated -->
 

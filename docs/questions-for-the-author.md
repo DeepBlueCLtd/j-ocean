@@ -319,3 +319,32 @@ dominance-mask cut, or should the hatch be restored to a threshold on the observ
 itself, which is what its declaration promises and which G-06 would equally permit? And should the
 SRD name the dominance mask, so that a second channel derived from the weights is a declared
 derivation rather than a component's decision?
+
+## 12. Should the declared viewport matrix reach below 1 366 px wide?
+
+**What was measured.** The window in the report that made beat 018's eighth pass necessary is
+**950 × 875**. `presentation.minimumViewportWidthPx` is **1 658** and the narrowest viewport in
+the declared matrix — `VIEWPORT_MATRIX` in `tests/shell/declared-geometry.ts`, which is a list of
+real machines rather than a set of declared figures — is **1 366 × 768**. So the window the author
+is actually using is 708 px below the declared minimum and 416 px narrower than anything the
+census has ever visited.
+
+Below the declared minimum the surface does the right thing as far as it goes: it says so on
+screen (*needs 1 658 px for the row; showing one horizon*) and it lays out the same workspace
+rather than a second presentation. The over-budget decision holds there at every font size
+measured — 16, 20, 24, 28 and 32 px — because it is drawn against the viewport and not in a pane.
+
+**What does not hold there.** The horizons pane. At 950 px wide the pre-row centre gives the
+square picture about 110 px, which is narrower than its own heading: at a 24 px root font the
+heading breaks a word across lines and the field's colour scale is clipped. The two figures beside
+it are intact and the picture is intact; what is unreadable is the label above the picture.
+
+**The question.** Is 950 px a window this application should hold, or a window it should refuse
+in one line the way it already refuses the row? The two answers are different work. Holding it
+means the pre-row centre stops being a picture beside a term list below some pane width and
+becomes one or the other, which is a presentation decision and not a fix. Refusing it means saying
+what the workspace needs on both axes, once, in the strip — and then the matrix should gain a
+viewport at or below 950 px wide so that the refusal is measured where it happens.
+
+What this pass did **not** do is widen a test until it passed. The matrix is unchanged and 950 px
+is recorded here.

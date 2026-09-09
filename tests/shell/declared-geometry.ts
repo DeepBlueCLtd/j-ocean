@@ -39,12 +39,14 @@ export interface DeclaredGeometry {
       readonly paneMinimumWidthPx: number;
       readonly paneMinimumHeightPx: number;
       readonly sashWidthPx: number;
-      /** FR-014: the walkthrough's mask and the card beside it, declared like every other
-          dimension of the layout so the tests measure against the file the shell is served. */
-      readonly walkthroughMaskOpacity: number;
+      /** FR-014 and FR-016: the one dim, the card placed beside a lit pane, and the widest a
+          modal decision may be drawn — declared like every other dimension of the layout so
+          the tests measure against the file the shell is served. */
+      readonly maskOpacity: number;
       readonly walkthroughCardWidthPx: number;
       readonly walkthroughCardMinimumHeightPx: number;
       readonly walkthroughCardGapPx: number;
+      readonly modalWidthPx: number;
       readonly storageKey: string;
       readonly layoutVersion: number;
     };

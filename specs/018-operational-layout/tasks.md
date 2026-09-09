@@ -186,3 +186,44 @@ twice.
       other, which the overlap census reported as soon as the floor grew.
 - [x] **T100** Each of the three outcomes planted once and watched failing by name — a defect, an
       overlap, an exemption with no reason, and a list that does not say which list — then removed.
+
+## The reader's font, and a decision no pane can hide (FR-015, FR-016, SC-011, SC-012)
+
+- [x] **T101** A fifth check in the census: **an element painted outside its clipping ancestor**.
+      Every interactive element and every text-bearing element in every pane, walked out through
+      the ancestors that actually clip it — respecting `position`, so a fixed card is not clipped
+      by the pane it is drawn over — and intersected with each of their boxes. The pane-content
+      check asks whether a pane's own content fits the pane, which is why it reported nothing on
+      the day `Integrate anyway` was painted below the foot of the controls pane: the pane had
+      grown to hold it, and it was the pane's **ancestor** that clipped it.
+- [x] **T102** An ancestor a reader can **scroll** is not a clip: the rectangle is moved into the
+      scroller's own box, as a wheel would move it, so an item below the fold of a list is judged
+      by whether the list is on screen. Without it the run provenance list reported eleven
+      unreachable figures at every viewport. And the walk starts at the element and not at its
+      parent, because the manifest is a `<pre>` that is its own scroller: 83 per cent of it
+      reported unreachable while a reader can read all of it.
+- [x] **T103** Watched failing on the defect before it was fixed, at 1 366 × 768 and a 28 px root
+      font: `proceed-anyway` 100 per cent outside `pane-content.controls`, and a colour scale
+      100 per cent outside a dockview split-view container that the pane-content check said
+      nothing about.
+- [x] **T104** The over-budget notice becomes a modal decision: a native `<dialog>` opened with
+      `showModal()`, centred on the viewport, `min(modalWidthPx, 100vw − 2 × pageGutterPx)` wide
+      and its content's own height. Focus moves into it; Escape declines and returns focus to the
+      advance; a click on the backdrop does the same; the dim is the surface's one dim.
+- [x] **T105** Its words are a decision. Two figures with their provenance and neither truncated,
+      two things a reader may do, and the three sentences that explained the frame budget are
+      `controls/run`'s help — the panel that had declared it had nothing to explain until one of
+      its buttons started asking a question. Recorded in `docs/narrative-disposition.json`.
+- [x] **T106** It moves no pane, asserted at every viewport in the matrix and at 20 px and 24 px,
+      measured across the close rather than the open. And the arithmetic holds on the new path:
+      declining and then proceeding lands on twelve hours and `stepsPerAdvance` steps.
+- [x] **T107** The reader's declared font as a census axis, set with the browser's own default
+      text size rather than an injected stylesheet. 20 px and 24 px at every viewport, on arrival
+      and over budget; 16 px keeps the whole state walk. Four defects found and fixed: a `16rem`
+      floor that starved the picture beside it, a `minmax(8rem, …)` label column that pushed its
+      figures out, `fieldLabelHeightPx` reserving pixels for a label written in `rem`, and 3 px of
+      controls pane the new help control costs.
+- [x] **T108** `presentation.workspace.maskOpacity` — one dim, used by the walkthrough's scrim and
+      the decision's backdrop — and `presentation.workspace.modalWidthPx`,
+      `presentation.fieldLabelHeightRem` and a re-measured `minimumViewportHeightPx` of 752. One
+      digest moves, `configuration`, and the other 40 are byte-identical.

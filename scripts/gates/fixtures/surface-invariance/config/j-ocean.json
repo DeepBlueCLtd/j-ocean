@@ -43,10 +43,11 @@
       "paneMinimumWidthPx": 220,
       "paneMinimumHeightPx": 120,
       "sashWidthPx": 4,
-      "walkthroughMaskOpacity": 0.62,
+      "maskOpacity": 0.62,
       "walkthroughCardWidthPx": 420,
       "walkthroughCardMinimumHeightPx": 180,
       "walkthroughCardGapPx": 12,
+      "modalWidthPx": 420,
       "storageKey": "j-ocean.workspace",
       "layoutVersion": 1
     },
@@ -55,7 +56,7 @@
       "thumbnailWidthPx": 40
     },
     "centreChromeHeightPx": 196,
-    "fieldLabelHeightPx": 72,
+    "fieldLabelHeightRem": 5,
     "anomalyLimitMetres": 220,
     "attributionHatchThreshold": 0.5,
     "footprint": {

@@ -89,6 +89,8 @@ It explains a panel that stays, so it is behind that panel's help control, openi
 | The centre region, the last line of the legend beneath the row (beat 015) | the row shows the field alone at this size: the attribution layer and each measurement at the depth it reached are drawn in the enlarged panel | `help:centre/horizon-row`, under **what the row draws, and what it does not** |
 | The centre region, the legend beneath the row, with the attribution layer shown (beat 005) | the same field on every panel: this run analyses once, at the issue instant. Attribution becomes per horizon when the forecast cycles. | `help:centre/attribution`, under **the same field on every panel** |
 | The centre region, the hatched entry of the legend beneath the row (beat 007) | a second channel, so the field reads without colour | `help:centre/attribution`, under **the hatched channel** |
+| The run controls, the second sentence of the over-budget notice (beat 003) | The chunk it was measured on counts toward the twelve hours; nothing beyond it has been integrated. | `help:controls/run`, under **the frame budget** |
+| The run controls, the last sentence of the over-budget notice (beat 003) | The page is saying so rather than freezing. | `help:controls/run`, under **the frame budget** |
 
 ## It came back, to the walkthrough
 
@@ -135,5 +137,6 @@ A reader drives it, or reads a live figure from it, so it stays — as a readout
 | The centre region, before the row is built (beat 013) | Six panels at the declared horizons — each stating what it is valid for, what it was initialised from, and what it was worth against two references. | The **horizons** pane |
 | The detail region, with nothing selected (beat 013) | Nothing is selected. Two things can appear here: a cell's attribution breakdown, from clicking a cell on any field; and a measurement's own profile beside the model's derived one, with the measured levels kept as a ghost, from hovering or clicking its mark. | The **selection** pane |
 | Each horizon panel, above that panel's own skill figures (beat 004) | The scorer's own verdict on this horizon, in the scorer's words: better than persistence by 0.0 per cent; worse than climatology by 208.8 per cent. | The **horizons** pane |
+| The run controls, the notice shown when the projected time exceeds the declared budget (beat 003) | The projected time to integrate the longest declared horizon, against the declared frame budget, with the choice to integrate anyway. | The **controls** pane |
 
 <!-- end generated -->

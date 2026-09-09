@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { BELOW_THE_ROW, declared } from './declared-geometry.js';
+import { advanceThroughTheBudget } from './census.js';
 
 /**
  * The documentation site's figures, captured from the real application.
@@ -64,8 +65,9 @@ test('the shell, on arrival', async ({ page }) => {
 test('the shell, after integrating', async ({ page }) => {
   await inOneView(page);
   await page.goto('/');
-  await page.getByTestId('advance').click();
-  await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 30_000 });
+  // Through the budget's question if this machine provokes one: a figure of the surface with a
+  // modal decision over it would be a figure of the decision.
+  await advanceThroughTheBudget(page);
   await selectTab(page, 'The run', 'run-panel');
   await page.screenshot({ path: `${IMAGES}001-shell-advanced.png` });
 });
@@ -81,8 +83,7 @@ test('the ocean after twelve hours', async ({ page }) => {
   await inOneView(page);
   await page.goto('/');
   await expect(page.getByTestId('analysed-field')).toBeVisible();
-  await page.getByTestId('advance').click();
-  await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 30_000 });
+  await advanceThroughTheBudget(page);
   await page.getByTestId('pane-horizons').screenshot({ path: `${IMAGES}003-field-advanced.png` });
   await selectTab(page, 'The run', 'run-panel');
   await page.getByTestId('run-panel').screenshot({ path: `${IMAGES}003-run-panel.png` });

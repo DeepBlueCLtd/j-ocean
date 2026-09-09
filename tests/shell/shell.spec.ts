@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Request } from '@playwright/test';
 import { declared, FLOOR, REFERENCE } from './declared-geometry.js';
+import { advanceThroughTheBudget } from './census.js';
 
 /**
  * SC-003 and User Story 3 of spec 001.
@@ -116,11 +117,11 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('step-time')).toContainText('not yet measured');
     const startInstant = await page.getByTestId('instant').textContent();
 
-    await page.getByTestId('advance').click();
-    // Twelve hours at the declared timestep. The exact count comes from configuration, so
-    // the test waits for the integration to stop rather than asserting a literal.
+    // Twelve hours at the declared timestep, through the budget's question if this machine's
+    // step time provokes one. The exact count comes from configuration, so the test waits for
+    // the integration to stop rather than asserting a literal.
+    await advanceThroughTheBudget(page);
     await expect(page.getByTestId('steps')).not.toHaveText('0');
-    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 30_000 });
     await expect(page.getByTestId('step-time')).toContainText('ms/step');
     // Principle V: the figure is host time and says so, in a kind of its own.
     await expect(page.getByTestId('step-time').locator('.host-time')).toBeVisible();
@@ -215,6 +216,101 @@ test.describe('the shell', () => {
       'two presses did not land on two advances',
     ).toHaveText(String(2 * advance.steps));
     await expect(page.getByTestId('instant')).toHaveText(advance.instantAfter(start, 2));
+  });
+
+  /**
+   * The over-budget decision is a modal, and declining it is a decision too (spec 018 FR-016).
+   *
+   * The author could not reach *Integrate anyway*: it was a notice at the foot of the controls
+   * pane, and the pane decided how tall it was. It is a `<dialog>` opened with `showModal()`
+   * now, which is what makes the three claims here true by construction rather than by
+   * inspection -- the top layer moves no pane, the platform contains focus, and Escape closes.
+   * Asserted anyway, because "by construction" is what the notice's own layout was said to be.
+   *
+   * **Escape declines**, and declining is the meaning not proceeding has always had here: the
+   * chunk that was measured stands and counted, and nothing beyond it is integrated. Pressing
+   * the control again resumes the *same* advance rather than starting another, so a reader who
+   * declines and then changes their mind lands on twelve hours and not on twenty-four -- which
+   * is the arithmetic `advance.ts` was written for, on a path it had never been asked about.
+   */
+  test('opens the over-budget decision as a modal, moves no pane, and declines on Escape', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await page.route(CONFIG_REQUEST, async (route) => {
+      const response = await route.fetch();
+      const config = JSON.parse(await response.text()) as { budget: { frameBudgetMs: number } };
+      config.budget.frameBudgetMs = 0.000_001;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(config),
+      });
+    });
+
+    await page.goto('/');
+    await expect(page.getByTestId('pane-controls')).toBeVisible();
+    const advance = await advanceTheControlOffers(page);
+    const start = Date.parse((await page.getByTestId('instant').textContent()) ?? '');
+
+    await page.getByTestId('advance').click();
+    const decision = page.getByTestId('over-budget');
+    await expect(decision).toBeVisible({ timeout: 30_000 });
+
+    // A dialog in the flow of the page is not a modal: no top layer, no backdrop, no focus
+    // held and no Escape. `showModal` is the difference and it is visible from here.
+    expect(
+      await decision.evaluate((node) => (node as HTMLDialogElement).matches(':modal')),
+      'the over-budget decision is a dialog that was rendered open rather than opened as a modal',
+    ).toBe(true);
+    expect(
+      await page.evaluate(
+        () => document.activeElement?.closest('[data-testid="over-budget"]') !== null,
+      ),
+      'opening the decision left focus outside it',
+    ).toBe(true);
+
+    // It moves no pane. Measured across the close rather than across the open, because the
+    // advance's own chunk changes what the provenance pane prints and this claim is about the
+    // dialog alone.
+    const geometry = async (): Promise<string> =>
+      page.evaluate(() =>
+        JSON.stringify(
+          Array.from(document.querySelectorAll<HTMLElement>('[data-pane-id]')).map((pane) => {
+            const box = pane.getBoundingClientRect();
+            return [pane.dataset['paneId'], box.x, box.y, box.width, box.height];
+          }),
+        ),
+      );
+    const withItOpen = await geometry();
+
+    const refused = Number(await page.getByTestId('steps').textContent());
+    expect(refused).toBe(declared.model.chunkSteps);
+
+    await page.keyboard.press('Escape');
+    await expect(decision).toHaveCount(0);
+    expect(await geometry(), 'closing the over-budget decision moved a pane').toBe(withItOpen);
+    expect(
+      await page.evaluate(
+        () => (document.activeElement as HTMLElement | null)?.dataset['testid'] ?? '',
+      ),
+      'declining left focus at the top of the document instead of on the control it came from',
+    ).toBe('advance');
+
+    // Declining integrates nothing beyond the chunk that was measured.
+    await expect(page.getByTestId('steps')).toHaveText(String(refused));
+
+    // And pressing again resumes the advance the reader asked for: twelve hours in total, not
+    // twelve on top of the chunk and not twenty-four.
+    await page.getByTestId('advance').click();
+    await expect(page.getByTestId('over-budget')).toBeVisible({ timeout: 30_000 });
+    await page.getByTestId('proceed-anyway').click();
+    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 60_000 });
+    await expect(
+      page.getByTestId('steps'),
+      'declining and then proceeding did not land on one advance',
+    ).toHaveText(String(advance.steps));
+    await expect(page.getByTestId('instant')).toHaveText(advance.instantAfter(start, 1));
   });
 
   /**
@@ -463,8 +559,7 @@ test.describe('the shell', () => {
          whose figures have just been filled in is a strip that changed for a reason that has
          nothing to do with this control. So both snapshots are taken with the run in the same
          state: advanced, its step time measured, its completion confirmed. */
-      await page.getByTestId('advance').click();
-      await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 60_000 });
+      await advanceThroughTheBudget(page);
       await expect(page.getByTestId('advance-report')).toContainText('Integrated');
 
       const run = await page.evaluate(async () => {
@@ -1443,8 +1538,7 @@ test.describe('the shell', () => {
 
     // Make it a run worth replaying: a drawn seed, some integration and an edit.
     await page.getByTestId('new-run').click();
-    await page.getByTestId('advance').click();
-    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 30_000 });
+    await advanceThroughTheBudget(page);
     await page.getByTestId('build-row').click();
     await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
     await page.getByTestId('bias-degrees').fill('1.5');
@@ -1586,8 +1680,7 @@ test.describe('the shell', () => {
     });
 
     await page.goto('/');
-    await page.getByTestId('advance').click();
-    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 30_000 });
+    await advanceThroughTheBudget(page);
     await page.getByTestId('build-row').click();
     await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
     await page.getByTestId('new-run').click();
