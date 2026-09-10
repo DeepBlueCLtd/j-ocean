@@ -10,8 +10,8 @@ import declarations from './panels.json';
  * of FR-054: help kept separately from the thing it explains goes stale silently, and a second
  * list of panels would be that staleness reintroduced by the fix for it.
  *
- * The regions are declared here too, and `Regions.tsx` lays out from them. So a panel's region
- * is one of the regions the layout draws, checked by the type rather than by inspection.
+ * The panes are declared here too, and `Workspace.tsx` lays out from them. So a panel's pane
+ * is one of the panes the layout draws, checked by the type rather than by inspection.
  *
  * Gate G-08 reads the same file: every declared feature has a help entry, every entry names a
  * declared panel and feature, and every panel named in `src/harness/` is declared. A panel
@@ -19,11 +19,25 @@ import declarations from './panels.json';
  */
 
 /**
- * The four regions of beat 013 (FR-044 to FR-047), in the order the layout places them.
- * `Regions.tsx` renders a section per entry; nothing else names a region.
+ * The panes of the workspace (SRD-v2 §8.1, ADR-0014), in the order the layout places them.
+ *
+ * Beat 013 had four regions in a CSS grid: controls, centre, scores, detail. Beat 018 keeps
+ * the division by rate of change and loses the grid. `scores` is gone as a place, because each
+ * horizon's figures now live **inside its own panel** -- which is what FR-046 asked for and is
+ * not achievable across independent panes -- and `centre` and `detail` are named for what they
+ * hold rather than for where they sit, because a reader may dock them anywhere.
+ *
+ * `status` is in this list and is not a dockview pane: it is the strip that carries the
+ * statement of FR-58, and a statement that could be closed, tabbed or dragged behind another
+ * pane is not one the surface is making. It is a pane for the purposes of gate G-08, which
+ * holds every panel's declaration against a place the layout draws.
+ *
+ * The export keeps its name. `Workspace.tsx` lays out from it, every panel declaration names
+ * one of these, and gate G-08 reads this very line -- one list of places, not two.
  */
-export const REGIONS = ['controls', 'centre', 'scores', 'detail'] as const;
+export const REGIONS = ['controls', 'horizons', 'selection', 'provenance', 'status'] as const;
 
+/** A pane of the workspace. Beat 013 called it a region and the name is kept for the type. */
 export type RegionId = (typeof REGIONS)[number];
 
 export interface PanelDeclaration {

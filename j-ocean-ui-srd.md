@@ -156,28 +156,30 @@ tables that disagree the first time an entry is edited.
 <!-- generated from docs/narrative-disposition.json by scripts/docs/build-disposition.ts -->
 
 Generated from `docs/narrative-disposition.json`, which is held by `tests/docs/disposition.test.ts`.
-62 pieces of matter: 14 stay in a region,
-30 went to the site, 15 are a panel's own
-help, built in beat 016-panel-help, and 3 were **dropped with a
-recorded reason** rather than carried anywhere. Every destination is resolved by the test:
-a site section that contains the words, a help entry that renders them, or a reason.
+78 pieces of matter: 15 stay in a region,
+28 went to the site, 24 are a panel's own
+help, built in beat 016-panel-help, 5 are the
+walkthrough's, reclaimed in beat 018-operational-layout, and 6
+were **dropped with a recorded reason** rather than carried anywhere. Every destination is
+resolved by the test: a site section that contains the words, a help entry or a walkthrough
+step that renders them, or a reason.
 
 | Was on the application page | The matter | Now |
 |---|---|---|
-| The head of the controls region, outside its scroller | j-ocean is not an operational forecast system. Its numerics are real but reduced, its domain small, and its claims are about relative skill between references it computes itself, scored against a truth record it did not author. | Stays, in the **controls** region |
-| The run controls | Which run this is: the recorded case under its declared label, or a run whose seed was drawn for this visit. | Stays, in the **controls** region |
-| The run controls | The measured step time as host time, against the declared frame budget. | Stays, in the **controls** region |
-| The controls region, the disclosure headed The run | The root seed, the domain and its computed cell size, the declared timestep against the stability the criterion admits, the steps taken, the instant the run is valid at, what it was initialised from, the excluded sponge margin and the outcrop clamps. | Stays, in the **controls** region |
-| The controls region, the disclosure headed What has been declared | The declared grid and the declared epoch. | Stays, in the **controls** region |
-| The controls region, the disclosure headed What the instruments measured | The ownship surface count at its declared interval and declared errors, the XBT drops and their declared level count, what each drop told us about the interface depth with its error, whether Argo is assimilated, and how many of each check fired. | Stays, in the **controls** region |
-| The controls region, the disclosure headed The record this run is scored against | The domain, the truth source, its native resolution against the model grid, its instants and their spacing, its depth levels, the Argo profiles and levels with the flagged count, and the climatology window with its overlap with this run's period. | Stays, in the **controls** region |
-| The controls region, the disclosure headed The manifest this run replays from | The build, the digest of the fields and the analysis, the manifest itself, and the controls that download, paste and import one. | Stays, in the **controls** region |
-| The controls region, beneath the issue-time control | How many observations the analysis saw at this issue instant, and how many had not happened yet. | Stays, in the **controls** region |
-| The controls region, beneath the row's toggles | What is drawn over every panel: the surface measurements, the XBT drops, the Argo profiles, how many carry a flag, and whether quality control was on. | Stays, in the **controls** region |
-| The centre region, before the row is built | The weight observations carried in each cell — the analysis's own gain, drawn as a field. | Stays, in the **centre** region |
-| The centre region, before the row is built | Six panels at the declared horizons — each stating what it is valid for, what it was initialised from, and what it was worth against two references. | Stays, in the **centre** region |
-| The scores region, before the row is scored | Each panel's skill against persistence and against climatology appears here, in that panel's own column, once the row has been built and scored. | Stays, in the **scores** region |
-| The detail region, with nothing selected | Nothing is selected. Two things can appear here: a cell's attribution breakdown, from clicking a cell on any field; and a measurement's own profile beside the model's derived one, with the measured levels kept as a ghost, from hovering or clicking its mark. | Stays, in the **detail** region |
+| The head of the controls region, outside its scroller | j-ocean is not an operational forecast system. Its numerics are real but reduced, its domain small, and its claims are about relative skill between references it computes itself, scored against a truth record it did not author. | Stays, in the **status** pane |
+| The run controls | Which run this is: the recorded case under its declared label, or a run whose seed was drawn for this visit. | Stays, in the **status** pane |
+| The run controls | The measured step time as host time, against the declared frame budget. | Stays, in the **status** pane |
+| The controls region, the disclosure headed The run | The root seed, the domain and its computed cell size, the declared timestep against the stability the criterion admits, the steps taken, the instant the run is valid at, what it was initialised from, the excluded sponge margin and the outcrop clamps. | Stays, in the **provenance** pane |
+| The controls region, the disclosure headed What has been declared | The declared grid and the declared epoch. | Stays, in the **provenance** pane |
+| The controls region, the disclosure headed What the instruments measured | The ownship surface count at its declared interval and declared errors, the XBT drops and their declared level count, what each drop told us about the interface depth with its error, whether Argo is assimilated, and how many of each check fired. | Stays, in the **provenance** pane |
+| The controls region, the disclosure headed The record this run is scored against | The domain, the truth source, its native resolution against the model grid, its instants and their spacing, its depth levels, the Argo profiles and levels with the flagged count, and the climatology window with its overlap with this run's period. | Stays, in the **provenance** pane |
+| The controls region, the disclosure headed The manifest this run replays from | The build, the digest of the fields and the analysis, the manifest itself, and the controls that download, paste and import one. | Stays, in the **provenance** pane |
+| The controls region, beneath the issue-time control | How many observations the analysis saw at this issue instant, and how many had not happened yet. | Stays, in the **controls** pane |
+| The controls region, beneath the row's toggles | What is drawn over every panel: the surface measurements, the XBT drops, the Argo profiles, how many carry a flag, and whether quality control was on. | Stays, in the **controls** pane |
+| The centre region, before the row is built | The weight observations carried in each cell — the analysis's own gain, drawn as a field. | Stays, in the **horizons** pane |
+| The centre region, before the row is built | Six panels at the declared horizons — each stating what it is valid for, what it was initialised from, and what it was worth against two references. | Stays, in the **horizons** pane |
+| The scores region, before the row is scored | Each panel's skill against persistence and against climatology appears here, in that panel's own column, once the row has been built and scored. | **Dropped**, with a reason: The scores region is gone. Beat 013 aligned each panel's figures to its column with CSS `subgrid` across two regions; beat 018 puts them inside the panel, which is what FR-046 asked for and is not achievable across independent panes. There is no region left for this to be the empty state of, and each panel now says "not scored yet" for itself -- the same fact, said by the thing it is about. |
+| The detail region, with nothing selected | Nothing is selected. Two things can appear here: a cell's attribution breakdown, from clicking a cell on any field; and a measurement's own profile beside the model's derived one, with the measured levels kept as a ghost, from hovering or clicking its mark. | Stays, in the **selection** pane |
 | The controls region, the disclosure headed What has been declared | Every figure here is a value in configuration, validated before anything was computed. No component in the tree holds a literal for any of them. | Site: `docs/site/data-model.md#What has been declared` |
 | The run disclosure, beside the computed cell size | a five-degree box is not square in kilometres | Site, and was already there: `docs/site/data-model.md#Configuration` |
 | The run disclosure, beneath Initialised from | Velocity is put in geostrophic balance with that thickness rather than taken from the truth, which carries motions this model has no layer for. | Site: `docs/site/architecture.md#What the initialisation takes from the truth, and what it does not` |
@@ -209,9 +211,9 @@ a site section that contains the words, a help entry that renders them, or a rea
 | The scores region, before the row is scored | There is no scores table anywhere else: a table would ask you to match a row label against a panel heading at every glance. | Help, at the panel: `help:scores`, under *skill against a reference* |
 | Each panel's score, in the disclosure headed Where this figure came from | A reduced-gravity model determines departures from a mean and not the mean itself, so every field is compared as an anomaly about its own. The offsets are published rather than absorbed. | Help, at the panel: `help:scores`, under *anomalies about their own mean* |
 | The detail region, above a cell's breakdown | A breakdown is an instrument of a selected cell, never a per-panel summary — that was specified first and was wrong. | Help, at the panel: `help:detail/attribution-breakdown`, under *a cell's breakdown* |
-| The walkthrough, step 1: What you are looking at | j-ocean is a teaching harness: a small, real ocean model, the simulated instruments that measure it, and an honest account of what each measurement was worth. It forecasts nothing you should act on. | Site: `docs/site/index.md#What you are looking at` |
+| The walkthrough, step 1: What you are looking at | j-ocean is a teaching harness: a small, real ocean model, the simulated instruments that measure it, and an honest account of what each measurement was worth. It forecasts nothing you should act on. | Walkthrough: `walkthrough:step-1` (reclaimed from site: docs/site/index.md#What you are looking at) |
 | The walkthrough, step 1: the legend of the four figure kinds | Every number on the page is typed by where it came from, and the four kinds never change appearance between panels: declared — a value in configuration, validated before anything ran; computed — produced by the model or the analysis on this visit; derived — read off a committed artefact the build regenerates; host time — how long the machinery took, never simulation time. | Site: `docs/site/data-model.md#The figure kinds` |
-| The walkthrough, step 2: Everything you can change | One column for every cause: which ocean, when the forecast was issued, which instruments the analysis was allowed to see, and whether quality control was running. Change any of them and every panel and every score answers where they are, without you moving. | Site: `docs/site/index.md#The four regions` |
+| The walkthrough, step 2: Everything you can change | One column for every cause: which ocean, when the forecast was issued, which instruments the analysis was allowed to see, and whether quality control was running. Change any of them and every panel and every score answers where they are, without you moving. | Walkthrough: `walkthrough:step-2` (reclaimed from site: docs/site/index.md#The four regions) |
 | The walkthrough, step 2, the note beneath it | A control that acts on one panel alone is not here; it is at that panel. | **Dropped**, with a reason: Beat 016 makes it true rather than said. Every panel that has something to explain now carries its own control at its own top right, and a sentence promising that a surface behaves this way is worth less than the surface behaving this way. |
 | The walkthrough, step 3: The forecast, at every horizon at once | One panel per declared horizon, all visible together rather than behind a slider — a forecast is a shape over lead time, and you cannot see a shape one frame at a time. | Help, at the panel: `help:centre/horizon-row`, under *building the row* |
 | The walkthrough, step 3, second paragraph | Two axes, not one: lead time runs across the row, and issue time is a control on the left. Moving the issue time earlier gives the analysis fewer observations and is the clearest way to watch skill change. | Help, at the panel: `help:controls/issue-time`, under *lead time and issue time* |
@@ -226,6 +228,22 @@ a site section that contains the words, a help entry that renders them, or a rea
 | The walkthrough, step 9: The record it is scored against | A real HYCOM subset and real Argo profiles, regenerated from a digest-verified download by a build gate. Nothing here was written by hand; a file that had been would fail the build. The harness did not author the thing it is marked against. | Site: `docs/site/data-model.md#The record this run is scored against` |
 | The walkthrough, step 10: Taking the run with you | The manifest holds everything needed to rebuild this run and none of its state: replay is re-computation, not the restoration of a snapshot. Export it, import it in another browser, and the digests should match — that comparison is what caught an analysis that meant two different things. | Help, at the panel: `help:controls/manifest`, under *importing a manifest* |
 | The walkthrough, step 11: What it deliberately does not do | Four capabilities are assessed, deferred, and cheap to adopt. Each has a written trigger, and a test measures the triggers on every run — so this list fails when it becomes wrong instead of going stale. | Site: `docs/site/deferred.md#Deferred, and what would trigger it` |
+| The below-the-floor notice, first paragraph | All 6 declared horizons side by side, each at the declared minimum of 190 px, want a viewport of at least 2038 x 728 px once the controls column, the detail column and the page gutter have taken theirs. That figure was measured from the built layout, not chosen. | Walkthrough: `walkthrough:step-6` |
+| The below-the-floor notice, second paragraph | So this is one horizon at a time instead. The strip carries all 6 and what each was worth, because comparison across horizons is the lesson; choosing one in the strip swaps the panel beneath it. Widen the window past the figure above and the full row returns without a reload. | Walkthrough: `walkthrough:step-6` |
+| Nowhere: the workspace is beat 018's, and had nothing to explain it | Drag a sash to resize a pane, drag a tab to move or group one, and the arrangement you leave is the arrangement you return to. Only the furniture is remembered: no seed, no manifest and nothing the run computed, which travel as a manifest and are rebuilt rather than restored. | Walkthrough: `walkthrough:step-7` |
+| The enlarged panel, beneath the depth elevation | A side elevation: longitude is the horizontal axis and latitude is not shown, so position is read from the field this is drawn beside. | Help, at the panel: `help:centre/horizon-panel`, under *enlarging a panel* |
+| The detail region, at the head of a selected cell's breakdown | Cell 5050, as the analysis weighted it. | Help, at the panel: `help:detail/attribution-breakdown`, under *a cell's breakdown* |
+| The centre region, the value beside Influence radius | A property of the declared correlation length scale, not of the ocean. | Help, at the panel: `help:centre/attribution`, under *the influence radius* |
+| The centre region, the last line of the legend beneath the row | the row shows the field alone at this size: the attribution layer and each measurement at the depth it reached are drawn in the enlarged panel | Help, at the panel: `help:centre/horizon-row`, under *what the row draws, and what it does not* |
+| The centre region, the legend beneath the row, with the attribution layer shown | the same field on every panel: this run analyses once, at the issue instant. Attribution becomes per horizon when the forecast cycles. | Help, at the panel: `help:centre/attribution`, under *the same field on every panel* |
+| The centre region, the hatched entry of the legend beneath the row | a second channel, so the field reads without colour | Help, at the panel: `help:centre/attribution`, under *the hatched channel* |
+| The centre region, the surface-measurement entry of the legend beneath the row | the track's own range | **Dropped**, with a reason: Beat 018. The clause named what the two figures beside it already are: the entry reads *surface measurement, dark for warm, over 18.1 to 24.3 degrees C*, and both ends are computed figures with their kind on them. A phrase that restates the figures next to it is the second source for one fact that FR-055 forbids, in four words. |
+| The centre region, the dashed entry of the legend beneath the row | so it did not inform it | **Dropped**, with a reason: Beat 018. The consequence of the clause before it -- *dashed: measured after the forecast was initialised* -- and a legend entry that argues from its own label is explaining rather than labelling. The mark itself still says it in full: clicking one opens the selection pane, which reads *taken after this forecast was initialised, so it did not inform it*, at the mark the reader asked about. |
+| Each horizon panel, above that panel's own skill figures | The scorer's own verdict on this horizon, in the scorer's words: better than persistence by 0.0 per cent; worse than climatology by 208.8 per cent. | Stays, in the **horizons** pane |
+| The run controls, the notice shown when the projected time exceeds the declared budget | The projected time to integrate the longest declared horizon, against the declared frame budget, with the choice to integrate anyway. | Stays, in the **controls** pane |
+| The run controls, the second sentence of the over-budget notice | The chunk it was measured on counts toward the twelve hours; nothing beyond it has been integrated. | Help, at the panel: `help:controls/run`, under *the frame budget* |
+| The run controls, the last sentence of the over-budget notice | The page is saying so rather than freezing. | Help, at the panel: `help:controls/run`, under *the frame budget* |
+| The over-budget decision, the label on its one projected figure | The check is on the longest declared horizon and not on the advance you pressed, because a frame budget is a claim about the machine and the honest way to gauge a machine is against the most this surface will ever ask of it. That is the walk building the horizon row makes; an advance of twelve hours is a fraction of it. The decision prints both costs so that neither figure stands for the other. | Help, at the panel: `help:controls/run`, under *the frame budget* |
 
 <!-- end generated -->
 
@@ -247,6 +265,40 @@ exists because a suite of passing tests said nothing about whether the page coul
 followed.
 
 ---
+
+## 8.1 Amendment of 8 September 2026: the surface is a workspace
+
+Beats 013 to 017 met every requirement in this document and the result still read as an article.
+Measured at 2560 x 1440: a 1,344 px scrolling controls pane in a 1,440 px window, two fifths of
+the surface empty, and state reported in sentences where an instrument shows a readout.
+
+The requirements below are amended by feature 018 and ADR-0014. What changes is the realisation,
+not the diagnosis of section 1.1.
+
+- **FR-41** is unchanged in its demand -- one viewport, no scrolling -- and gains a distinction it
+  lacked: a pane may scroll a **list** a reader scans, and may never scroll a **body of text**.
+  The declared-scroller doctrine that let a column of prose satisfy this requirement is withdrawn.
+- **FR-44 to FR-47** keep their division by rate of change and lose their realisation as a CSS
+  grid of four fixed regions. The surface is a docked pane workspace whose panes fill the screen.
+  In particular **FR-46**'s scores move *inside* each horizon panel rather than into a separate
+  region aligned to it, which is what the requirement asked for and is not achievable across
+  independent panes.
+- **FR-48** stands, and is narrowed: an empty region still says what would appear in it, in as
+  few words as will do it. It is not a licence for explanation on the surface.
+- **New: explanation belongs to help (FR-52) or to a walkthrough.** The walkthrough that FR-52
+  retired returns to explain the *workspace*; panel help continues to explain each panel. They
+  answer different questions.
+- **New: the workspace arrangement may persist.** Principle IX forbids persisting forecast inputs
+  and outputs; pane geometry is neither. See ADR-0014.
+- **FR-43 is unchanged in what it does and compacted in what it says.** The below-the-floor
+  answer said the size it needed in two paragraphs, which was an explanation on the surface and
+  was the first thing a reader at a small window met. It states the size as a declared figure,
+  in one line; the explanation is the walkthrough's.
+- **The declared floor is measured from the workspace and not from fixed tracks.** Beat 013's
+  2 038 x 728 was 828 px of chrome that could not shrink, so an ordinary 2 000 px monitor got
+  the fallback. In a workspace the flanking panes flex to the width below which they cannot be
+  read, and the measured floor is **1 658 x 960**. The reference viewport is declared on both
+  axes and is **2 560 x 1 440**.
 
 ## 9. Open questions
 

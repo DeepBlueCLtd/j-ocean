@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Request } from '@playwright/test';
-import { declared } from './declared-geometry.js';
+import { declared, FLOOR, REFERENCE } from './declared-geometry.js';
+import { advanceThroughTheBudget } from './census.js';
 
 /**
  * SC-003 and User Story 3 of spec 001.
@@ -12,10 +13,60 @@ import { declared } from './declared-geometry.js';
 const CONFIG_REQUEST = /j-ocean.*\.json$/;
 
 /** A disclosure has to be opened before what is inside it can be seen. */
+/**
+ * Open whatever holds a panel's figures.
+ *
+ * Beat 018 turned four disclosures into four tabs of the provenance pane, so "open the run
+ * panel" is now "select the run tab". The claim every caller makes is unchanged -- these
+ * figures are on the surface when a reader asks for them -- so the helper takes the change and
+ * the tests keep their assertions. Where the element is still a `<details>` it is still opened.
+ */
+const PROVENANCE_TABS: Readonly<Record<string, string>> = {
+  'run-panel': 'The run',
+  'instruments-panel': 'Instruments',
+  'truth-panel': 'Truth record',
+  'manifest-panel': 'Manifest',
+};
+
 async function openDisclosure(page: Page, testId: string): Promise<void> {
+  const tab = PROVENANCE_TABS[testId];
+  if (tab !== undefined) {
+    await page.locator('.dv-tab', { hasText: tab }).first().click();
+    await expect(page.getByTestId(testId)).toBeVisible();
+    return;
+  }
   await page.getByTestId(testId).evaluate((node) => {
     (node as HTMLDetailsElement).open = true;
   });
+}
+
+/**
+ * What the advance control says it does, and what that is in the run's own units.
+ *
+ * The hours are read off the control's label rather than written down here: the claim under
+ * test is that the run ends up where the surface said it would, so the surface has to be the
+ * one saying it. The timestep is declared, like every other figure these tests measure
+ * against.
+ */
+async function advanceTheControlOffers(page: Page): Promise<{
+  readonly label: string;
+  readonly hours: number;
+  readonly steps: number;
+  readonly instantAfter: (fromMs: number, advances: number) => string;
+}> {
+  // The label the reader is being shown, and not the two the control reserves its width
+  // against: `advance-label` is what the button says now (see `App.tsx`, the run controls).
+  const label = ((await page.getByTestId('advance-label').textContent()) ?? '').trim();
+  const match = /(\d+(?:\.\d+)?)\s*hours?/.exec(label);
+  expect(match, `the advance control does not say how far it advances: "${label}"`).not.toBeNull();
+  const hours = Number(match?.[1]);
+  return {
+    label,
+    hours,
+    steps: Math.round((hours * 3600) / declared.clock.timestepSeconds),
+    instantAfter: (fromMs, advances) =>
+      new Date(fromMs + advances * hours * 3_600_000).toISOString(),
+  };
 }
 
 test.describe('the shell', () => {
@@ -56,6 +107,7 @@ test.describe('the shell', () => {
     await page.goto('/');
     await expect(page.getByTestId('root-seed')).toHaveText(/^[0-9a-f]{16}$/);
     await expect(page.getByTestId('recorded-case')).toContainText('the recorded case');
+    await openDisclosure(page, 'manifest-panel');
     await expect(page.getByTestId('manifest')).toContainText('"recordedCase": true');
   });
 
@@ -65,15 +117,1006 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('step-time')).toContainText('not yet measured');
     const startInstant = await page.getByTestId('instant').textContent();
 
-    await page.getByTestId('advance').click();
-    // Twelve hours at the declared timestep. The exact count comes from configuration, so
-    // the test waits for the integration to stop rather than asserting a literal.
+    // Twelve hours at the declared timestep, through the budget's question if this machine's
+    // step time provokes one. The exact count comes from configuration, so the test waits for
+    // the integration to stop rather than asserting a literal.
+    await advanceThroughTheBudget(page);
     await expect(page.getByTestId('steps')).not.toHaveText('0');
-    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 30_000 });
     await expect(page.getByTestId('step-time')).toContainText('ms/step');
     // Principle V: the figure is host time and says so, in a kind of its own.
     await expect(page.getByTestId('step-time').locator('.host-time')).toBeVisible();
     await expect(page.getByTestId('instant')).not.toHaveText(startInstant ?? '');
+  });
+
+  /**
+   * The control does what it says, whichever way a reader reaches the end of it (FR-008,
+   * FR-009; spec 018 US3).
+   *
+   * ## The defect this was written for
+   *
+   * The author pressed *Integrate 12 hours*, was shown the over-budget notice, pressed
+   * *Integrate anyway*, and the run advanced **16 h 48 min**. `integrate` advanced a chunk in
+   * order to time it, *then* asked whether the budget allowed the rest, and on a refusal it
+   * kept those 72 steps and counted none of them; proceeding took a fresh 180 from where the
+   * probe had left the run. 72 + 180 = 252 steps at 240 s. Two presses landed on 33 h 36 min.
+   *
+   * Nothing in the suite asked what the run had actually advanced. The existing integration
+   * test asserted `steps` was *not* `0` and the instant had *changed*, with a comment saying
+   * the exact count comes from configuration so the test waits rather than asserting a
+   * literal. That is the shape of the hole: a figure derived from configuration can be
+   * derived in the test as well as in the shell, and a control 40 per cent wrong satisfies
+   * "not zero".
+   *
+   * ## How far it should have gone, read off the control itself
+   *
+   * The hours come from the button's own label and the timestep from the declared clock, so
+   * this is not a test of 180 steps: it is a test that the run stands where the control said
+   * it would put it. Change the label and the assertion changes with it; change the advance
+   * and the assertion does not.
+   */
+  test('advances exactly what its label says, through the refusal and again after it', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    // Served a frame budget no machine can meet, the way G-05 and one-view.spec reach this
+    // notice: the refusal is the state under test, not this host's step time.
+    await page.route(CONFIG_REQUEST, async (route) => {
+      const response = await route.fetch();
+      const config = JSON.parse(await response.text()) as { budget: { frameBudgetMs: number } };
+      config.budget.frameBudgetMs = 0.000_001;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(config),
+      });
+    });
+
+    await page.goto('/');
+    await expect(page.getByTestId('pane-controls')).toBeVisible();
+    const advance = await advanceTheControlOffers(page);
+    await expect(page.getByTestId('steps')).toHaveText('0');
+    const start = Date.parse((await page.getByTestId('instant').textContent()) ?? '');
+
+    // The press. The probe is measured, the budget refuses, and what it was measured on is a
+    // chunk of the advance rather than a mutation nobody counted.
+    await page.getByTestId('advance').click();
+    await expect(page.getByTestId('over-budget')).toBeVisible({ timeout: 30_000 });
+    const refused = Number(await page.getByTestId('steps').textContent());
+    expect(refused, 'the probe took no step, so nothing was measured').toBeGreaterThan(0);
+    expect(
+      refused,
+      'the refusal integrated the whole advance, which is not what "nothing beyond the first ' +
+        'chunk" says',
+    ).toBeLessThan(advance.steps);
+    expect(refused).toBe(declared.model.chunkSteps);
+
+    // "Integrate anyway": the advance finishes where it was going, not a whole advance past it.
+    await page.getByTestId('proceed-anyway').click();
+    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 60_000 });
+    await expect(
+      page.getByTestId('steps'),
+      `pressing ${advance.label} once and proceeding did not advance ${String(advance.steps)} steps`,
+    ).toHaveText(String(advance.steps));
+    await expect(page.getByTestId('instant')).toHaveText(advance.instantAfter(start, 1));
+
+    // The completion is announced where the advance was asked for, with the figures.
+    const report = page.getByTestId('surface-report');
+    await expect(report).toHaveAttribute('role', 'status');
+    await expect(report).toContainText(String(advance.steps));
+    await expect(report).toContainText(advance.instantAfter(start, 1));
+
+    // And again. Two presses of a twelve-hour control are twenty-four hours; this landed on
+    // 504 steps -- 33 h 36 min -- until the probe's chunk was counted.
+    await page.getByTestId('advance').click();
+    await expect(page.getByTestId('over-budget')).toBeVisible({ timeout: 30_000 });
+    await page.getByTestId('proceed-anyway').click();
+    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 60_000 });
+    await expect(
+      page.getByTestId('steps'),
+      'two presses did not land on two advances',
+    ).toHaveText(String(2 * advance.steps));
+    await expect(page.getByTestId('instant')).toHaveText(advance.instantAfter(start, 2));
+  });
+
+  /**
+   * The over-budget decision is a modal, and declining it is a decision too (spec 018 FR-016).
+   *
+   * The author could not reach *Integrate anyway*: it was a notice at the foot of the controls
+   * pane, and the pane decided how tall it was. It is a `<dialog>` opened with `showModal()`
+   * now, which is what makes the three claims here true by construction rather than by
+   * inspection -- the top layer moves no pane, the platform contains focus, and Escape closes.
+   * Asserted anyway, because "by construction" is what the notice's own layout was said to be.
+   *
+   * **Escape declines**, and declining is the meaning not proceeding has always had here: the
+   * chunk that was measured stands and counted, and nothing beyond it is integrated. Pressing
+   * the control again resumes the *same* advance rather than starting another, so a reader who
+   * declines and then changes their mind lands on twelve hours and not on twenty-four -- which
+   * is the arithmetic `advance.ts` was written for, on a path it had never been asked about.
+   */
+  test('opens the over-budget decision as a modal, moves no pane, and declines on Escape', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await page.route(CONFIG_REQUEST, async (route) => {
+      const response = await route.fetch();
+      const config = JSON.parse(await response.text()) as { budget: { frameBudgetMs: number } };
+      config.budget.frameBudgetMs = 0.000_001;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(config),
+      });
+    });
+
+    await page.goto('/');
+    await expect(page.getByTestId('pane-controls')).toBeVisible();
+    const advance = await advanceTheControlOffers(page);
+    const start = Date.parse((await page.getByTestId('instant').textContent()) ?? '');
+
+    await page.getByTestId('advance').click();
+    const decision = page.getByTestId('over-budget');
+    await expect(decision).toBeVisible({ timeout: 30_000 });
+
+    // A dialog in the flow of the page is not a modal: no top layer, no backdrop, no focus
+    // held and no Escape. `showModal` is the difference and it is visible from here.
+    expect(
+      await decision.evaluate((node) => (node as HTMLDialogElement).matches(':modal')),
+      'the over-budget decision is a dialog that was rendered open rather than opened as a modal',
+    ).toBe(true);
+    expect(
+      await page.evaluate(
+        () => document.activeElement?.closest('[data-testid="over-budget"]') !== null,
+      ),
+      'opening the decision left focus outside it',
+    ).toBe(true);
+
+    // It moves no pane. Measured across the close rather than across the open, because the
+    // advance's own chunk changes what the provenance pane prints and this claim is about the
+    // dialog alone.
+    const geometry = async (): Promise<string> =>
+      page.evaluate(() =>
+        JSON.stringify(
+          Array.from(document.querySelectorAll<HTMLElement>('[data-pane-id]')).map((pane) => {
+            const box = pane.getBoundingClientRect();
+            return [pane.dataset['paneId'], box.x, box.y, box.width, box.height];
+          }),
+        ),
+      );
+    const withItOpen = await geometry();
+
+    const refused = Number(await page.getByTestId('steps').textContent());
+    expect(refused).toBe(declared.model.chunkSteps);
+
+    await page.keyboard.press('Escape');
+    await expect(decision).toHaveCount(0);
+    expect(await geometry(), 'closing the over-budget decision moved a pane').toBe(withItOpen);
+    expect(
+      await page.evaluate(
+        () => (document.activeElement as HTMLElement | null)?.dataset['testid'] ?? '',
+      ),
+      'declining left focus at the top of the document instead of on the control it came from',
+    ).toBe('advance');
+
+    // Declining integrates nothing beyond the chunk that was measured.
+    await expect(page.getByTestId('steps')).toHaveText(String(refused));
+
+    // And pressing again resumes the advance the reader asked for: twelve hours in total, not
+    // twelve on top of the chunk and not twenty-four.
+    await page.getByTestId('advance').click();
+    await expect(page.getByTestId('over-budget')).toBeVisible({ timeout: 30_000 });
+    await page.getByTestId('proceed-anyway').click();
+    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 60_000 });
+    await expect(
+      page.getByTestId('steps'),
+      'declining and then proceeding did not land on one advance',
+    ).toHaveText(String(advance.steps));
+    await expect(page.getByTestId('instant')).toHaveText(advance.instantAfter(start, 1));
+  });
+
+  /**
+   * The decision names **both** costs, and attributes each to the work it is the cost of
+   * (FR-008, Principle V; the author's report: *"it happens a lot quicker than the dialog
+   * warned"*).
+   *
+   * ## The defect
+   *
+   * The notice printed one projected figure and it was `projectedHorizonMs`: the longest
+   * declared horizon, 96 h and 1 440 steps, which is the walk *building the horizon row*
+   * makes. The control that opened the notice is *Integrate 12 hours*, 180 steps. So the
+   * figure under that heading was eight times the cost of the press that produced it, and a
+   * reader read "1 730 ms" as *this will take 1 730 ms* when it meant *the row would*.
+   *
+   * The arithmetic was never wrong and the **check** is not what changed: NFR-04 gauges the
+   * machine against the worst case and FR-008 is written about the longest declared horizon.
+   * What changed is that a figure now says what it is about.
+   *
+   * ## What is asserted
+   *
+   * Both projections come from one step time, so the ratio between them is declared
+   * arithmetic and not a measurement: `longest horizon / ADVANCE_HOURS`, which is 8 at the
+   * declared horizons. Asserting the **ratio** rather than either figure is what makes this a
+   * test of the attribution rather than of how fast the machine running it happens to be.
+   */
+  test('names both costs in the over-budget decision, and says which is which', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    /* A budget no machine can meet, so the decision is certain. It is also the figure the
+       third readout prints, so what is asserted below is the figure this page was **served**
+       and not the repository's own -- a test that held the served page against the file would
+       be asserting a budget nothing on screen was measured against. */
+    const servedBudgetMs = 0.000_001;
+    await page.route(CONFIG_REQUEST, async (route) => {
+      const response = await route.fetch();
+      const config = JSON.parse(await response.text()) as { budget: { frameBudgetMs: number } };
+      config.budget.frameBudgetMs = servedBudgetMs;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(config),
+      });
+    });
+    await page.goto('/');
+    await expect(page.getByTestId('pane-controls')).toBeVisible();
+    await page.getByTestId('advance').click();
+    await expect(page.getByTestId('over-budget')).toBeVisible({ timeout: 30_000 });
+
+    const advance = await advanceTheControlOffers(page);
+    const longestHorizonHours = Math.max(...declared.horizons.leadHours);
+    const stepsToTheRow = Math.round(
+      (longestHorizonHours * 3600) / declared.clock.timestepSeconds,
+    );
+
+    /* Each readout with the label above it, so that what is asserted is the pairing and not
+       merely the presence of two numbers in one box. */
+    const readouts = await page.evaluate(() =>
+      Array.from(
+        document.querySelectorAll<HTMLElement>('[data-testid="over-budget-figures"] > div'),
+      ).map((one) => ({
+        label: (one.querySelector('dt')?.textContent ?? '').replace(/\s+/g, ' ').trim(),
+        figure: (one.querySelector('dd')?.textContent ?? '').trim(),
+        readout: (one.querySelector('dd') as HTMLElement | null)?.dataset['testid'] ?? '',
+      })),
+    );
+    expect(
+      readouts.map((one) => one.readout),
+      'the decision does not print this advance, the row and the budget, in that order',
+    ).toEqual(['projected-advance', 'projected-row', 'declared-budget']);
+
+    // The advance's own figures are in the advance's own label, and the row's in the row's.
+    // A label that named neither is how one figure came to stand for both.
+    expect(readouts[0]?.label).toContain(`${String(advance.hours)} h`);
+    expect(readouts[0]?.label).toContain(String(advance.steps));
+    expect(readouts[1]?.label).toContain(`${String(longestHorizonHours)} h`);
+    expect(readouts[1]?.label).toContain(String(stepsToTheRow));
+    expect(readouts[2]?.label.toLowerCase()).toContain('budget');
+    expect(readouts[2]?.figure).toContain(`${String(servedBudgetMs)} ms`);
+
+    const msOf = (text: string): number => Number(/([\d.]+)\s*ms/.exec(text)?.[1] ?? NaN);
+    const advanceMs = msOf(readouts[0]?.figure ?? '');
+    const rowMs = msOf(readouts[1]?.figure ?? '');
+    expect(Number.isFinite(advanceMs) && Number.isFinite(rowMs)).toBe(true);
+    expect(
+      rowMs,
+      'the two projections are not the same step time applied to two amounts of work, so one ' +
+        'of them is not what its label says it is',
+    ).toBeGreaterThan(advanceMs);
+
+    /* Both are `perStepMs` times a declared number of steps, so the ratio is arithmetic on
+       configuration. Rounded to whole milliseconds for printing, so the comparison carries the
+       rounding rather than pretending it is exact. */
+    const ratio = stepsToTheRow / advance.steps;
+    expect(
+      rowMs / advanceMs,
+      `the row's projection is not ${String(ratio)} times the advance's, which is what the ` +
+        'declared horizons and the declared advance make it',
+    ).toBeCloseTo(ratio, 1);
+
+    console.log(
+      `    over budget: this advance (${String(advance.hours)} h, ${String(advance.steps)} ` +
+        `steps) ${String(advanceMs)} ms, the horizon row (${String(longestHorizonHours)} h, ` +
+        `${String(stepsToTheRow)} steps) ${String(rowMs)} ms, against a declared budget of ` +
+        `${String(servedBudgetMs)} ms -- a factor of ${(rowMs / advanceMs).toFixed(2)}`,
+    );
+  });
+
+  /**
+   * The same claim on the path where the budget says nothing, which is the path a fast enough
+   * machine takes and the one a refusal test can never reach.
+   */
+  test('advances exactly what its label says when the budget is not exceeded', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await page.route(CONFIG_REQUEST, async (route) => {
+      const response = await route.fetch();
+      const config = JSON.parse(await response.text()) as { budget: { frameBudgetMs: number } };
+      // A budget no step time can exceed, so the notice cannot appear and the advance runs
+      // straight through its chunks.
+      config.budget.frameBudgetMs = 1_000_000;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(config),
+      });
+    });
+
+    await page.goto('/');
+    await expect(page.getByTestId('pane-controls')).toBeVisible();
+    const advance = await advanceTheControlOffers(page);
+    const start = Date.parse((await page.getByTestId('instant').textContent()) ?? '');
+
+    await page.getByTestId('advance').click();
+    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 60_000 });
+    await expect(page.getByTestId('over-budget')).toHaveCount(0);
+    await expect(page.getByTestId('steps')).toHaveText(String(advance.steps));
+    await expect(page.getByTestId('instant')).toHaveText(advance.instantAfter(start, 1));
+
+    await page.getByTestId('advance').click();
+    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 60_000 });
+    await expect(page.getByTestId('steps')).toHaveText(String(2 * advance.steps));
+    await expect(page.getByTestId('instant')).toHaveText(advance.instantAfter(start, 2));
+  });
+
+  /**
+   * NFR-04's other half: while it runs, the surface says so and the control cannot be pressed
+   * again.
+   *
+   * The author measured `aria-busy` absent and the button enabled at every sample of a run
+   * they watched take seconds. `view.integrating` did disable the button, and it was set in
+   * the same task as the chunk it described: the main thread was blocked by the work before
+   * the browser could paint the state that says the work is happening. Every chunk runs after
+   * a yield now, the measured one included, so the busy state is on screen for the whole of
+   * it -- which is what this samples.
+   */
+  test('cannot be pressed again while it integrates, and says it is working', async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.route(CONFIG_REQUEST, async (route) => {
+      const response = await route.fetch();
+      const config = JSON.parse(await response.text()) as { budget: { frameBudgetMs: number } };
+      config.budget.frameBudgetMs = 1_000_000;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(config),
+      });
+    });
+    await page.goto('/');
+    await expect(page.getByTestId('pane-controls')).toBeVisible();
+
+    // Sampled from inside the page, between the chunks the integration yields on: an
+    // assertion driven from the test process cannot see a state that lasts a tenth of a
+    // second.
+    const samples = await page.evaluate(async () => {
+      const read = (): { busy: boolean; disabled: boolean; says: string } => ({
+        busy:
+          document.querySelector('[data-testid="run-controls"]')?.getAttribute('aria-busy') ===
+          'true',
+        disabled:
+          (document.querySelector('[data-testid="advance"]') as HTMLButtonElement | null)
+            ?.disabled ?? false,
+        says: document.querySelector('[data-testid="surface-report"]')?.textContent ?? '',
+      });
+      const taken: { busy: boolean; disabled: boolean; says: string }[] = [];
+      (document.querySelector('[data-testid="advance"]') as HTMLButtonElement).click();
+      for (let i = 0; i < 400; i += 1) {
+        const state = read();
+        taken.push(state);
+        if (!state.busy && i > 0) break;
+        await new Promise((resolve) => { setTimeout(resolve, 0); });
+      }
+      return taken;
+    });
+
+    const busy = samples.filter((sample) => sample.busy);
+    expect(
+      busy.length,
+      'no sample caught the integration in progress, so nothing on the surface reports it',
+    ).toBeGreaterThan(0);
+    expect(
+      busy.filter((sample) => !sample.disabled),
+      'the advance control was pressable while it was integrating',
+    ).toEqual([]);
+    expect(
+      busy.filter((sample) => !sample.says.includes('Integrating')),
+      'the live region said nothing while the run was integrating',
+    ).toEqual([]);
+
+    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 60_000 });
+    await expect(page.getByTestId('run-controls')).toHaveAttribute('aria-busy', 'false');
+    await expect(page.getByTestId('surface-report')).toContainText('Integrated');
+  });
+
+  /**
+   * The pointer says something long is running, for all three of them (NFR-04; the author's
+   * report: *"when that long process is running, I need to see some kind of busy cursor"*).
+   *
+   * **Three operations and one flag.** An advance, building the horizon row and scoring every
+   * horizon each block the main thread for seconds, and until beat 018's seventh pass only the
+   * advance said anything at all -- and it said it in a live region and a disabled button, not
+   * at the pointer, which is where a reader who has just clicked is looking. `working.ts`
+   * holds the one notion; the stylesheet has one rule against it, so the three cannot drift
+   * into saying different things.
+   *
+   * **`progress` and not `wait`.** `wait` says the application is blocked. The advance yields
+   * between chunks and every pane stays readable while it runs, so `progress` -- "working,
+   * still usable" -- is the true one.
+   *
+   * **Sampled from inside the page**, because each of these blocks the main thread from the
+   * moment it starts: an assertion driven from the test process cannot ask a question while
+   * the work it is asking about is running. What is sampled for the two synchronous ones is
+   * the frame *after* the one that paints the busy state, which is the frame the work is
+   * scheduled on -- if the flag were not up by then, no reader would ever see it.
+   */
+  test('shows a busy pointer for every operation that takes seconds', async ({ page }) => {
+    test.setTimeout(300_000);
+    await page.route(CONFIG_REQUEST, async (route) => {
+      const response = await route.fetch();
+      const config = JSON.parse(await response.text()) as { budget: { frameBudgetMs: number } };
+      // A budget no step time can exceed: this test is about the pointer, and the over-budget
+      // refusal is a different question, asked above.
+      config.budget.frameBudgetMs = 1_000_000;
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(config) });
+    });
+    await page.goto('/');
+    await expect(page.getByTestId('pane-controls')).toBeVisible();
+
+    /** Press a control, and read the surface on the frame the work is scheduled on. */
+    const press = async (testId: string): Promise<{ resting: string; working: string; flag: string }> =>
+      page.evaluate(async (id) => {
+        const surface = document.querySelector('[data-testid="one-view"]') as HTMLElement;
+        const cursor = (): string => getComputedStyle(surface).cursor;
+        const resting = cursor();
+        (document.querySelector(`[data-testid="${id}"]`) as HTMLButtonElement).click();
+        await new Promise((resolve) => { requestAnimationFrame(() => { resolve(null); }); });
+        return { resting, working: cursor(), flag: surface.dataset['working'] ?? '(unset)' };
+      }, testId);
+
+    const building = await press('build-row');
+    expect(building.resting, 'the surface said it was working before anything was asked of it').toBe('auto');
+    expect(building.flag, 'building the horizon row does not say what the surface is doing').toBe(
+      'building the horizon row',
+    );
+    expect(
+      building.working,
+      'the pointer does not say the surface is working while the row is built, which is the ' +
+        'longest wait this surface has',
+    ).toBe('progress');
+    await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 120_000 });
+    await expect(page.getByTestId('one-view')).toHaveAttribute('data-working', 'false');
+
+    const scoring = await press('score-row');
+    expect(scoring.flag, 'scoring every horizon does not say what the surface is doing').toBe(
+      'scoring every horizon',
+    );
+    expect(scoring.working, 'the pointer does not say the surface is working while it scores').toBe(
+      'progress',
+    );
+    await expect(page.getByTestId('panel-score-24')).toContainText('persistence', { timeout: 120_000 });
+    await expect(page.getByTestId('one-view')).toHaveAttribute('data-working', 'false');
+
+    // The advance drives itself in chunks, so it is sampled between them rather than on one
+    // frame: every sample of it must say the same thing the other two said once.
+    const samples = await page.evaluate(async () => {
+      const surface = document.querySelector('[data-testid="one-view"]') as HTMLElement;
+      const read = (): { busy: boolean; says: string; cursor: string } => ({
+        busy: surface.dataset['working'] !== 'false',
+        says: surface.dataset['working'] ?? '(unset)',
+        cursor: getComputedStyle(surface).cursor,
+      });
+      const taken: { busy: boolean; says: string; cursor: string }[] = [];
+      (document.querySelector('[data-testid="advance"]') as HTMLButtonElement).click();
+      for (let i = 0; i < 400; i += 1) {
+        const state = read();
+        taken.push(state);
+        if (!state.busy && i > 0) break;
+        await new Promise((resolve) => { setTimeout(resolve, 0); });
+      }
+      return taken;
+    });
+    const busy = samples.filter((sample) => sample.busy);
+    expect(busy.length, 'no sample caught the advance in progress').toBeGreaterThan(0);
+    expect(
+      busy.filter((sample) => sample.cursor !== 'progress'),
+      'the pointer did not say the surface was working while it integrated',
+    ).toEqual([]);
+    expect(
+      busy.filter((sample) => sample.says !== 'integrating').map((sample) => sample.says),
+      'the surface said it was doing something other than integrating while it integrated',
+    ).toEqual([]);
+    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 60_000 });
+    await expect(page.getByTestId('one-view')).toHaveAttribute('data-working', 'false');
+  });
+
+  /**
+   * The control says how far it has got, and saying so moves nothing (the author's request;
+   * spec 018 FR-002).
+   *
+   * A progress line under the button would be a line in the pane whose content height **is**
+   * the declared floor. A relabel costs no line at all -- and costs nothing else either, which
+   * is the property measured here: the button reserves the width of its widest label up front,
+   * so the button, the control beside it and every pane in the dock have the same rectangle
+   * while it works as when it is idle.
+   *
+   * The defect this is written against is beat 018's own: the walkthrough offer changed its
+   * label from *Walk me through it* to *Close the walkthrough* and moved every pane in the
+   * dock by 11 px. A label that changes width is a layout that moves under the reader's
+   * pointer, and it is measured at the floor -- where the controls pane is narrowest and a
+   * wider button is a wrapped row -- and at the reference width.
+   */
+  test('relabels the advance control while it works, and reflows nothing', async ({ page }) => {
+    test.setTimeout(300_000);
+    await page.route(CONFIG_REQUEST, async (route) => {
+      const response = await route.fetch();
+      const config = JSON.parse(await response.text()) as { budget: { frameBudgetMs: number } };
+      config.budget.frameBudgetMs = 1_000_000;
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(config) });
+    });
+
+    for (const width of [FLOOR.width, REFERENCE.width]) {
+      await page.setViewportSize({ width, height: FLOOR.height });
+      await page.goto('/');
+      await page.evaluate(() => { window.localStorage.clear(); });
+      await page.reload();
+      await expect(page.getByTestId('pane-controls')).toBeVisible();
+
+      /* One advance first, and the resting layout measured after it. What is under test is
+         the relabel and nothing else, and the run's own figures arrive with the first advance
+         -- the step time in the status strip is *not yet measured* until then, and a strip
+         whose figures have just been filled in is a strip that changed for a reason that has
+         nothing to do with this control. So both snapshots are taken with the run in the same
+         state: advanced, its step time measured, its completion confirmed. */
+      await advanceThroughTheBudget(page);
+      await expect(page.getByTestId('surface-report')).toContainText('Integrated');
+
+      const run = await page.evaluate(async () => {
+        const boxes = (): string =>
+          JSON.stringify(
+            [
+              ...Array.from(document.querySelectorAll<HTMLElement>('[data-pane-id]')).map(
+                (pane) => [pane.dataset['paneId'], pane.getBoundingClientRect()] as const,
+              ),
+              ...['advance', 'new-run'].map(
+                (id) =>
+                  [
+                    id,
+                    (document.querySelector(`[data-testid="${id}"]`) as HTMLElement).getBoundingClientRect(),
+                  ] as const,
+              ),
+            ].map(([name, box]) => [name, box.x, box.y, box.width, box.height]),
+          );
+        const label = (): string =>
+          (document.querySelector('[data-testid="advance-label"]')?.textContent ?? '').trim();
+
+        const resting = { boxes: boxes(), label: label() };
+        const seen: { boxes: string; label: string }[] = [];
+        (document.querySelector('[data-testid="advance"]') as HTMLButtonElement).click();
+        for (let i = 0; i < 400; i += 1) {
+          const surface = document.querySelector('[data-testid="one-view"]');
+          seen.push({ boxes: boxes(), label: label() });
+          if (surface?.getAttribute('data-working') === 'false' && i > 0) break;
+          await new Promise((resolve) => { setTimeout(resolve, 0); });
+        }
+        return { resting, seen, after: { boxes: boxes(), label: label() } };
+      });
+
+      const relabelled = run.seen.filter((sample) => sample.label !== run.resting.label);
+      expect(
+        relabelled.length,
+        `at ${String(width)} px the control never said it was integrating, so there is no ` +
+          'relabel to measure',
+      ).toBeGreaterThan(0);
+      expect(
+        relabelled.filter((sample) => !/^Integrating \d+ of \d+$/.test(sample.label)).map((s) => s.label),
+        'the control said something other than how far it has got',
+      ).toEqual([]);
+      const moved: string[] = [];
+      for (const sample of run.seen) {
+        if (sample.boxes === run.resting.boxes) continue;
+        const was = JSON.parse(run.resting.boxes) as [string, number, number, number, number][];
+        const now = JSON.parse(sample.boxes) as [string, number, number, number, number][];
+        for (const [at, one] of now.entries()) {
+          const then = was[at];
+          if (then === undefined || JSON.stringify(one) === JSON.stringify(then)) continue;
+          moved.push(`"${sample.label}": ${one[0]} was ${JSON.stringify(then.slice(1))} and is ${JSON.stringify(one.slice(1))}`);
+        }
+      }
+      expect(
+        moved,
+        `at ${String(width)} px the relabel moved something: every pane's rectangle, the ` +
+          "control's own and its neighbour's are measured against the resting layout, and one " +
+          'of these samples differs from it',
+      ).toEqual([]);
+      expect(run.after.boxes, 'the layout did not come back to where it started').toBe(run.resting.boxes);
+      expect(run.after.label).toBe(run.resting.label);
+
+      console.log(
+        `    at ${String(width)} px the advance control is ` +
+          `${String(JSON.parse(run.resting.boxes).find((one: [string, number, number, number]) => one[0] === 'advance')[3])} px wide ` +
+          `saying "${run.resting.label}" and saying "${relabelled[0]?.label ?? ''}", across ` +
+          `${String(run.seen.length)} samples of one advance, and nothing else moved`,
+      );
+    }
+  });
+
+  /**
+   * Every other long control says how far it has got, and saying so moves nothing (the
+   * author's report: *"for the other buttons in that panel, there is no indication of
+   * progress -- which makes it difficult to engage with"*).
+   *
+   * ## What was missing
+   *
+   * The advance had the relabel, the disabled state and the confirmation. *Build the horizon
+   * row*, *Re-issue*, *Revert to the recorded case* and *Score every horizon against truth*
+   * had a busy **cursor** and nothing else -- and they are the operations that cost seconds.
+   * *Re-issue* had a `Re-issuing…` label it had never once shown, because the prop that turned
+   * it on was passed as the literal `false`.
+   *
+   * ## Why the count is real
+   *
+   * `forecastInChunks` and `scoreHorizonByHorizon` yield once per declared horizon, which is
+   * what those loops were always made of, so *3 of 8* is a position in the work rather than a
+   * number chosen to look like one. The **totals differ between presses** and that is the
+   * point: a first build computes the quay-side brief and an edit needs a baseline to be
+   * differenced against, so the denominator is asked of the work before it starts.
+   *
+   * ## What is measured
+   *
+   * The same property the advance's own relabel is held to, and against the same defect: this
+   * beat's walkthrough offer changed its label and moved **every pane in the dock by 11 px**.
+   * Each control reserves the width of the widest thing it can say, so the control, its
+   * neighbours and every pane have the same rectangle while it works as when it is idle. Only
+   * the samples taken **while the operation is running** are compared: the commit that ends
+   * one of these is the commit that puts the row, the scores or the edit on the surface, and
+   * the layout is allowed to change for that.
+   *
+   * At the floor, where the controls pane is narrowest and a wider button is a wrapped row,
+   * and at the reference width.
+   */
+  test('relabels every long control while it works, and reflows nothing', async ({ page }) => {
+    test.setTimeout(900_000);
+
+    /** Every pane, and every control in the pane the author was reading. */
+    const WATCHED = [
+      'advance',
+      'new-run',
+      'build-row',
+      'reissue',
+      'revert',
+      'bias-degrees',
+      'quality-control',
+      'score-row',
+      'toggle-difference',
+      'toggle-attribution',
+    ];
+
+    /**
+     * Press one control and read the surface between the chunks it yields on, from inside the
+     * page: each chunk blocks the main thread, so an assertion driven from the test process
+     * cannot ask a question while the work it is asking about is running.
+     */
+    const watch = async (
+      press: string,
+      labelId: string,
+    ): Promise<{
+      resting: { boxes: string; label: string };
+      seen: { boxes: string; label: string; working: string }[];
+    }> =>
+      page.evaluate(
+        async ({ press: id, labelId: label, watched }) => {
+          const boxes = (): string =>
+            JSON.stringify(
+              [
+                ...Array.from(document.querySelectorAll<HTMLElement>('[data-pane-id]')).map(
+                  (pane) => [`pane:${String(pane.dataset['paneId'])}`, pane] as const,
+                ),
+                ...watched.map(
+                  (name) =>
+                    [name, document.querySelector<HTMLElement>(`[data-testid="${name}"]`)] as const,
+                ),
+              ]
+                .filter((entry): entry is readonly [string, HTMLElement] => entry[1] !== null)
+                .map(([name, element]) => {
+                  const box = element.getBoundingClientRect();
+                  return [name, box.x, box.y, box.width, box.height];
+                }),
+            );
+          const says = (): string =>
+            (document.querySelector(`[data-testid="${label}"]`)?.textContent ?? '').trim();
+          const state = (): string =>
+            document.querySelector('[data-testid="one-view"]')?.getAttribute('data-working') ??
+            '(unset)';
+
+          const resting = { boxes: boxes(), label: says() };
+          const seen: { boxes: string; label: string; working: string }[] = [];
+          (document.querySelector(`[data-testid="${id}"]`) as HTMLButtonElement).click();
+          for (let at = 0; at < 2000; at += 1) {
+            seen.push({ boxes: boxes(), label: says(), working: state() });
+            if (state() === 'false' && at > 0) break;
+            await new Promise((resolve) => { setTimeout(resolve, 0); });
+          }
+          return { resting, seen };
+        },
+        { press, labelId, watched: WATCHED },
+      );
+
+    /** What the relabel said, and whether anything moved while it was saying it. */
+    const judge = (
+      run: { resting: { boxes: string; label: string }; seen: { boxes: string; label: string; working: string }[] },
+      where: string,
+      control: string,
+      pattern: RegExp,
+      says: string,
+    ): string => {
+      const working = run.seen.filter((sample) => sample.working !== 'false');
+      expect(
+        working.length,
+        `at ${where} ${control} never reported itself running, so there is nothing to measure`,
+      ).toBeGreaterThan(0);
+      expect(
+        working.map((sample) => sample.working).filter((one) => one !== says),
+        `at ${where} the surface said it was doing something other than ${says}`,
+      ).toEqual([]);
+      const relabelled = working.filter((sample) => sample.label !== run.resting.label);
+      expect(
+        relabelled.length,
+        `at ${where} ${control} never said how far it had got, so there is no relabel to measure`,
+      ).toBeGreaterThan(0);
+      expect(
+        relabelled.filter((sample) => !pattern.test(sample.label)).map((one) => one.label),
+        `at ${where} ${control} said something other than how far it has got`,
+      ).toEqual([]);
+
+      /* It counts **up**. A label that says *0 of 8* for the whole of the work is a label with
+         a denominator and no position in it, which is the thing that would make this a
+         decoration rather than a readout. The totals are read off the labels rather than
+         written down here: they differ between presses because the work does, and a test that
+         asserted one of them would be asserting the arithmetic rather than the count. */
+      const counted = [...new Set(relabelled.map((sample) => sample.label))];
+      expect(
+        counted.length,
+        `at ${where} ${control} said "${counted[0] ?? ''}" for the whole of the work, so its ` +
+          'count is a denominator rather than a position in it',
+      ).toBeGreaterThan(1);
+      const reached = counted.map((label) => Number(/(\d+) of (\d+)/.exec(label)?.[1] ?? -1));
+      expect(
+        Math.max(...reached),
+        `at ${where} ${control} never got past ${String(Math.max(...reached))}`,
+      ).toBeGreaterThan(Math.min(...reached));
+
+      const was = new Map(
+        (JSON.parse(run.resting.boxes) as [string, number, number, number, number][]).map(
+          (one) => [one[0], one] as const,
+        ),
+      );
+      const moved: string[] = [];
+      for (const sample of working) {
+        if (sample.boxes === run.resting.boxes) continue;
+        for (const now of JSON.parse(sample.boxes) as [string, number, number, number, number][]) {
+          const then = was.get(now[0]);
+          // A control that was not on the surface when the resting layout was measured cannot
+          // have moved from it; what it must not do is move anything else, which is asked of
+          // every other row here.
+          if (then === undefined || JSON.stringify(now) === JSON.stringify(then)) continue;
+          moved.push(
+            `"${sample.label}": ${now[0]} was ${JSON.stringify(then.slice(1))} and is ${JSON.stringify(now.slice(1))}`,
+          );
+        }
+      }
+      expect(
+        moved,
+        `at ${where} the relabel of ${control} moved something: every pane's rectangle and ` +
+          "every control in the pane the author was reading are measured against the resting " +
+          'layout, and one of these samples differs from it',
+      ).toEqual([]);
+
+      const width = (JSON.parse(run.resting.boxes) as [string, number, number, number, number][])
+        .find((one) => one[0] === control)?.[3];
+      return (
+        `    at ${where} ${control} is ${String(width)} px wide saying ` +
+        `"${run.resting.label}" and saying ${counted.map((one) => `"${one}"`).join(', ')}, ` +
+        `across ${String(working.length)} samples of one run, and nothing else moved`
+      );
+    };
+
+    const measured: string[] = [];
+    for (const width of [FLOOR.width, REFERENCE.width]) {
+      const where = `${String(width)} px`;
+      await page.setViewportSize({ width, height: FLOOR.height });
+      await page.goto('/');
+      await page.evaluate(() => { window.localStorage.clear(); });
+      await page.reload();
+      await expect(page.getByTestId('pane-controls')).toBeVisible();
+
+      // 1. Building the row. Eight chunks: the issue analysis, six declared horizons and the
+      //    quay-side brief, which is computed on this press and never again.
+      measured.push(
+        judge(
+          await watch('build-row', 'build-row-label'),
+          where,
+          'build-row',
+          /^Building \d+ of \d+$/,
+          'building the horizon row',
+        ),
+      );
+      await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 180_000 });
+
+      // 2. Re-issuing it at another instant. Seven: the brief is already held.
+      await page.getByTestId('issue-time').focus();
+      await page.keyboard.press('ArrowRight');
+      await expect(page.getByTestId('reissue')).toBeEnabled();
+      measured.push(
+        judge(
+          await watch('reissue', 'reissue-label'),
+          where,
+          'reissue',
+          /^Re-issuing \d+ of \d+$/,
+          're-issuing the row',
+        ),
+      );
+
+      /* 3. An edit, so that there is something to revert. Applying one is a long operation of
+            its own, and its control is a number field: a count inside a control's *name* is a
+            readout in the wrong place, so the field is disabled while it runs and the status
+            strip is what says how far along. That is asserted here, because it is the one long
+            control on this surface whose own label cannot carry the count.
+
+            It is also the press with the most work behind it -- an edited forecast and the
+            baseline it is differenced against, fourteen chunks -- which is why the totals are
+            read off the strip rather than written down. */
+      await page.getByTestId('bias-degrees').fill('1.5');
+      const applying = await page.evaluate(async () => {
+        const seen: { says: string; working: string; disabled: boolean }[] = [];
+        for (let at = 0; at < 2000; at += 1) {
+          const surface = document.querySelector('[data-testid="one-view"]');
+          seen.push({
+            says: (document.querySelector('[data-testid="surface-report"]')?.textContent ?? '')
+              .replace(/\s+/g, ' ')
+              .trim(),
+            working: surface?.getAttribute('data-working') ?? '(unset)',
+            disabled:
+              (document.querySelector('[data-testid="bias-degrees"]') as HTMLInputElement | null)
+                ?.disabled ?? false,
+          });
+          if (surface?.getAttribute('data-working') === 'false' && at > 0) break;
+          await new Promise((resolve) => { setTimeout(resolve, 0); });
+        }
+        return seen;
+      });
+      const applyingWhile = applying.filter((one) => one.working === 'applying an edit');
+      expect(
+        applyingWhile.length,
+        `at ${where} applying an edit never reported itself running`,
+      ).toBeGreaterThan(0);
+      expect(
+        applyingWhile.filter((one) => !one.disabled).length,
+        `at ${where} the bias field could be typed into while the edit it asked for was running`,
+      ).toBe(0);
+      const applyingSaid = [
+        ...new Set(applyingWhile.map((one) => one.says).filter((one) => one !== '')),
+      ];
+      expect(
+        applyingSaid.filter((one) => !/^Applying the edit: \d+ of \d+$/.test(one)),
+        `at ${where} the strip said something other than how far the edit had got`,
+      ).toEqual([]);
+      expect(
+        applyingSaid.length,
+        `at ${where} the strip did not count the edit up: it said "${applyingSaid[0] ?? ''}"`,
+      ).toBeGreaterThan(1);
+      measured.push(
+        `    at ${where} applying an edit says ${applyingSaid
+          .map((one) => `"${one}"`)
+          .join(', ')} in the status strip, with its own field disabled throughout`,
+      );
+
+      await expect(page.getByTestId('one-view')).toHaveAttribute('data-working', 'false', {
+        timeout: 180_000,
+      });
+      await expect(page.getByTestId('revert')).toBeEnabled();
+      measured.push(
+        judge(
+          await watch('revert', 'revert-label'),
+          where,
+          'revert',
+          /^Reverting \d+ of \d+$/,
+          'reverting to the recorded case',
+        ),
+      );
+
+      // 4. Scoring. Six: one per declared horizon, which is what the scorer walks.
+      await expect(page.getByTestId('score-row')).toBeEnabled();
+      measured.push(
+        judge(
+          await watch('score-row', 'score-row-label'),
+          where,
+          'score-row',
+          /^Scoring \d+ of \d+$/,
+          'scoring every horizon',
+        ),
+      );
+    }
+    for (const line of measured) console.log(line);
+  });
+
+  /**
+   * The advance is confirmed where a reader can see it, and says nothing before there is one
+   * (the author's request: *"plus some verification that it's complete"*).
+   *
+   * **In the status strip, and the measurement chose it.** Beside the control that asked for
+   * it, a visible line is 30 px of the controls pane -- two wrapped lines in a pane 220 px
+   * wide -- and the pane's own content height at the floor's width *is* the declared floor, so
+   * it would take the floor past the 768 px of the shortest window in the matrix. In the strip
+   * it costs **nothing**: the strip's height at the floor is set by FR-58's statement, and the
+   * readouts beside it have 22 px of room under them. That is what the last assertion here
+   * measures -- the strip is the same height with the confirmation on screen as without it, so
+   * it cannot be the two-row strip that cost the floor 44 px before beat 018 cut it to one.
+   *
+   * And it is on screen whatever pane has focus, which the run controls are not: a reader may
+   * close the controls pane, and the strip is not a pane.
+   */
+  test('confirms a completed advance in the strip, and says nothing until there is one', async ({
+    page,
+  }) => {
+    test.setTimeout(300_000);
+    await page.setViewportSize(FLOOR);
+    await page.goto('/');
+    await page.evaluate(() => { window.localStorage.clear(); });
+    await page.reload();
+    await expect(page.getByTestId('pane-controls')).toBeVisible();
+
+    const report = page.getByTestId('surface-report');
+    await expect(report).toHaveAttribute('role', 'status');
+    // FR-048 is answered by the control, which says what it will do before it does it: a strip
+    // that always says something about an advance nobody asked for is noise.
+    await expect(report).toHaveText('');
+    const before = await page.getByTestId('pane-status').evaluate((strip) => ({
+      strip: strip.getBoundingClientRect().height,
+      report: (strip.querySelector('[data-testid="surface-report"]') as HTMLElement).getBoundingClientRect()
+        .height,
+    }));
+    expect(
+      before.report,
+      'the line is not held before there is anything to say, so the strip will grow under a ' +
+        'reader at the moment their advance finishes',
+    ).toBeGreaterThan(0);
+
+    const advance = await advanceTheControlOffers(page);
+    const start = Date.parse((await page.getByTestId('instant').textContent()) ?? '');
+    await page.getByTestId('advance').click();
+    await expect(page.getByTestId('over-budget')).toBeVisible({ timeout: 60_000 });
+    await page.getByTestId('proceed-anyway').click();
+    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 60_000 });
+
+    // Painted, and inside the strip rather than in the accessibility tree alone.
+    await expect(report).toBeVisible();
+    await expect(page.getByTestId('pane-status').getByTestId('surface-report')).toHaveCount(1);
+    await expect(report).toContainText(String(advance.steps));
+    await expect(report).toContainText(advance.instantAfter(start, 1));
+    // Principle V: both figures carry their kind, and the kind is the one the run's own
+    // figures carry, because these are the run's own figures.
+    await expect(report.locator('.figure.computed')).toHaveCount(2);
+
+    const after = await page.getByTestId('pane-status').evaluate((strip) => ({
+      strip: strip.getBoundingClientRect().height,
+      report: (strip.querySelector('[data-testid="surface-report"]') as HTMLElement).getBoundingClientRect()
+        .height,
+      scrolls: strip.scrollWidth > strip.clientWidth + 1,
+    }));
+    expect(after.report, 'the confirmation is not drawn').toBeGreaterThan(0);
+    expect(after.report, 'the confirmation is more than the line the strip held for it').toBe(before.report);
+    expect(after.scrolls, 'the confirmation runs past the strip').toBe(false);
+    expect(
+      after.strip,
+      `the confirmation made the status strip ${String(after.strip)} px tall against ` +
+        `${String(before.strip)} px without it. At the floor's width the strip is one row, and ` +
+        'a second row is 44 px of a height budget the floor spends exactly (spec 018, "the ' +
+        'floor, re-measured")',
+    ).toBe(before.strip);
+    console.log(
+      `    at the declared floor the strip is ${String(before.strip)} px tall without the ` +
+        `confirmation and ${String(after.strip)} px with it, of which the confirmation is ` +
+        `${String(Math.round(after.report))} px`,
+    );
   });
 
   /**
@@ -91,12 +1134,25 @@ test.describe('the shell', () => {
     // not a picture drawn to illustrate it -- to the site's architecture page, where
     // tests/docs/disposition.test.ts holds them. What is left here is the label of the
     // picture, and the picture is still the analysis's own field.
-    await expect(panel).toContainText('the analysis’s own gain');
+    /* Beat 018 made this a figure label of five words. What the field *is* -- the analysis's
+       own gain, exported from the same arithmetic that produced the answer -- was already on
+       the site (docs/narrative-disposition.json, `analysed-field`), and the label names the
+       quantity rather than arguing for it. */
+    await expect(panel).toContainText('Weight carried by observations');
     await openDisclosure(page, 'run-panel');
-    await expect(page.getByTestId('initialisation')).toContainText('layer thickness');
-    // FR-003: the criterion is on the surface, not only in a test.
-    await expect(page.getByTestId('stability')).toContainText('the declared criterion admits');
-    await expect(page.getByTestId('outcrops')).toContainText('counted rather than swallowed');
+    /* Beat 018 made the run's provenance a term list: the same figures, each on its own line
+       with its own label, rather than four sentences that joined them with connective prose.
+       So the claim is asserted against the labels the list uses. */
+    const run = page.getByTestId('run-panel');
+    await expect(page.getByTestId('initialisation')).toContainText(/^\d{4}-/);
+    await expect(run).toContainText('Layer thickness');
+    // FR-003: the criterion is on the surface, not only in a test. The declared timestep, the
+    // largest stable one and the scheme's linear boundary are three figures a reader compares.
+    await expect(page.getByTestId('stability')).toContainText(' s');
+    await expect(run).toContainText('Largest stable step');
+    await expect(run).toContainText('Linear boundary');
+    await expect(run).toContainText('Outcrop clamps');
+    await expect(page.getByTestId('outcrops')).toContainText(' m');
 
     // FR-010: one rendering module. The surface says which path it took rather than leaving
     // a reader to assume, and this test records it.
@@ -131,12 +1187,19 @@ test.describe('the shell', () => {
     const before = await page.getByTestId('root-seed').textContent();
 
     await page.getByTestId('new-run').click();
-    await expect(page.getByTestId('recorded-case')).toContainText('not the recorded case');
+    /* Beat 018 says this in the status strip as a figure and a label rather than as a
+       sentence: the seed that was drawn, and that it was drawn for this visit -- which is
+       what "no longer the recorded case" meant. */
+    await expect(page.getByTestId('recorded-case')).toContainText('drawn for this visit');
     const after = await page.getByTestId('root-seed').textContent();
     expect(after).toMatch(/^[0-9a-f]{16}$/);
     expect(after).not.toBe(before);
-    await expect(page.getByTestId('manifest')).toContainText('"recordedCase": false');
+    /* The run's own figures and the manifest are two tabs of one pane, and the layout manager
+       takes an unselected tab's contents out of the document rather than hiding them. So each
+       figure is read from the tab that holds it, which is what a reader does. */
     await expect(page.getByTestId('steps')).toHaveText('0');
+    await openDisclosure(page, 'manifest-panel');
+    await expect(page.getByTestId('manifest')).toContainText('"recordedCase": false');
   });
 
   test('shows the validation error and provisions no run when configuration is invalid', async ({
@@ -164,20 +1227,25 @@ test.describe('the shell', () => {
 
   test('states what the run is scored against, and what that record costs', async ({ page }) => {
     await page.goto('/');
+    await openDisclosure(page, 'truth-panel');
     const panel = page.getByTestId('truth-panel');
     await expect(panel).toBeVisible();
     await expect(page.getByTestId('truth-source')).toContainText('HYCOM');
 
     // Review R-2: the truth is coarser than the model, and the surface says so rather than
     // leaving a reader to assume otherwise.
-    await expect(panel).toContainText('coarser than the model grid');
+    // Beat 018 turned the sentence into a term list, so what is asserted is the figures: the
+    // truth's own resolution and how many model cells it is worth. The claim -- that the
+    // surface says the truth is coarser rather than leaving a reader to assume otherwise --
+    // is the same one, made by two figures instead of by a clause.
+    await expect(panel).toContainText('the model grid');
 
     // The figures the domain choice changes are still here: the instants and their spacing,
     // the profiles and how many carry a flag, and the climatology's overlap with this run's
     // period. What each of them *means* went to the site's data-model page in beat 014, and
     // tests/docs/disposition.test.ts holds the words against that page.
-    await expect(page.getByTestId('truth-instants')).toContainText('hours apart');
-    await expect(page.getByTestId('observation-count')).toContainText('carry a flag');
+    await expect(page.getByTestId('truth-instants')).toContainText('h apart');
+    await expect(page.getByTestId('observation-count')).toContainText('flagged');
     await expect(page.getByTestId('climatology-overlap')).toContainText('days');
     await expect(page.getByTestId('climatology-overlap').locator('.figure.computed')).toHaveCount(1);
   });
@@ -220,7 +1288,7 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
 
     const row = await page
-      .getByTestId('centre-stack')
+      .getByTestId('pane-horizons')
       .evaluate((node) => ({ scrollWidth: node.scrollWidth, clientWidth: node.clientWidth }));
     expect(
       row.scrollWidth,
@@ -229,7 +1297,7 @@ test.describe('the shell', () => {
 
     // Every panel is inside the container it is drawn in, and no narrower than the declared
     // minimum -- "visible" is not the same as "present and one pixel wide".
-    const container = await page.getByTestId('centre-stack').boundingBox();
+    const container = await page.getByTestId('pane-horizons').boundingBox();
     for (const lead of [0, 12, 24, 48, 72, 96]) {
       const box = await page.getByTestId(`panel-${String(lead)}`).boundingBox();
       expect(box, `panel ${String(lead)} has no box`).not.toBeNull();
@@ -321,12 +1389,19 @@ test.describe('the shell', () => {
     await page.getByTestId('build-row').click();
     await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
     await page.getByTestId('toggle-attribution').click();
-    await expect(page.getByTestId('row-legend')).toContainText('second channel');
+
+    /* The legend labels the two marks and no longer argues about them. Beat 018 took the two
+       clauses that explained -- *a second channel, so the field reads without colour* and
+       *this run analyses once, at ...; attribution becomes per horizon when the forecast
+       cycles* -- into `centre/attribution`'s help (FR-007, and the disposition record's
+       `attribution-hatch-channel` and `attribution-scope`). What the first of them claimed is
+       measured below rather than asserted in a legend. */
+    await expect(page.getByTestId('row-legend')).toContainText('hatched where observations lead');
 
     // Six identical attribution fields would imply six analyses. The run makes one, and the
-    // legend says so rather than leaving the row to suggest otherwise.
+    // legend says which it is -- as a label of six words -- rather than leaving the row to
+    // suggest otherwise.
     await expect(page.getByTestId('attribution-scope')).toContainText('the same field on every panel');
-    await expect(page.getByTestId('attribution-scope')).toContainText('analyses once');
 
     const contrast = await page
       .getByTestId('panel-field-24')
@@ -442,8 +1517,15 @@ test.describe('the shell', () => {
     expect(counts[0]).toBe(declaredTotal);
     expect(counts[0]).toBeGreaterThan(0);
 
-    // FR-24 on the surface: the rejected are counted where the drawing is, not in a log.
-    await expect(summary).toContainText('drawn as flagged, never omitted');
+    /*
+     * FR-24 on the surface: the rejected are counted where the drawing is, not in a log.
+     *
+     * Beat 018 made the summary a readout, so what is asserted is the readout: the count is
+     * labelled FLAGGED and is a figure. The clause that used to be beside it -- "drawn as
+     * flagged, never omitted" -- was an explanation of a property the surface has, and it is
+     * this panel's own help (docs/narrative-disposition.json, `footprint-summary`).
+     */
+    await expect(summary).toContainText('Flagged');
     expect(Number(await page.getByTestId('footprint-flagged-count').textContent())).toBeGreaterThan(0);
 
     // FR-002: the recorded case has marks on both sides of the initialisation instant, and
@@ -526,7 +1608,10 @@ test.describe('the shell', () => {
     // the floor with an indicator, not silently truncated.
     expect(await elevation.locator('[data-continues-below="true"]').count()).toBeGreaterThan(0);
 
-    await expect(elevation).toContainText('latitude is not shown');
+    /* Beat 018 moved this sentence to `help:centre/horizon-panel`, under *enlarging a panel*
+       (docs/narrative-disposition.json, `needle-elevation-caption`). What is left under the
+       figure is its label: the floor depth, and that the needles hang to the depths reached. */
+    await expect(elevation).toContainText('at the depths reached');
   });
 
   test('shows a profile beside the model derived profile, with every level kind labelled', async ({
@@ -651,15 +1736,23 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('panel-score-24')).toContainText('persistence', { timeout: 60_000 });
     expect(await page.getByTestId('panel-brief-24').textContent()).toBe(brief);
 
-    // FR-008: two curves once two issue times have been scored, labelled by issue instant.
-    await openDisclosure(page, 'skill-disclosure');
+    /*
+     * FR-008: two curves once two issue times have been scored, labelled by issue instant.
+     *
+     * Beat 013 put the curve behind a disclosure and said why: at the width six panels take,
+     * drawn open across the scores region it would have been either a small picture in a band
+     * of empty paper or six hundred pixels tall. Beat 018 gave it the horizons pane's own
+     * width and the height the row does not use -- which is the band beat 013 left empty -- so
+     * it is drawn rather than disclosed, and this reads it where it is.
+     */
     const curves = page.getByTestId('skill-inset').locator('[data-issue-instant]');
     expect(await curves.count()).toBe(2);
     // Exactly one of them is the row's current issue time; the other is the one it was.
     expect(await page.getByTestId('skill-inset').locator('[data-current="true"]').count()).toBe(1);
-    await expect(page.getByTestId('skill-inset')).toContainText('Skill against persistence');
+    await expect(page.getByTestId('skill-curve')).toContainText('Skill by lead time');
 
     // FR-009: the manifest records the issue time, so a rerun is reproducible from it.
+    await openDisclosure(page, 'manifest-panel');
     await expect(page.getByTestId('manifest')).toContainText('"issueInstantMs"');
   });
 
@@ -674,7 +1767,14 @@ test.describe('the shell', () => {
     const withheld = Number(await page.getByTestId('observations-withheld').textContent());
     expect(available).toBeGreaterThan(0);
     expect(withheld).toBeGreaterThan(0);
-    await expect(page.getByTestId('issue-observations')).toContainText('had not happened yet');
+    /*
+     * Beat 018 made this a readout: SEEN and NOT YET with the figures under them, where it had
+     * been "The analysis at this issue instant saw 2 observations; 29 had not happened yet" --
+     * a sentence a reader had to read to find two numbers, and one the author's review named.
+     * The claim is the same: the surface says how much the issue instant leaves out, and it
+     * says it as two labelled figures.
+     */
+    await expect(page.getByTestId('issue-observations')).toContainText('Not yet');
   });
 
   test('says whether it shows the recorded case or an edit, and comes back in one action', async ({
@@ -697,10 +1797,19 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('run-status')).toContainText('edit', { timeout: 120_000 });
     await expect(page.getByTestId('edit-list')).toContainText('biased by 1.50');
 
-    await page.getByTestId('quality-control').uncheck();
+    /* Clicked rather than `uncheck()`ed, and the difference is what beat 018's seventh pass
+       changed. Applying an edit rebuilds the row, which takes seconds, so it now runs on the
+       frame after the one that says the surface is working (`working.ts`) -- and until that
+       work commits, the control shows the state of the run, which is the state before the
+       edit. `uncheck()` asserts the box has flipped by the time the click returns, which is
+       an assertion that the edit was applied before the surface said it was working.
+       FR-034's claim is about what the run is, and it is asserted below on the edit list and
+       the box together. */
+    await page.getByTestId('quality-control').click();
     await expect(page.getByTestId('edit-list')).toContainText('quality control off', {
       timeout: 120_000,
     });
+    await expect(page.getByTestId('quality-control')).not.toBeChecked();
 
     // FR-010: edits compose in order, and one action removes all of them.
     await page.getByTestId('revert').click();
@@ -835,16 +1944,20 @@ test.describe('the shell', () => {
 
     // Make it a run worth replaying: a drawn seed, some integration and an edit.
     await page.getByTestId('new-run').click();
-    await page.getByTestId('advance').click();
-    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 30_000 });
+    await advanceThroughTheBudget(page);
     await page.getByTestId('build-row').click();
     await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
     await page.getByTestId('bias-degrees').fill('1.5');
     await page.getByTestId('bias-degrees').blur();
     await expect(page.getByTestId('run-status')).toContainText('edit', { timeout: 120_000 });
 
+    await openDisclosure(page, 'manifest-panel');
     const manifest = (await page.getByTestId('manifest').textContent()) ?? '';
-    const digest = await page.getByTestId('results-digest').textContent();
+    // The digest from the status strip, which is outside the dock and therefore always there.
+    const digest = await page.getByTestId('status-digest').textContent();
+    // The seed from the tab that holds it: an unselected tab's contents are not in the
+    // document, so a figure is read where it is drawn.
+    await openDisclosure(page, 'run-panel');
     const seed = await page.getByTestId('root-seed').textContent();
     expect(manifest).toContain('"biasDegC": 1.5');
     // FR-002: the manifest carries no field, score or observation data.
@@ -858,15 +1971,20 @@ test.describe('the shell', () => {
     await other.goto(page.url());
     await openDisclosure(other, 'manifest-panel');
     await expect(other.getByTestId('manifest')).toContainText('rootSeed');
+    /* Beat 018's fifth pass folded the paste box into a disclosure: at the declared floor the
+       tab is 220 px wide and the two figures, the document and this form together want 463 px
+       of a 311 px pane, so the tab arrives showing the manifest and opens the box on request. */
+    await openDisclosure(other, 'manifest-import');
     await other.getByTestId('manifest-input').fill(manifest);
     await other.getByTestId('import-manifest').click();
 
-    await expect(other.getByTestId('root-seed')).toHaveText(seed ?? '', { timeout: 60_000 });
-    await expect(other.getByTestId('results-digest')).toHaveText(digest ?? '');
+    await expect(other.getByTestId('status-digest')).toHaveText(digest ?? '', { timeout: 60_000 });
     await expect(other.getByTestId('import-failure')).toHaveCount(0);
     // The edits came back with it: a manifest that recorded them and a replay that ignored
     // them would reproduce a run nobody made.
     await expect(other.getByTestId('manifest')).toContainText('"biasDegC": 1.5');
+    await openDisclosure(other, 'run-panel');
+    await expect(other.getByTestId('root-seed')).toHaveText(seed ?? '');
     await fresh.close();
   });
 
@@ -877,6 +1995,7 @@ test.describe('the shell', () => {
     await openDisclosure(page, 'manifest-panel');
     const manifest = (await page.getByTestId('manifest').textContent()) ?? '';
     const parsed = JSON.parse(manifest) as Record<string, unknown>;
+    await openDisclosure(page, 'manifest-import');
 
     // FR-003 and FR-005. A digest difference is a refusal: the declared values differ, and a
     // run made against other values is a different run.
@@ -911,6 +2030,7 @@ test.describe('the shell', () => {
       string,
       unknown
     >;
+    await openDisclosure(page, 'manifest-import');
     // FR-005: a reader holding a manifest from last month is better served by a warned replay
     // than by a door, and the warning says identity is no longer promised.
     await page.getByTestId('manifest-input').fill(
@@ -922,9 +2042,22 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('import-failure')).toHaveCount(0);
   });
 
-  test('writes nothing to storage, in a whole visit', async ({ page }) => {
-    // NFR-02 and FR-006. Measured rather than promised: the storage APIs are replaced before
-    // the page loads and any write is recorded.
+  /**
+   * NFR-02, restated where beat 018 moved the line.
+   *
+   * This test used to read "writes nothing to storage, in a whole visit", and that was the
+   * whole claim while the surface had no furniture to remember. A workspace does: a reader
+   * who drags a sash and comes back to a different arrangement has been given a layout
+   * manager and denied the only thing one is for.
+   *
+   * So the claim is narrowed to exactly what the constitution's amended Principle IX allows,
+   * and every part of it is still measured rather than promised. **One** key is written, and
+   * it is the key configuration declares. No cookie, no IndexedDB, no session storage, and
+   * nothing in the address. What is inside that key -- geometry and pane identity, and no
+   * seed, no manifest and nothing the run computed -- is `tests/shell/workspace.spec.ts` and
+   * `tests/harness/workspace-state.test.ts`, which fail by name on a planted `seed`.
+   */
+  test('writes one key and no other storage, in a whole visit', async ({ page }) => {
     await page.addInitScript(() => {
       const writes: string[] = [];
       (window as unknown as { __writes: string[] }).__writes = writes;
@@ -953,14 +2086,26 @@ test.describe('the shell', () => {
     });
 
     await page.goto('/');
-    await page.getByTestId('advance').click();
-    await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 30_000 });
+    await advanceThroughTheBudget(page);
     await page.getByTestId('build-row').click();
     await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
     await page.getByTestId('new-run').click();
 
     const writes = await page.evaluate(() => (window as unknown as { __writes: string[] }).__writes);
-    expect(writes, `these were written: ${writes.join(', ')}`).toEqual([]);
+    const allowed = `localStorage.${declared.presentation.workspace.storageKey}`;
+    expect(
+      [...new Set(writes)].filter((write) => write !== allowed),
+      `these were written besides ${allowed}: ${writes.join(', ')}`,
+    ).toEqual([]);
+    // And the one that is allowed is a preference about furniture, held under the key
+    // configuration declares -- not a key a component chose for itself.
+    /* Read through `key(i)` rather than `Object.keys`, which would also return the `setItem`
+       this test assigned to the storage object a moment ago -- the instrument reporting on
+       itself. */
+    const keys = await page.evaluate(() =>
+      Array.from({ length: window.localStorage.length }, (_, at) => window.localStorage.key(at)),
+    );
+    expect(keys).toEqual([declared.presentation.workspace.storageKey]);
     expect(page.url()).not.toContain('#');
     expect(page.url()).not.toContain('?');
   });
@@ -999,7 +2144,9 @@ test.describe('the shell', () => {
     page,
   }) => {
     await page.goto('/');
-    await expect(page.getByTestId('scores-empty')).toContainText('in that panel’s own column');
+    /* Beat 013's scores region had an empty state saying where the figures would appear.
+       There is no scores region now -- each panel carries its own figures -- so the claim is
+       made where it is now true: the panel itself says it has not been scored. */
     await page.getByTestId('build-row').click();
     await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId('panel-score-24')).toContainText('not scored yet');
@@ -1008,15 +2155,18 @@ test.describe('the shell', () => {
     const score = page.getByTestId('panel-score-24');
     await expect(score).toContainText('persistence', { timeout: 60_000 });
 
-    // FR-021: the convention, and the words. Whichever way this run falls, the statement
-    // says it in the SRD's terms rather than in kinder ones.
-    await expect(score.locator('.statement')).toContainText(/than (persistence|climatology)/);
+    // The readout, which is what a reader glances at: two skills against two references.
     await expect(score).toContainText('vs persistence');
     await expect(score).toContainText('vs climatology');
 
-    // FR-022: a score without provenance is an assertion.
+    // FR-022: a score without provenance is an assertion. FR-021's words are the first thing
+    // inside it since beat 018 -- the convention, and whichever way this run falls, said in
+    // the SRD's terms rather than in kinder ones.
     await openDisclosure(page, 'panel-provenance-24');
     const provenance = page.getByTestId('panel-provenance-24');
+    await expect(provenance.locator('.statement')).toContainText(
+      /than (persistence|climatology)/,
+    );
     await expect(provenance).toContainText('root-mean-square');
     await expect(provenance).toContainText('sponge margin');
     await expect(provenance).toContainText('declining to resolve below');
@@ -1041,22 +2191,33 @@ test.describe('the shell', () => {
     await page.goto('/');
     const field = page.getByTestId('analysed-field');
     await expect(field).toBeVisible();
-    await expect(field).toContainText('the analysis’s own gain');
+    /* Beat 018 made this a figure label of five words; what the field *is* -- the analysis's
+       own gain, exported from the same arithmetic that produced the answer -- is the panel's
+       own help, and docs/narrative-disposition.json records both moves. */
+    await expect(field).toContainText('Weight carried by observations');
 
-    // Review R-7: the radius is a property of the declared length scale, and the surface
-    // says so rather than letting a reader take it for a property of the ocean.
-    await expect(page.getByTestId('influence-radius')).toContainText('not of the ocean');
+    /* Review R-7: the radius is a property of the declared length scale and not of the ocean.
+       The clause that argued that was already the panel's help word for word, so the surface
+       says the figure with its unit and its kind and stops repeating the argument. */
+    const radius = page.getByTestId('influence-radius');
+    await expect(radius).toContainText(' km');
+    await expect(radius.locator('.figure.declared')).toHaveCount(1);
 
-    // FR-048: with nothing selected the region says what could be there and how to put it
-    // there, rather than rendering blank.
-    await expect(page.getByTestId('detail-empty')).toContainText('attribution breakdown');
+    /* FR-048: with nothing selected the pane says what could be there and how to put it
+       there, rather than rendering blank. Beat 018 said the same thing in nine words rather
+       than in a paragraph: what is missing, and the one act that supplies it. */
+    await expect(page.getByTestId('detail-empty')).toContainText('Nothing selected');
+    await expect(page.getByTestId('detail-empty')).toContainText('Click a cell');
     await expect(page.getByTestId('cell-breakdown')).toHaveCount(0);
 
     // FR-18: a breakdown is an instrument of a selected cell. It says which cell, and the
     // sentence explaining why it is never a per-panel summary is owed to this region's help.
     await page.getByTestId('attribution-view-overlay').click({ position: { x: 200, y: 200 } });
     const breakdown = page.getByTestId('cell-breakdown');
-    await expect(breakdown).toContainText('as the analysis weighted it');
+    /* The clause that said the shares are the analysis's own weighting is a help entry now
+       (docs/narrative-disposition.json). What is asserted here is what it named: the cell,
+       and the three shares as computed figures. */
+    await expect(breakdown).toContainText('Cell');
     await expect(breakdown).toContainText('observations');
     await expect(breakdown).toContainText('climatology');
     // Principle V: every share the breakdown prints is a computed figure and is drawn as one.
@@ -1074,12 +2235,17 @@ test.describe('the shell', () => {
     page,
   }) => {
     await page.goto('/');
+    // The instruments are a tab of the provenance pane now, so the panel is reached before it
+    // can be asserted about.
+    await openDisclosure(page, 'instruments-panel');
     const panel = page.getByTestId('instruments-panel');
     await expect(panel).toBeVisible();
-    await openDisclosure(page, 'instruments-panel');
-    await expect(page.getByTestId('surface-count')).toContainText('representativeness');
-    await expect(page.getByTestId('drop-count')).toContainText('levels each');
-    await expect(page.getByTestId('argo-state')).toContainText(/external|not assimilated/);
+    await expect(page.getByTestId('surface-count')).toContainText(' h');
+    await expect(panel).toContainText('representativeness');
+    await expect(page.getByTestId('drop-count')).toContainText('levels');
+    /* Whether Argo was assimilated, said either way: this configuration assimilates, and the
+       readout is the count and the state rather than a sentence about the state. */
+    await expect(page.getByTestId('argo-state')).toContainText(/assimilated/);
     await expect(page.getByTestId('flag-summary')).toBeVisible();
     await expect(page.getByTestId('interface-estimates').locator('.figure.computed').first()).toBeVisible();
 
@@ -1147,7 +2313,11 @@ test.describe('the shell', () => {
     await openDisclosure(page, 'run-panel');
     const run = page.getByTestId('run-panel');
     await expect(run).toContainText('100 × 100');
-    await expect(page.getByTestId('stability')).toContainText('2013-09');
+    /* Beat 018 gave the epoch a line of its own rather than a clause inside the timestep's
+       sentence. The claim -- that the epoch is on the surface and attributed -- is the same,
+       and it is now made by a labelled figure instead of by a sentence. */
+    await expect(run).toContainText('Epoch');
+    await expect(run).toContainText('2013-09');
     await expect(run.locator('.figure.declared').first()).toBeVisible();
   });
 });

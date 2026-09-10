@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { HELP_ENTRIES } from '../../src/harness/help/index.js';
+import { WALKTHROUGH_STEPS } from '../../src/harness/Walkthrough.js';
 import { REGIONS } from '../../src/harness/panels.js';
 import { declaredConfiguration } from '../support/config.js';
 import {
@@ -32,7 +33,13 @@ import {
  *    matter -- which is what beat 014 wrote this test forward to. Until beat 016 these were
  *    reported as owed and counted; they are paid now, and the same eight paragraphs are held
  *    against the sentences a reader actually opens;
- * 3. every **stays** entry names one of the four regions of beat 013;
+ * 3. every **stays** entry names one of the panes of the workspace;
+ * 3a. every **walkthrough** entry resolves to a step of the walkthrough that, **rendered**,
+ *    contains the matter -- beat 018's addition, and the first time this record has had to
+ *    describe matter moving *back*. Beat 016 sent two of the retired tour's steps to the site
+ *    on the reasoning that a workspace-level explanation had nowhere to live; beat 018's docked
+ *    workspace gave it somewhere, and a record that could only say where matter went once would
+ *    have quietly stopped describing the tree;
  * 4. every **dropped** entry carries a reason, because a paragraph that vanished without one is
  *    indistinguishable from a paragraph somebody lost.
  *
@@ -88,6 +95,16 @@ export function sectionUnder(markdown: string, heading: string): string | null {
  * says. A source that mentioned the words in a comment would satisfy a text search and teach a
  * reader nothing.
  */
+export function renderedWalkthrough(): ReadonlyMap<string, string> {
+  const { config } = declaredConfiguration();
+  return new Map(
+    WALKTHROUGH_STEPS.map((step, at) => [
+      `step-${String(at + 1)}`,
+      `${step.title} ${renderToStaticMarkup(step.body(config) as never)}`,
+    ]),
+  );
+}
+
 export function renderedHelp(): ReadonlyMap<string, string> {
   const { config } = declaredConfiguration();
   return new Map(
@@ -109,6 +126,7 @@ export function failuresOf(
   record: DispositionRecord,
   root: string,
   help: ReadonlyMap<string, string> = renderedHelp(),
+  walkthrough: ReadonlyMap<string, string> = renderedWalkthrough(),
 ): string[] {
   const failures: string[] = [];
   const say = (entry: Entry, what: string): void => {
@@ -118,7 +136,25 @@ export function failuresOf(
   for (const entry of record.entries) {
     if (entry.kind === 'stays') {
       if (!(REGIONS as readonly string[]).includes(entry.destination)) {
-        say(entry, `stays, but ${entry.destination} is not one of the four regions`);
+        say(entry, `stays, but ${entry.destination} is not one of the panes`);
+      }
+      continue;
+    }
+
+    if (entry.kind === 'walkthrough') {
+      if (!entry.destination.startsWith('walkthrough:')) {
+        say(entry, 'came back to the walkthrough, but its destination names no step');
+        continue;
+      }
+      const step = entry.destination.slice('walkthrough:'.length);
+      const rendered = walkthrough.get(step);
+      if (rendered === undefined) {
+        say(entry, `names a walkthrough step that does not exist: ${step}`);
+        continue;
+      }
+      const wanted = entry.restatedAs ?? entry.matter;
+      if (!normalise(rendered).includes(normalise(wanted))) {
+        say(entry, `the walkthrough's ${step} does not say it`);
       }
       continue;
     }
@@ -191,7 +227,7 @@ describe('the disposition record', () => {
     expect(new Set(ids).size, 'two entries share an id').toBe(ids.length);
     for (const entry of record.entries) {
       expect(entry.matter.trim(), `${entry.id} carries no matter`).not.toBe('');
-      expect(['stays', 'site', 'help', 'dropped']).toContain(entry.kind);
+      expect(['stays', 'site', 'help', 'dropped', 'walkthrough']).toContain(entry.kind);
     }
   });
 
@@ -200,7 +236,7 @@ describe('the disposition record', () => {
    * what every panel declaration names; the record's own list has to be that list, or the
    * record is describing a surface that has moved on without it.
    */
-  it('names the regions the layout draws, and not a copy of them', () => {
+  it('names the panes the layout draws, and not a copy of them', () => {
     expect(record.regions).toEqual([...REGIONS]);
   });
 
@@ -208,7 +244,7 @@ describe('the disposition record', () => {
     expect(failuresOf(record, ROOT)).toEqual([]);
   });
 
-  it('names one of the four regions for everything that stayed', () => {
+  it('names one of the panes for everything that stayed', () => {
     for (const entry of record.entries.filter((one) => one.kind === 'stays')) {
       expect(REGIONS, `${entry.id} stays in ${entry.destination}`).toContain(
         entry.destination as (typeof REGIONS)[number],
@@ -226,8 +262,12 @@ describe('the disposition record', () => {
    * `failuresOf` renders the entry and looks for the words.
    */
   it('has paid the eight explanations beat 014 owed, at the panels it named', () => {
+    /* The eight beat 014 owed, and not every help entry that has ever existed: beat 018 sent
+       one more paragraph to a panel's help, and it says which beat built it. Filtering on that
+       is what keeps this assertion about the debt it was written to hold. */
     const owed = record.entries.filter(
-      (entry) => entry.kind === 'help' && entry.step === undefined,
+      (entry) =>
+        entry.kind === 'help' && entry.step === undefined && entry.builtIn === '016-panel-help',
     );
     expect(record.helpBuiltIn).toBe('016-panel-help');
     expect(
@@ -267,7 +307,10 @@ describe('the disposition record', () => {
       1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
     ]);
     for (const entry of steps) {
-      expect(['site', 'help', 'dropped'], `${entry.id} went nowhere nameable`).toContain(entry.kind);
+      expect(
+        ['site', 'help', 'dropped', 'walkthrough'],
+        `${entry.id} went nowhere nameable`,
+      ).toContain(entry.kind);
     }
     console.log(
       `    ${String(steps.length)} pieces of the walkthrough, across ${String(numbers.length)} ` +
@@ -277,11 +320,44 @@ describe('the disposition record', () => {
     );
   });
 
-  it('does not leave the walkthrough on the surface it retired', () => {
+  /**
+   * Beat 016 asserted here that `src/harness/Walkthrough.tsx` did not exist. That test's claim
+   * was that **panel help does not sequence** (FR-052) and its subject was the file; beat 018
+   * brings the file back for a different question — *what am I looking at*, which panel help
+   * cannot answer — so the claim is asserted where it belongs, against panel help, and the
+   * walkthrough is held to its own requirement instead: it is offered, and every step names a
+   * pane that exists.
+   */
+  it('brings the walkthrough back for the workspace, and holds it to naming a pane', () => {
     expect(
       existsSync(join(ROOT, 'src/harness/Walkthrough.tsx')),
-      'the walkthrough component is still in the tree; FR-052 says panel-level and not a tour',
-    ).toBe(false);
+      'the walkthrough is gone again, and three entries in the record point at its steps',
+    ).toBe(true);
+    expect(record.walkthroughReclaimedIn).toBe('018-operational-layout');
+    for (const step of WALKTHROUGH_STEPS) {
+      expect(REGIONS, `a walkthrough step names the pane "${step.pane}"`).toContain(step.pane);
+    }
+  });
+
+  /** Every reclaimed piece says where it came back from, or it is not a reclamation. */
+  it('says where every reclaimed piece was before it came back', () => {
+    const back = record.entries.filter((entry) => entry.kind === 'walkthrough');
+    expect(back.length, 'nothing was reclaimed, and beat 018 said it reclaimed two steps').toBeGreaterThanOrEqual(2);
+    for (const entry of back) {
+      expect(entry.reclaimedIn, `${entry.id} does not say which beat reclaimed it`).toBe(
+        '018-operational-layout',
+      );
+    }
+    const moved = back.filter((entry) => entry.previously !== undefined);
+    expect(
+      moved.length,
+      'no reclaimed entry says where it was, so the record cannot show matter moving back',
+    ).toBeGreaterThanOrEqual(2);
+    console.log(
+      `    ${String(back.length)} pieces came back to the walkthrough in beat ` +
+        `${record.walkthroughReclaimedIn}: ` +
+        back.map((entry) => `${entry.id} (${entry.previously ?? 'new'})`).join(', '),
+    );
   });
 });
 
@@ -327,10 +403,29 @@ describe('a planted entry, so that the check is watched failing', () => {
     expect(failures[0]).toContain('does not contain the matter');
   });
 
-  it('fails when something that stays names a region that does not exist', () => {
+  it('fails when something that stays names a pane that does not exist', () => {
     const failures = failuresOf(plant({ kind: 'stays', destination: 'sidebar' }), ROOT);
     expect(failures).toHaveLength(1);
-    expect(failures[0]).toContain('not one of the four regions');
+    expect(failures[0]).toContain('not one of the panes');
+  });
+
+  /** Beat 018's own two, so the walkthrough branch is watched failing as well. */
+  it('fails when a reclaimed piece names a walkthrough step that does not exist', () => {
+    const failures = failuresOf(
+      plant({ kind: 'walkthrough', destination: 'walkthrough:step-99' }),
+      ROOT,
+    );
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toContain('does not exist');
+  });
+
+  it('fails when the step exists and does not say it', () => {
+    const failures = failuresOf(
+      plant({ kind: 'walkthrough', destination: 'walkthrough:step-1' }),
+      ROOT,
+    );
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toContain('does not say it');
   });
 
   /** Beat 016's own three, so that the help and dropped branches are watched failing too. */

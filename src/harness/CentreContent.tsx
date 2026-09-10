@@ -9,9 +9,11 @@ import { useEffect, useRef } from 'react';
  * below the viewport floor -- and two states that must never disagree are a rule somebody has
  * to remember. A discriminated union makes it a property of the type instead.
  *
- * The fallback below the floor (FR-043) is not a second arrangement of the same idea: it is
- * this union, **forced** to `enlarged`. `resolveCentreContent` is where that forcing happens,
- * and it is the one place either presentation asks what the centre holds.
+ * The answer below the width the row needs (FR-043) is not a second arrangement of the same
+ * idea: it is this union, **forced** to `enlarged`. `resolveCentreContent` is where that
+ * forcing happens, and it is the one place anything asks what the centre holds. Beat 018's
+ * second pass made that true of the whole surface rather than only of the centre: there is one
+ * workspace at every viewport now, and this union is the only thing a narrow window changes.
  */
 
 export type CentreContent =
@@ -52,9 +54,9 @@ export interface ResolvedCentreContent {
  * horizon, which is exactly what G-05 exists to catch. So the enlargement is dropped, the
  * centre returns to the row, and the caller is handed the horizon it lost so it can say so.
  *
- * **Below the floor there is no row.** `mustEnlarge` is the FR-043 fallback, and it selects an
- * enlargement rather than laying out a single panel of its own: the first declared horizon
- * where nothing has been chosen. One implementation, at any viewport.
+ * **Narrower than the row needs, there is no row.** `mustEnlarge` is the FR-043 answer, and it
+ * selects an enlargement rather than laying out a single panel of its own: the first declared
+ * horizon where nothing has been chosen. One implementation, at any viewport.
  */
 export function resolveCentreContent(
   requested: CentreContent,

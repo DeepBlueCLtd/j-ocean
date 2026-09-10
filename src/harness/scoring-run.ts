@@ -56,7 +56,27 @@ export interface ScoringRun {
   readonly refusal: string | null;
 }
 
-export function scoreEveryHorizon(inputs: ScoringRunInputs): ScoringRun {
+/**
+ * How many chunks `scoreHorizonByHorizon` yields for this configuration: one per declared
+ * horizon. Asked before the work starts, so a control that says *3 of 6* has its total up front.
+ */
+export function scoringChunkCount(config: Configuration): number {
+  return config.horizons.leadHours.length;
+}
+
+/**
+ * Scoring the row, one horizon at a time (the author's report, beat 018's ninth pass).
+ *
+ * The count a control shows while it works has to be a real position in the work, and this
+ * function already walked the horizons in order. So it yields between them, and the six the
+ * loop was always made of are the six the control counts. Nothing else changes: the order of
+ * operations is the order the callback had, the `try` still wraps the whole walk so that a
+ * horizon outside the record stops it with what was scored before it, and the `yield`s sit
+ * between statements. G-07 digests every one of these scores.
+ */
+export function* scoreHorizonByHorizon(
+  inputs: ScoringRunInputs,
+): Generator<void, ScoringRun, void> {
   const { config, domain, forecast, truth, climatology, brief } = inputs;
   const horizons = [...config.horizons.leadHours].sort((a, b) => a - b);
 
@@ -79,6 +99,7 @@ export function scoreEveryHorizon(inputs: ScoringRunInputs): ScoringRun {
       if (panel === undefined || panel.field === null) {
         next.set(leadHours, null);
         briefNext.set(leadHours, null);
+        yield;
         continue;
       }
       const validInstantMs = panel.validInstantMs;
@@ -108,6 +129,9 @@ export function scoreEveryHorizon(inputs: ScoringRunInputs): ScoringRun {
         leadHours,
         score({ ...common, forecast: brief.field, initial: brief.field }),
       );
+      // One chunk per declared horizon, including the ones with nothing to score: what the
+      // control counts is horizons walked, and a horizon that refused was still walked.
+      yield;
     }
   } catch (error) {
     // The spec's second edge case: a horizon whose valid instant is outside the record. The
@@ -134,4 +158,18 @@ export function scoreEveryHorizon(inputs: ScoringRunInputs): ScoringRun {
     points,
     refusal: null,
   };
+}
+
+/**
+ * Every horizon scored, with nothing between them.
+ *
+ * The driver over the chunks, and what every caller that is not watching it happen asks: gate
+ * G-07 among them, which is the whole reason this function was lifted out of the component in
+ * beat 013. One path, whether or not somebody is counting it.
+ */
+export function scoreEveryHorizon(inputs: ScoringRunInputs): ScoringRun {
+  const chunks = scoreHorizonByHorizon(inputs);
+  let chunk = chunks.next();
+  while (!chunk.done) chunk = chunks.next();
+  return chunk.value;
 }

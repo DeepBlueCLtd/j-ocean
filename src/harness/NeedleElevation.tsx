@@ -111,10 +111,17 @@ export function NeedleElevation(props: NeedleElevationProps) {
         }}
       >
         {/* The depth labels are HTML, not SVG text: the drawing stretches its horizontal axis
-            to the panel's width, which would stretch lettering with it. */}
+            to the panel's width, which would stretch lettering with it.
+
+            Placed as a **share of the drawing's height** rather than at `yOf(depth)` pixels
+            (spec 018 T072). The drawing is stretched on both axes now -- it takes the height
+            the aside gives it, which in a 1 210 px pane is not the 170 px the viewBox is
+            written in -- and a label placed at a pixel offset into a box of another height
+            names a depth the line beside it is not at. `preserveAspectRatio="none"` makes the
+            mapping linear, so a share is exact. */}
         <div className="elevation-axis" aria-hidden="true">
           {gridDepths.map((depth) => (
-            <span key={depth} style={{ top: `${String(yOf(depth))}px` }}>
+            <span key={depth} style={{ top: `${String((yOf(depth) / heightPx) * 100)}%` }}>
               {depth.toFixed(0)}
             </span>
           ))}
@@ -218,10 +225,13 @@ export function NeedleElevation(props: NeedleElevationProps) {
         })}
       </svg>
       </div>
-      <figcaption>
-        Depth to <span className="declared">{floor.toFixed(0)} m</span>, needles at the depths
-        actually reached. A side elevation: longitude is the horizontal axis and latitude is
-        not shown, so position is read from the field this is drawn beside.
+      {/* A label, not an explanation (spec 018 FR-007). What a side elevation is -- that
+          longitude is the horizontal axis, that latitude is not shown, and that position is
+          therefore read from the field beside it -- is this panel's own help, under
+          *enlarging a panel*, and docs/narrative-disposition.json records the move. */}
+      <figcaption className="figure-label">
+        Depth to <span className="figure declared">{floor.toFixed(0)} m</span>, at the depths
+        reached
       </figcaption>
     </figure>
   );

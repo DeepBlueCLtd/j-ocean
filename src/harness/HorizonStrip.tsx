@@ -10,8 +10,8 @@ import type { Score } from '../scoring/scorer.js';
  * There is exactly one of these. Beat 013 built a strip for the answer below the viewport
  * floor, because a no-scroll requirement without a smallest-case answer is an unfinished one;
  * this beat makes that strip **the one way the centre holds a single panel**, at any viewport,
- * and the below-floor presentation an instance of it rather than a parallel arrangement. Two
- * things that draw a strip are two things that drift.
+ * and the answer below the width the row needs an instance of it rather than a parallel
+ * arrangement. Two things that draw a strip are two things that drift.
  *
  * **Why the figures are here.** A strip of thumbnails alone reduces the comparison to a
  * picture. FR-050 says comparison across horizons is the lesson -- it is why the row was
@@ -162,7 +162,8 @@ export function HorizonStrip(props: HorizonStripProps) {
       ref={container}
       className="horizon-strip"
       data-testid="horizon-strip"
-      data-scrolls="true"
+      data-scrolls="list"
+      data-list="every declared horizon, as controls"
       role="toolbar"
       aria-label="Every declared horizon, and what each was worth"
       aria-orientation="horizontal"

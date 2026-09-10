@@ -5,6 +5,7 @@ import { ENTRY as controlsEditing } from './controls-editing-what-was-measured.j
 import { ENTRY as controlsIssueTime } from './controls-issue-time.js';
 import { ENTRY as controlsManifest } from './controls-manifest.js';
 import { ENTRY as controlsObservationFootprint } from './controls-observation-footprint.js';
+import { ENTRY as controlsRun } from './controls-run.js';
 import { ENTRY as detailAttributionBreakdown } from './detail-attribution-breakdown.js';
 import { ENTRY as scores } from './scores.js';
 import type { Explanation, HelpEntry } from './entry.js';
@@ -18,6 +19,7 @@ import type { Explanation, HelpEntry } from './entry.js';
  * no explanation, and an explanation naming a feature or a panel that does not exist.
  */
 export const HELP_ENTRIES: readonly HelpEntry[] = [
+  controlsRun,
   controlsIssueTime,
   controlsEditing,
   controlsObservationFootprint,

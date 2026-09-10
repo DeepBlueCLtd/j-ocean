@@ -46,10 +46,9 @@ async function regionBoxes(page: Page): Promise<Record<string, Rect | null>> {
       return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
     };
     return {
-      controls: box('region-controls'),
-      centre: box('region-centre'),
-      scores: box('region-scores'),
-      detail: box('region-detail'),
+      controls: box('pane-controls'),
+      centre: box('pane-horizons'),
+      detail: box('pane-selection'),
     };
   });
 }
@@ -137,7 +136,7 @@ test.describe('enlargement is a selection', () => {
   }) => {
     test.setTimeout(240_000);
     const fit = async (state: string): Promise<void> => {
-      const measured = await page.getByTestId('region-centre').evaluate((element) => ({
+      const measured = await page.getByTestId('pane-horizons').evaluate((element) => ({
         clientHeight: element.clientHeight,
         scrollHeight: element.scrollHeight,
       }));
@@ -245,7 +244,11 @@ test.describe('enlargement is a selection', () => {
     // Scoring costs about a second and happens when it is asked for. If enlarging had asked,
     // the control would say it had been done.
     await expect(page.getByTestId('score-row')).toBeEnabled();
-    await expect(page.getByTestId('score-row')).toHaveText('Score every horizon against truth');
+    // The label the reader is shown, and not the two the control reserves its width against
+    // (see `HorizonRow.tsx`, the row's display controls).
+    await expect(page.getByTestId('score-row-label')).toHaveText(
+      'Score every horizon against truth',
+    );
     await expect(page.getByTestId('panel-score-24')).toContainText('not scored yet');
 
     // A swap does not ask either.
@@ -272,7 +275,12 @@ test.describe('enlargement is a selection', () => {
     await page.getByTestId('build-row').click();
     await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 60_000 });
 
-    await expect(page.getByTestId('row-fidelity')).toContainText('the field alone');
+    /* FR-051's requirement is that the row *states* it is showing the field alone, and beat
+       018 made that a label of eight words: the account of what the enlarged panel adds is
+       `centre/horizon-row`'s help (`docs/narrative-disposition.json`, `row-fidelity`), because
+       spec 018 FR-007 keeps explanation off the surface. The claim is unchanged and its
+       wording is not. */
+    await expect(page.getByTestId('row-fidelity')).toContainText('field only');
     await expect(page.getByTestId('row-fidelity')).toContainText('enlarged panel');
     await expect(page.getByTestId('needle-elevation')).toHaveCount(0);
 
@@ -477,8 +485,11 @@ test.describe('enlargement is a selection', () => {
     const weight = (box: { x: number; y: number; width: number; height: number }): number => {
       const y = box.y - (stripBox?.y ?? 0) + box.height / 2;
       const left = box.x - (stripBox?.x ?? 0);
+      /* From one pixel inside the slot's left edge, which is where the luminance probe above
+         reads: at the edge itself the sample can land on the paper outside the border, and a
+         scan that starts there measures the gap rather than the border. */
       let inked = 0;
-      while (inked < 12 && pixels.luminanceAt(left + inked, y) < 230) inked += 1;
+      while (inked < 12 && pixels.luminanceAt(left + 1 + inked, y) < 230) inked += 1;
       return inked;
     };
     const markedWeight = weight(markedBox as { x: number; y: number; width: number; height: number });

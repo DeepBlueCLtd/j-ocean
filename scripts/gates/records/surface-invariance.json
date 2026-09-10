@@ -5,7 +5,7 @@
   "quantities": [
     {
       "name": "configuration",
-      "digest": "ddeef5c75a5308381347d9defff8392163c9bb98defaa556be800717d1e9043b",
+      "digest": "e9ae23f94555bbef89a1668cdffb5b7e44a6d8c321a8fb0b11ecc76e83e3338d",
       "producer": "digestOf in src/config/digest.ts, over the configuration loadConfiguration validated."
     },
     {
@@ -91,7 +91,7 @@
     {
       "name": "state.afterDeclaredAdvance.bytes",
       "digest": "218b7dcedfabd5563e79be2fdcb9a41a5551202f318951329ee9f18773e9cb04",
-      "producer": "stateBytes in src/model/grid.ts, after Run.advance took the 180 steps of the shell's twelve-hour advance."
+      "producer": "stateBytes in src/model/grid.ts, after beginAdvance in src/harness/advance.ts drove the run the 180 steps of the shell's twelve-hour advance, in chunks of 72."
     },
     {
       "name": "runScore.lead-24h",

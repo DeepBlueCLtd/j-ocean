@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Score } from '../scoring/scorer.js';
-import { PanelHelp } from './Help.js';
+import { PanelCorner, PanelHelp } from './Help.js';
 import { FieldView, type Marker } from './FieldView.js';
 import type { Footprint } from './footprint.js';
 import { NeedleElevation } from './NeedleElevation.js';
@@ -25,12 +25,14 @@ import { NeedleElevation } from './NeedleElevation.js';
  * the room to drag a waypoint -- rather than a bigger picture alone. Which of the six is
  * enlarged is a selection made in the strip above it and never a mode: see `HorizonStrip.tsx`.
  *
- * Beat 013 divides the panel between two regions. The picture and its labels stay in the
- * centre; the skill figures are `PanelScore`, drawn in the scores region in this panel's own
- * column (FR-046). They are still one object to a reader, because the column is shared
- * structurally rather than by arrangement -- see `Regions.tsx`. And what a mark says is no
- * longer drawn under the panel that drew it: it fills the detail region (FR-047), so that
- * reading a profile never changes the shape of the surface.
+ * Beat 013 divided the panel between two regions: the picture and its labels in the centre,
+ * the skill figures in a scores region beneath, aligned to the panel's column by CSS
+ * `subgrid`. Beat 018 puts them back **inside the panel**, and that is a correction rather
+ * than a compromise. FR-046 asks that a score be read *as one object with its picture*; a
+ * score inside its panel is that, and it does not depend on two containers agreeing about
+ * geometry -- which independent panes cannot do anyway. What a mark says is still not drawn
+ * under the panel that drew it: it fills the selection pane (FR-047), so that reading a
+ * profile never changes the shape of the surface.
  */
 
 export interface PanelProps {
@@ -69,6 +71,15 @@ export interface PanelProps {
   readonly needleOffsetPx: number;
   readonly levelTickLimit: number;
   readonly enlarged: boolean;
+  /**
+   * This panel's own skill figures (FR-046), drawn beneath its own picture.
+   *
+   * Null before anything has been scored, which the panel says rather than leaving blank: a
+   * blank space and "nobody has asked yet" are not the same fact (Principle VI).
+   */
+  readonly score: Score | null;
+  /** FR-026: the frozen quay-side brief, scored at the same instant, as the baseline. */
+  readonly briefScore: Score | null;
   /**
    * What the drawing means, drawn beside the enlarged panel's field and nowhere else. In the
    * row it is one legend for six panels, under the row; enlarged there is one panel, so it
@@ -192,7 +203,7 @@ export function Panel(props: PanelProps) {
 
         </div>
 
-        <div className={enlarged ? 'enlarged-aside' : undefined} data-scrolls={enlarged ? 'true' : undefined}>
+        <div className={enlarged ? 'enlarged-aside' : undefined}>
           {/* FR-003: the depth axis exists only where there is room for it to be read. At row
               width a drop is a depth-coded glyph; enlarged, it is a needle at its own depths. */}
           {enlarged && (
@@ -236,6 +247,14 @@ export function Panel(props: PanelProps) {
           {enlarged && props.legend}
         </div>
       </div>
+
+      {/* FR-046: beneath its own picture, in its own panel, and never in a table elsewhere. */}
+      <PanelScore
+        leadHours={leadHours}
+        score={props.score}
+        briefScore={props.briefScore}
+        refusal={props.refusal}
+      />
     </article>
   );
 }
@@ -250,14 +269,28 @@ export interface PanelScoreProps {
 }
 
 /**
- * One panel's skill figures, in that panel's own column (FR-046).
+ * One panel's skill figures, inside that panel (FR-046).
  *
  * Not a table: a table asks a reader to match a row label against a panel heading at every
  * glance, and six figures read left to right draw the decay without a curve being plotted.
- * The statement is the scorer's own words, printed verbatim -- FR-021 says a model that is
- * not earning its compute is told so in those words, and the surface does not get to phrase
- * it more kindly. It wraps in its column and is never truncated: a truncated provenance is a
- * figure without its provenance (Principle V).
+ *
+ * **The scorer's own words are still here, and are one disclosure away.** FR-021 says a model
+ * that is not earning its compute is told so in those words, and the surface does not get to
+ * phrase it more kindly; Principle VI says a losing score has to be visible. Both hold, and
+ * spec 018 FR-008 and US4 say where each of them holds:
+ *
+ *  - **the loss is visible as a figure.** `vs persistence` and `vs climatology` are the
+ *    readout, and a negative one is printed as it computes -- there is no state of this panel
+ *    in which a reader has to open anything to find out that the model lost.
+ *  - **the scorer's statement is behind *Where this figure came from*,** first, verbatim and
+ *    unsoftened. It was drawn above the figures until beat 018, which put a two-line sentence
+ *    -- *better than persistence by 0.0 per cent; worse than climatology by 208.8 per cent* --
+ *    over the very figures that say the same thing, and made a reader read a sentence to find
+ *    two numbers already beneath it. That is the readout-written-as-prose the author's review
+ *    named, and moving it changes nothing about what it says: the string is the scorer's, not
+ *    this component's, and it is rendered whole.
+ *
+ * Fewer sentences on the surface; not less provenance, and not a softer verdict.
  */
 export function PanelScore(props: PanelScoreProps) {
   const { leadHours, score } = props;
@@ -266,21 +299,33 @@ export function PanelScore(props: PanelScoreProps) {
 
   return (
     <div className="score-cell panel-score" data-testid={`panel-score-${String(leadHours)}`}>
-      <p className="score-lead">
-        <span className="declared">+{leadHours} h</span>
-      </p>
+      {/*
+        The scores panel has no heading line of its own inside a horizon panel -- the panel's
+        own head names the horizon -- so its help control is placed in the corner by the
+        stylesheet rather than in the flow (FR-053, and G-08 holds the pairing).
+        
+        It carries the lead time as its **instance**, for the reason `centre/horizon-panel`
+        does: six panels drawing one declaration are six panels, and a key they shared would
+        mean pressing one control opened six cards over six panels.
+      */}
+      <PanelCorner panel="scores" instance={String(leadHours)} />
       {props.refusal !== null ? (
         <span className="unmeasured">no score: this panel has no forecast</span>
       ) : score === null ? (
         <span className="unmeasured">not scored yet</span>
       ) : (
         <>
-          <p className="statement">{score.statement}</p>
           <dl className="panel-labels">
+            {/* The readout, and where Principle VI is kept: a losing score is a negative
+                figure in the panel, printed as it computes, with nothing to open first. */}
             <dt>vs persistence</dt>
-            <dd className="computed">{skill(score.skillAgainstPersistence)}</dd>
+            <dd className="computed" data-testid={`panel-skill-persistence-${String(leadHours)}`}>
+              {skill(score.skillAgainstPersistence)}
+            </dd>
             <dt>vs climatology</dt>
-            <dd className="computed">{skill(score.skillAgainstClimatology)}</dd>
+            <dd className="computed" data-testid={`panel-skill-climatology-${String(leadHours)}`}>
+              {skill(score.skillAgainstClimatology)}
+            </dd>
             {/* FR-026: the departure brief, the baseline everything else is watched
                 against. Persistence from the quay side, never refreshed -- correct at
                 issue and losing to the world on its own. */}
@@ -293,8 +338,12 @@ export function PanelScore(props: PanelScoreProps) {
             <dt>this forecast</dt>
             <dd className="computed">{score.forecastError.value.toFixed(1)} m</dd>
           </dl>
-          <details data-testid={`panel-provenance-${String(leadHours)}`}>
+          <details className="provenance" data-testid={`panel-provenance-${String(leadHours)}`}>
             <summary>Where this figure came from</summary>
+            {/* The scorer's own sentence, first and whole. Byte for byte what the scorer
+                produced -- `score.statement` is not reassembled, reworded or truncated here --
+                which is what FR-021 and Principle VI ask of the surface that prints it. */}
+            <p className="statement">{score.statement}</p>
             <p>
               {score.provenance.metric}, over {score.provenance.regionLabel} (
               <span className="computed">{score.provenance.cellsScored.value}</span> cells),

@@ -1,17 +1,19 @@
 {
-  "record": "Where every piece of narrative that was on the application page went (SRD-v2 FR-42 and §7; spec 014 FR-002, spec 016 FR-007). One entry per piece of matter: where it was, the words themselves, what kind of matter it is, and where it went. Beat 014 emptied the page; beat 016 built the panel help those entries were owed to and retired the walkthrough, so every one of its steps has an entry here too. The words are carried here rather than only in a diff, because “we tidied the page” and “we deleted the explanation” look identical from the outside. Held by tests/docs/disposition.test.ts; §7 of j-ocean-ui-srd.md and docs/site/disposition.md are generated from it by scripts/docs/build-disposition.ts.",
-  "beat": "016-panel-help",
+  "record": "Where every piece of narrative that was on the application page went (SRD-v2 FR-42 and §7; spec 014 FR-002, spec 016 FR-007). One entry per piece of matter: where it was, the words themselves, what kind of matter it is, and where it went. Beat 014 emptied the page; beat 016 built the panel help those entries were owed to and retired the walkthrough, so every one of its steps has an entry here too. The words are carried here rather than only in a diff, because “we tidied the page” and “we deleted the explanation” look identical from the outside. Beat 018 made the surface a workspace, moved every panel between panes, turned the readouts that had been written as sentences back into readouts, and brought the walkthrough back with two of its steps. Held by tests/docs/disposition.test.ts; §7 of j-ocean-ui-srd.md and docs/site/disposition.md are generated from it by scripts/docs/build-disposition.ts.",
+  "beat": "018-operational-layout",
   "kinds": {
-    "stays": "The reader drives it, or reads a live figure from it. It stays, compacted, in the region that owns it, and the destination is one of the four regions of beat 013.",
+    "stays": "The reader drives it, or reads a live figure from it. It stays, in the pane that owns it, and the destination is one of the panes of the workspace. Beat 018 turned several of these from sentences into readouts: the matter is the same and the form is not, and the note on each says so.",
     "site": "It states no live figure at all. It goes to a section of a page under docs/site/, and the test holds that section against these words.",
     "help": "It explains a panel that stays. It goes to that panel's help entry, and the test renders that entry and holds the words against it. Beat 016 built these.",
-    "dropped": "It said something the surface now says better, or says for itself. It is not carried anywhere, and the reason is recorded here rather than left to be inferred from its absence."
+    "dropped": "It said something the surface now says better, or says for itself. It is not carried anywhere, and the reason is recorded here rather than left to be inferred from its absence.",
+    "walkthrough": "It explains the workspace rather than any one panel. It goes to a step of the walkthrough, and the test renders that step and holds the words against it. Beat 016 retired the walkthrough and sent these elsewhere; beat 018's docked workspace raises the question panel help cannot answer, so they came back."
   },
   "regions": [
     "controls",
-    "centre",
-    "scores",
-    "detail"
+    "horizons",
+    "selection",
+    "provenance",
+    "status"
   ],
   "entries": [
     {
@@ -19,43 +21,43 @@
       "wasAt": "The head of the controls region, outside its scroller",
       "fromBeat": "001",
       "kind": "stays",
-      "destination": "controls",
+      "destination": "status",
       "matter": "j-ocean is not an operational forecast system. Its numerics are real but reduced, its domain small, and its claims are about relative skill between references it computes itself, scored against a truth record it did not author.",
-      "note": "FR-003, FR-058 and SRD-v1 FR-02. It is not narrative and it does not move: it is the one sentence the application owes a reader who arrived without context, and it is visible without interaction."
+      "note": "FR-003, FR-058 and SRD-v1 FR-02. It is not narrative and it does not move: it is the one sentence the application owes a reader who arrived without context. Beat 018 puts it in the status strip, which is deliberately not a pane -- it cannot be closed, tabbed behind anything or dragged into a corner, so there is no arrangement in which the statement is not on screen."
     },
     {
       "id": "recorded-case",
       "wasAt": "The run controls",
       "fromBeat": "001",
       "kind": "stays",
-      "destination": "controls",
+      "destination": "status",
       "matter": "Which run this is: the recorded case under its declared label, or a run whose seed was drawn for this visit.",
-      "note": "SRD-v1 FR-34. A live statement of what is on screen, not an explanation of it. The declared label now carries its declared typography (Principle V)."
+      "note": "Beat 018 made it a readout. It had been a sentence -- \"This is the recorded case: the declared seed, unchanged\" -- and it is now a label and a declared figure in the status strip, beside the step time and the digest, where a reader glances rather than reads."
     },
     {
       "id": "step-time",
       "wasAt": "The run controls",
       "fromBeat": "001",
       "kind": "stays",
-      "destination": "controls",
+      "destination": "status",
       "matter": "The measured step time as host time, against the declared frame budget.",
-      "note": "NFR-04. Two live figures and their comparison."
+      "note": "Beat 018 made it a readout in the status strip: a label, a host-time figure, and whether it is within or over the declared budget, which is a declared figure of its own."
     },
     {
       "id": "run-provenance",
       "wasAt": "The controls region, the disclosure headed The run",
       "fromBeat": "001",
       "kind": "stays",
-      "destination": "controls",
+      "destination": "provenance",
       "matter": "The root seed, the domain and its computed cell size, the declared timestep against the stability the criterion admits, the steps taken, the instant the run is valid at, what it was initialised from, the excluded sponge margin and the outcrop clamps.",
-      "note": "Every line is a live figure. The disclosure stays; the sentences that explained rather than stated have left it."
+      "note": "Beat 018 made this a tab rather than a disclosure, and a term list rather than sentences: \"Timestep 900 s from the epoch, inside the 275.0 s the declared criterion admits\" was five figures joined by connective prose, and it is now five lines of a list. Every figure is the same figure."
     },
     {
       "id": "declared-figures",
       "wasAt": "The controls region, the disclosure headed What has been declared",
       "fromBeat": "001",
       "kind": "stays",
-      "destination": "controls",
+      "destination": "provenance",
       "matter": "The declared grid and the declared epoch.",
       "note": "FR-004 and Principle V. The disclosure is gone; the two figures it held that were nowhere else relocate into the run disclosure, keeping their declared typography. The declared horizons are on the row and the row invitation, and the declared domains are on the domain control, so those two figures were already inline where they are used."
     },
@@ -64,27 +66,27 @@
       "wasAt": "The controls region, the disclosure headed What the instruments measured",
       "fromBeat": "004",
       "kind": "stays",
-      "destination": "controls",
+      "destination": "provenance",
       "matter": "The ownship surface count at its declared interval and declared errors, the XBT drops and their declared level count, what each drop told us about the interface depth with its error, whether Argo is assimilated, and how many of each check fired.",
-      "note": "Live figures, and they change with the domain and with the toggles that drive them, so they stay in the region that owns those causes."
+      "note": "Beat 018 made this a tab and a term list. The counts are unchanged; the sentences that joined them are gone, and what the footprint is remains the panel's own help."
     },
     {
       "id": "truth-record-figures",
       "wasAt": "The controls region, the disclosure headed The record this run is scored against",
       "fromBeat": "002",
       "kind": "stays",
-      "destination": "controls",
+      "destination": "provenance",
       "matter": "The domain, the truth source, its native resolution against the model grid, its instants and their spacing, its depth levels, the Argo profiles and levels with the flagged count, and the climatology window with its overlap with this run's period.",
-      "note": "The spec proposed moving this panel to the site whole, on the ground that derived-artefact facts do not change while a reader works. On the built surface they do: the domain control of SRD-v1 FR-11 changes every figure here. So the figures stay in the controls region, which owns that cause, and only the sentences that explained them went to the site."
+      "note": "Beat 018 made this a tab and a term list. Every figure is unchanged."
     },
     {
       "id": "manifest",
       "wasAt": "The controls region, the disclosure headed The manifest this run replays from",
       "fromBeat": "011",
       "kind": "stays",
-      "destination": "controls",
+      "destination": "provenance",
       "matter": "The build, the digest of the fields and the analysis, the manifest itself, and the controls that download, paste and import one.",
-      "note": "Replay is something a reader drives. The entry point stays in the controls region; only its explanation left."
+      "note": "Beat 018 made this a tab. The manifest itself is the one thing on this surface that scrolls a list: it is a document a reader copies, line by line, which is what FR-002 admits."
     },
     {
       "id": "issue-observations",
@@ -93,7 +95,7 @@
       "kind": "stays",
       "destination": "controls",
       "matter": "How many observations the analysis saw at this issue instant, and how many had not happened yet.",
-      "note": "The clearest live consequence of the control it sits under."
+      "note": "Beat 018 made it a readout. It had been \"The analysis at this issue instant saw 2 observations; 29 had not happened yet\" -- two figures a reader had to read a line of prose to find -- and it is now SEEN and NOT YET with the figures under them. The author's review named this sentence."
     },
     {
       "id": "footprint-summary",
@@ -102,43 +104,43 @@
       "kind": "stays",
       "destination": "controls",
       "matter": "What is drawn over every panel: the surface measurements, the XBT drops, the Argo profiles, how many carry a flag, and whether quality control was on.",
-      "note": "The spec proposed sending the footprint figures to the detail region. The built surface already draws them in the controls region, beside the toggles that change them, and FR-047 gives the detail region to whatever was last selected. So they stay where they are."
+      "note": "Beat 018 made it a readout: five labels and five figures, where it had been \"Drawn over every panel: 25 surface measurements, 6 XBT drops and 25 Argo profiles, of which 11 carry a flag -- drawn as flagged, never omitted. Quality control was on.\" The author's review named this one too. The clause that explained -- that a flagged observation is drawn and never omitted -- was already this panel's own help, and stays there."
     },
     {
       "id": "analysed-field",
       "wasAt": "The centre region, before the row is built",
       "fromBeat": "005",
       "kind": "stays",
-      "destination": "centre",
+      "destination": "horizons",
       "matter": "The weight observations carried in each cell — the analysis's own gain, drawn as a field.",
-      "note": "The picture, its label, the influence radius as a property of the declared correlation length scale, and the counts of what entered and was excluded from the analysis."
+      "note": "Beat 018: the centre region became the horizons pane, and the caption became a figure label of five words. What the field is remains the panel's own help."
     },
     {
       "id": "row-invitation",
       "wasAt": "The centre region, before the row is built",
       "fromBeat": "013",
       "kind": "stays",
-      "destination": "centre",
+      "destination": "horizons",
       "matter": "Six panels at the declared horizons — each stating what it is valid for, what it was initialised from, and what it was worth against two references.",
-      "note": "FR-048: a region with nothing in it says what would appear there. This is that statement, and it is what the region is entitled to say."
+      "note": "Beat 018: the centre region became the horizons pane. FR-048 is narrowed by SRD-v2 section 8.1 -- an empty pane says what would appear in it, in as few words as will do it -- so this is now \"Panels at 0, 12, 24, 48, 72, 96 h, once the row is built.\""
     },
     {
       "id": "scores-empty",
       "wasAt": "The scores region, before the row is scored",
       "fromBeat": "013",
-      "kind": "stays",
-      "destination": "scores",
+      "kind": "dropped",
+      "destination": "dropped",
       "matter": "Each panel's skill against persistence and against climatology appears here, in that panel's own column, once the row has been built and scored.",
-      "note": "FR-048."
+      "reason": "The scores region is gone. Beat 013 aligned each panel's figures to its column with CSS `subgrid` across two regions; beat 018 puts them inside the panel, which is what FR-046 asked for and is not achievable across independent panes. There is no region left for this to be the empty state of, and each panel now says \"not scored yet\" for itself -- the same fact, said by the thing it is about."
     },
     {
       "id": "detail-empty",
       "wasAt": "The detail region, with nothing selected",
       "fromBeat": "013",
       "kind": "stays",
-      "destination": "detail",
+      "destination": "selection",
       "matter": "Nothing is selected. Two things can appear here: a cell's attribution breakdown, from clicking a cell on any field; and a measurement's own profile beside the model's derived one, with the measured levels kept as a ghost, from hovering or clicking its mark.",
-      "note": "FR-048."
+      "note": "Beat 018: the detail region became the selection pane, and FR-048 as section 8.1 narrows it means this says \"Nothing selected. Click a cell, or a measurement's mark.\" What can appear there, and why it has a pane of its own, is the panel's own help, which already carries both sentences."
     },
     {
       "id": "declared-aside",
@@ -427,10 +429,12 @@
       "wasAt": "The walkthrough, step 1: What you are looking at",
       "fromBeat": "013",
       "step": 1,
-      "kind": "site",
-      "destination": "docs/site/index.md#What you are looking at",
+      "kind": "walkthrough",
+      "destination": "walkthrough:step-1",
       "matter": "j-ocean is a teaching harness: a small, real ocean model, the simulated instruments that measure it, and an honest account of what each measurement was worth. It forecasts nothing you should act on.",
-      "note": "It is about the whole surface rather than about a panel, so it is not a help entry. The application still carries the statement of FR-02 without interaction (FR-058); this is the longer answer to what the thing is."
+      "note": "Reclaimed. Beat 016 sent this to the site's welcome page because a workspace-level explanation had nowhere to live once the tour was gone. It has somewhere again. It is still on the site as well, which is where a reader who has not opened the application meets it; what came back is the step.",
+      "previously": "site: docs/site/index.md#What you are looking at",
+      "reclaimedIn": "018-operational-layout"
     },
     {
       "id": "step-figure-typography",
@@ -447,10 +451,13 @@
       "wasAt": "The walkthrough, step 2: Everything you can change",
       "fromBeat": "013",
       "step": 2,
-      "kind": "site",
-      "destination": "docs/site/index.md#The four regions",
+      "kind": "walkthrough",
+      "destination": "walkthrough:step-2",
       "matter": "One column for every cause: which ocean, when the forecast was issued, which instruments the analysis was allowed to see, and whether quality control was running. Change any of them and every panel and every score answers where they are, without you moving.",
-      "note": "A description of the layout, which is a thing to read once rather than at the moment of confusion."
+      "note": "Reclaimed, and restated: it said \"one column\", and the workspace has panes rather than columns. The record keeps the words it had on the application and names the words that are there now, because a record that quietly updated its own quotation would be no record.",
+      "previously": "site: docs/site/index.md#The four regions",
+      "reclaimedIn": "018-operational-layout",
+      "restatedAs": "One pane for every cause: which ocean, when the forecast was issued, which instruments the analysis was allowed to see, and whether quality control was running. Change any of them and every panel and every score answers where they are, without you moving."
     },
     {
       "id": "step-control-at-its-panel",
@@ -590,7 +597,182 @@
       "kind": "site",
       "destination": "docs/site/deferred.md#Deferred, and what would trigger it",
       "matter": "Four capabilities are assessed, deferred, and cheap to adopt. Each has a written trigger, and a test measures the triggers on every run — so this list fails when it becomes wrong instead of going stale."
+    },
+    {
+      "id": "floor-notice-size",
+      "wasAt": "The below-the-floor notice, first paragraph",
+      "fromBeat": "013",
+      "kind": "walkthrough",
+      "destination": "walkthrough:step-6",
+      "matter": "All 6 declared horizons side by side, each at the declared minimum of 190 px, want a viewport of at least 2038 x 728 px once the controls column, the detail column and the page gutter have taken theirs. That figure was measured from the built layout, not chosen.",
+      "restatedAs": "declared horizons side by side, each at the declared minimum of",
+      "reclaimedIn": "018-operational-layout",
+      "note": "The below-the-floor answer was itself two paragraphs of prose, which is the fault this beat exists to fix, and it was the first thing a reader at a small window met -- which made the fallback read as an apology. The surface now states the size as the declared figure it is, in one line, and the explanation is the walkthrough's, reachable from that same presentation. The figures in the walkthrough's version are read from configuration, so the sentence cannot go stale as the floor moves -- and it has moved twice: 2038 x 728 became 1658 x 960 when the panes stopped being fixed tracks, and the height came down to 740 when the first 960 turned out to be taller than any browser window a reader has."
+    },
+    {
+      "id": "floor-notice-strip",
+      "wasAt": "The below-the-floor notice, second paragraph",
+      "fromBeat": "013",
+      "kind": "walkthrough",
+      "destination": "walkthrough:step-6",
+      "matter": "So this is one horizon at a time instead. The strip carries all 6 and what each was worth, because comparison across horizons is the lesson; choosing one in the strip swaps the panel beneath it. Widen the window past the figure above and the full row returns without a reload.",
+      "restatedAs": "Narrower than that, the workspace is unchanged and its centre shows one horizon at a time. The strip carries all of them and what each was worth, because comparison across horizons is the lesson; choosing one in the strip swaps the panel beneath it. Widen the window past the figure above and the row returns without a reload.",
+      "reclaimedIn": "018-operational-layout",
+      "note": "Restated twice for the workspace. The first pass said what returns above the floor is the workspace and not only the row; the second says what gives way below it is the row and not the workspace, because the answer down there stopped being a second arrangement of every pane and became this one with one horizon in the centre. The record keeps the words the surface had and names the words that are there now."
+    },
+    {
+      "id": "workspace-arrangement",
+      "wasAt": "Nowhere: the workspace is beat 018's, and had nothing to explain it",
+      "fromBeat": "018",
+      "kind": "walkthrough",
+      "destination": "walkthrough:step-7",
+      "matter": "Drag a sash to resize a pane, drag a tab to move or group one, and the arrangement you leave is the arrangement you return to. Only the furniture is remembered: no seed, no manifest and nothing the run computed, which travel as a manifest and are rebuilt rather than restored.",
+      "reclaimedIn": "018-operational-layout",
+      "note": "New matter rather than moved matter, and recorded here for the same reason as the rest: a reader who is told their arrangement persists is owed the sentence that says what does not."
+    },
+    {
+      "id": "needle-elevation-caption",
+      "wasAt": "The enlarged panel, beneath the depth elevation",
+      "fromBeat": "008",
+      "kind": "help",
+      "destination": "help:centre/horizon-panel",
+      "feature": "enlarging a panel",
+      "matter": "A side elevation: longitude is the horizontal axis and latitude is not shown, so position is read from the field this is drawn beside.",
+      "restatedAs": "The depth axis beside the field is a side elevation: longitude is the horizontal axis and latitude is not shown, so position is read from the field this is drawn beside.",
+      "builtIn": "018-operational-layout",
+      "note": "Beat 018. The caption was a label and an explanation in one sentence: the label -- the floor depth and that the needles hang to the depths reached -- stays under the figure, and the explanation of what a side elevation is went to the panel that draws it. It is under *enlarging a panel* because the elevation exists only there."
+    },
+    {
+      "id": "breakdown-as-weighted",
+      "wasAt": "The detail region, at the head of a selected cell's breakdown",
+      "fromBeat": "005",
+      "kind": "help",
+      "destination": "help:detail/attribution-breakdown",
+      "feature": "a cell's breakdown",
+      "matter": "Cell 5050, as the analysis weighted it.",
+      "restatedAs": "It is read from the weights the analysis actually used in that cell, not computed again for the picture.",
+      "builtIn": "018-operational-layout",
+      "note": "Beat 018. The clause said where the shares came from, which is what the help entry it points at already said in full. The pane keeps the cell as a labelled figure and drops the clause: the same fact, said once, by the thing that can say it properly."
+    },
+    {
+      "id": "influence-radius-clause",
+      "wasAt": "The centre region, the value beside Influence radius",
+      "fromBeat": "005",
+      "kind": "help",
+      "destination": "help:centre/attribution",
+      "feature": "the influence radius",
+      "matter": "A property of the declared correlation length scale, not of the ocean.",
+      "restatedAs": "not something the ocean was asked about",
+      "builtIn": "018-operational-layout",
+      "note": "Beat 018. The value was a figure wrapped in a sentence that argued about it. The figure stays, with its unit and its kind; the argument was already the panel's help word for word, and this records that the surface stopped repeating it."
+    },
+    {
+      "id": "row-fidelity",
+      "wasAt": "The centre region, the last line of the legend beneath the row",
+      "fromBeat": "015",
+      "kind": "help",
+      "destination": "help:centre/horizon-row",
+      "feature": "what the row draws, and what it does not",
+      "matter": "the row shows the field alone at this size: the attribution layer and each measurement at the depth it reached are drawn in the enlarged panel",
+      "restatedAs": "The row shows the field alone at this size: the attribution layer and each measurement at the depth it reached are drawn in the enlarged panel.",
+      "builtIn": "018-operational-layout",
+      "note": "Beat 018, FR-007. FR-051 requires the row to state that it is showing the field alone and spec 018 FR-007 requires no explanation on the surface, and both hold because they ask for different things. The legend keeps the label -- *field only -- depths in the enlarged panel*, eight words -- and the account of what the enlarged panel adds, and that enlarging changes what is shown and never what was computed, is the row's own help."
+    },
+    {
+      "id": "attribution-scope",
+      "wasAt": "The centre region, the legend beneath the row, with the attribution layer shown",
+      "fromBeat": "005",
+      "kind": "help",
+      "destination": "help:centre/attribution",
+      "feature": "the same field on every panel",
+      "matter": "the same field on every panel: this run analyses once, at the issue instant. Attribution becomes per horizon when the forecast cycles.",
+      "restatedAs": "Attribution becomes one field per horizon when the forecast cycles",
+      "builtIn": "018-operational-layout",
+      "note": "Beat 018, FR-007. Two sentences in a legend, one of them carrying a computed instant. The guard against six identical fields implying six analyses is a label and stays -- *the same field on every panel*, six words -- and why it is one field, and what would make it six, is the attribution panel's help. Help teaches and does not report (FR-055), so the instant does not go with it: the run publishes its issue instant as a figure of its own."
+    },
+    {
+      "id": "attribution-hatch-channel",
+      "wasAt": "The centre region, the hatched entry of the legend beneath the row",
+      "fromBeat": "007",
+      "kind": "help",
+      "destination": "help:centre/attribution",
+      "feature": "the hatched channel",
+      "matter": "a second channel, so the field reads without colour",
+      "restatedAs": "it is a second channel: the field reads with the colour taken out",
+      "builtIn": "018-operational-layout",
+      "note": "Beat 018, FR-007. The legend entry labelled the mark and then explained why the mark exists. The label stays -- *hatched where observations lead the background and the climatology* -- and the reason the hatching is drawn at all is the panel's help. What the clause claimed is measured rather than asserted either way: `tests/shell/shell.spec.ts` takes the colour out of the rendered pixels and holds the contrast against a declared margin."
+    },
+    {
+      "id": "legend-track-range",
+      "wasAt": "The centre region, the surface-measurement entry of the legend beneath the row",
+      "fromBeat": "007",
+      "kind": "dropped",
+      "destination": "dropped",
+      "matter": "the track's own range",
+      "reason": "Beat 018. The clause named what the two figures beside it already are: the entry reads *surface measurement, dark for warm, over 18.1 to 24.3 degrees C*, and both ends are computed figures with their kind on them. A phrase that restates the figures next to it is the second source for one fact that FR-055 forbids, in four words."
+    },
+    {
+      "id": "legend-after-initialisation",
+      "wasAt": "The centre region, the dashed entry of the legend beneath the row",
+      "fromBeat": "007",
+      "kind": "dropped",
+      "destination": "dropped",
+      "matter": "so it did not inform it",
+      "reason": "Beat 018. The consequence of the clause before it -- *dashed: measured after the forecast was initialised* -- and a legend entry that argues from its own label is explaining rather than labelling. The mark itself still says it in full: clicking one opens the selection pane, which reads *taken after this forecast was initialised, so it did not inform it*, at the mark the reader asked about."
+    },
+    {
+      "id": "score-statement",
+      "wasAt": "Each horizon panel, above that panel's own skill figures",
+      "fromBeat": "004",
+      "kind": "stays",
+      "destination": "horizons",
+      "matter": "The scorer's own verdict on this horizon, in the scorer's words: better than persistence by 0.0 per cent; worse than climatology by 208.8 per cent.",
+      "note": "Beat 018, FR-008 and US4. It did not leave the surface and it stopped being the first thing on it: it is the first line inside *Where this figure came from*, one disclosure away, byte for byte as the scorer produced it and never truncated or reworded. It had been a two-line sentence drawn over the very figures that say the same thing, which made a reader read prose to find two numbers already beneath it -- the readout-written-as-prose the author's review named. Principle VI is unmoved: a losing score is visible as a figure in every state of the panel, because the skill against each reference is printed as it computes and a negative one is printed negative."
+    },
+    {
+      "id": "over-budget-projection",
+      "wasAt": "The run controls, the notice shown when the projected time exceeds the declared budget",
+      "fromBeat": "003",
+      "kind": "stays",
+      "destination": "controls",
+      "matter": "The projected time to integrate the longest declared horizon, against the declared frame budget, with the choice to integrate anyway.",
+      "note": "Beat 018's eighth pass. It stays, and it stopped being a paragraph and stopped being laid out in a pane. It is a modal decision opened from the run controls -- two readouts and two buttons -- because a notice inside the controls pane is as tall as the reader's declared font makes it and as narrow as the pane is: at 950 x 875 with a 24 px root font there were 39 px under *Integrate anyway*, and at 28 px the control was painted 183 px below the foot of the pane with no scrollbar anywhere to reach it. Both figures keep their kind and neither is ellipsised."
+    },
+    {
+      "id": "over-budget-chunk-counts",
+      "wasAt": "The run controls, the second sentence of the over-budget notice",
+      "fromBeat": "003",
+      "kind": "help",
+      "destination": "help:controls/run",
+      "feature": "the frame budget",
+      "matter": "The chunk it was measured on counts toward the twelve hours; nothing beyond it has been integrated.",
+      "restatedAs": "The chunk it was measured on counts toward the advance you asked for; nothing beyond it has been integrated.",
+      "builtIn": "018-operational-layout",
+      "note": "Beat 018's eighth pass, FR-007. A decision prompt leads with the figures and the choice; this sentence answers *what has already happened*, which is an explanation of how the advance is chunked and not part of the decision. The hours are no longer restated: the control's own label says how far an advance goes, and help that repeated it would be the second source FR-055 forbids."
+    },
+    {
+      "id": "over-budget-not-freezing",
+      "wasAt": "The run controls, the last sentence of the over-budget notice",
+      "fromBeat": "003",
+      "kind": "help",
+      "destination": "help:controls/run",
+      "feature": "the frame budget",
+      "matter": "The page is saying so rather than freezing.",
+      "builtIn": "018-operational-layout",
+      "note": "Beat 018's eighth pass, FR-007. It explains why the question is asked at all, which is the panel's business and not the prompt's. The panel had declared that it had nothing to explain -- four buttons that each say on their own face what they will do -- and that was true until one of them stopped and asked a question."
+    },
+    {
+      "id": "over-budget-which-horizon-the-check-uses",
+      "wasAt": "The over-budget decision, the label on its one projected figure",
+      "fromBeat": "003",
+      "kind": "help",
+      "destination": "help:controls/run",
+      "feature": "the frame budget",
+      "matter": "The check is on the longest declared horizon and not on the advance you pressed, because a frame budget is a claim about the machine and the honest way to gauge a machine is against the most this surface will ever ask of it. That is the walk building the horizon row makes; an advance of twelve hours is a fraction of it. The decision prints both costs so that neither figure stands for the other.",
+      "builtIn": "018-operational-layout",
+      "note": "Beat 018's ninth pass, FR-007 and Principle V. The decision printed one projection -- the longest declared horizon, 96 h and 1 440 steps -- under the heading of a press of *Integrate 12 hours*, which is 180 steps, and the author read it as the cost of that press: \"it happens a lot quicker than the dialog warned\". The arithmetic was never wrong and FR-008's check has not moved. What the prompt owed was the attribution, so it prints both costs with what each is the cost of; *why* the check is gauged against the worst case is an explanation of the budget rather than part of the decision, and it belongs beside the three sentences that left this notice in the eighth pass."
     }
   ],
-  "helpBuiltIn": "016-panel-help"
+  "helpBuiltIn": "016-panel-help",
+  "walkthroughReclaimedIn": "018-operational-layout"
 }

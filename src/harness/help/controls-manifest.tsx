@@ -32,6 +32,12 @@ export const ENTRY: HelpEntry = {
             what makes a claim about a run something another person can check rather than
             something they have to take from you.
           </p>
+          <p>
+            Those sentences are about the forecast itself. A workspace also remembers how you
+            arranged it &mdash; pane geometry and pane identity, under one declared key, and
+            nothing else: a stored forecast would be a second way to bring one back with none
+            of the checks above, while a stored pane width is a preference about furniture.
+          </p>
         </>
       ),
     },

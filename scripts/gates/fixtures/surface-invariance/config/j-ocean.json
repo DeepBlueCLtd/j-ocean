@@ -27,19 +27,36 @@
     "frameBudgetMs": 33
   },
   "presentation": {
-    "referenceViewportWidthPx": 2038,
+    "referenceViewportWidthPx": 2560,
+    "referenceViewportHeightPx": 1440,
     "minimumPanelWidthPx": 190,
-    "minimumViewportWidthPx": 2038,
-    "minimumViewportHeightPx": 728,
-    "controlsWidthPx": 390,
-    "detailWidthPx": 390,
+    "minimumViewportWidthPx": 1658,
+    "minimumViewportHeightPx": 960,
+    "controlsWidthPx": 340,
+    "detailWidthPx": 470,
     "panelGapPx": 10,
-    "pageGutterPx": 48,
+    "pageGutterPx": 20,
+    "workspace": {
+      "statusHeightPx": 46,
+      "provenanceFraction": 0.5,
+      "skillCurveFraction": 0.3,
+      "paneMinimumWidthPx": 220,
+      "paneMinimumHeightPx": 120,
+      "sashWidthPx": 4,
+      "maskOpacity": 0.62,
+      "walkthroughCardWidthPx": 420,
+      "walkthroughCardMinimumHeightPx": 180,
+      "walkthroughCardGapPx": 12,
+      "modalWidthPx": 420,
+      "storageKey": "j-ocean.workspace",
+      "layoutVersion": 1
+    },
     "strip": {
       "heightPx": 46,
       "thumbnailWidthPx": 40
     },
     "centreChromeHeightPx": 196,
+    "fieldLabelHeightRem": 5,
     "anomalyLimitMetres": 220,
     "attributionHatchThreshold": 0.5,
     "footprint": {
