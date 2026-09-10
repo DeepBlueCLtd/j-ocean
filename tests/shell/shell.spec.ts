@@ -200,7 +200,7 @@ test.describe('the shell', () => {
     await expect(page.getByTestId('instant')).toHaveText(advance.instantAfter(start, 1));
 
     // The completion is announced where the advance was asked for, with the figures.
-    const report = page.getByTestId('advance-report');
+    const report = page.getByTestId('surface-report');
     await expect(report).toHaveAttribute('role', 'status');
     await expect(report).toContainText(String(advance.steps));
     await expect(report).toContainText(advance.instantAfter(start, 1));
@@ -314,6 +314,113 @@ test.describe('the shell', () => {
   });
 
   /**
+   * The decision names **both** costs, and attributes each to the work it is the cost of
+   * (FR-008, Principle V; the author's report: *"it happens a lot quicker than the dialog
+   * warned"*).
+   *
+   * ## The defect
+   *
+   * The notice printed one projected figure and it was `projectedHorizonMs`: the longest
+   * declared horizon, 96 h and 1 440 steps, which is the walk *building the horizon row*
+   * makes. The control that opened the notice is *Integrate 12 hours*, 180 steps. So the
+   * figure under that heading was eight times the cost of the press that produced it, and a
+   * reader read "1 730 ms" as *this will take 1 730 ms* when it meant *the row would*.
+   *
+   * The arithmetic was never wrong and the **check** is not what changed: NFR-04 gauges the
+   * machine against the worst case and FR-008 is written about the longest declared horizon.
+   * What changed is that a figure now says what it is about.
+   *
+   * ## What is asserted
+   *
+   * Both projections come from one step time, so the ratio between them is declared
+   * arithmetic and not a measurement: `longest horizon / ADVANCE_HOURS`, which is 8 at the
+   * declared horizons. Asserting the **ratio** rather than either figure is what makes this a
+   * test of the attribution rather than of how fast the machine running it happens to be.
+   */
+  test('names both costs in the over-budget decision, and says which is which', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    /* A budget no machine can meet, so the decision is certain. It is also the figure the
+       third readout prints, so what is asserted below is the figure this page was **served**
+       and not the repository's own -- a test that held the served page against the file would
+       be asserting a budget nothing on screen was measured against. */
+    const servedBudgetMs = 0.000_001;
+    await page.route(CONFIG_REQUEST, async (route) => {
+      const response = await route.fetch();
+      const config = JSON.parse(await response.text()) as { budget: { frameBudgetMs: number } };
+      config.budget.frameBudgetMs = servedBudgetMs;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(config),
+      });
+    });
+    await page.goto('/');
+    await expect(page.getByTestId('pane-controls')).toBeVisible();
+    await page.getByTestId('advance').click();
+    await expect(page.getByTestId('over-budget')).toBeVisible({ timeout: 30_000 });
+
+    const advance = await advanceTheControlOffers(page);
+    const longestHorizonHours = Math.max(...declared.horizons.leadHours);
+    const stepsToTheRow = Math.round(
+      (longestHorizonHours * 3600) / declared.clock.timestepSeconds,
+    );
+
+    /* Each readout with the label above it, so that what is asserted is the pairing and not
+       merely the presence of two numbers in one box. */
+    const readouts = await page.evaluate(() =>
+      Array.from(
+        document.querySelectorAll<HTMLElement>('[data-testid="over-budget-figures"] > div'),
+      ).map((one) => ({
+        label: (one.querySelector('dt')?.textContent ?? '').replace(/\s+/g, ' ').trim(),
+        figure: (one.querySelector('dd')?.textContent ?? '').trim(),
+        readout: (one.querySelector('dd') as HTMLElement | null)?.dataset['testid'] ?? '',
+      })),
+    );
+    expect(
+      readouts.map((one) => one.readout),
+      'the decision does not print this advance, the row and the budget, in that order',
+    ).toEqual(['projected-advance', 'projected-row', 'declared-budget']);
+
+    // The advance's own figures are in the advance's own label, and the row's in the row's.
+    // A label that named neither is how one figure came to stand for both.
+    expect(readouts[0]?.label).toContain(`${String(advance.hours)} h`);
+    expect(readouts[0]?.label).toContain(String(advance.steps));
+    expect(readouts[1]?.label).toContain(`${String(longestHorizonHours)} h`);
+    expect(readouts[1]?.label).toContain(String(stepsToTheRow));
+    expect(readouts[2]?.label.toLowerCase()).toContain('budget');
+    expect(readouts[2]?.figure).toContain(`${String(servedBudgetMs)} ms`);
+
+    const msOf = (text: string): number => Number(/([\d.]+)\s*ms/.exec(text)?.[1] ?? NaN);
+    const advanceMs = msOf(readouts[0]?.figure ?? '');
+    const rowMs = msOf(readouts[1]?.figure ?? '');
+    expect(Number.isFinite(advanceMs) && Number.isFinite(rowMs)).toBe(true);
+    expect(
+      rowMs,
+      'the two projections are not the same step time applied to two amounts of work, so one ' +
+        'of them is not what its label says it is',
+    ).toBeGreaterThan(advanceMs);
+
+    /* Both are `perStepMs` times a declared number of steps, so the ratio is arithmetic on
+       configuration. Rounded to whole milliseconds for printing, so the comparison carries the
+       rounding rather than pretending it is exact. */
+    const ratio = stepsToTheRow / advance.steps;
+    expect(
+      rowMs / advanceMs,
+      `the row's projection is not ${String(ratio)} times the advance's, which is what the ` +
+        'declared horizons and the declared advance make it',
+    ).toBeCloseTo(ratio, 1);
+
+    console.log(
+      `    over budget: this advance (${String(advance.hours)} h, ${String(advance.steps)} ` +
+        `steps) ${String(advanceMs)} ms, the horizon row (${String(longestHorizonHours)} h, ` +
+        `${String(stepsToTheRow)} steps) ${String(rowMs)} ms, against a declared budget of ` +
+        `${String(servedBudgetMs)} ms -- a factor of ${(rowMs / advanceMs).toFixed(2)}`,
+    );
+  });
+
+  /**
    * The same claim on the path where the budget says nothing, which is the path a fast enough
    * machine takes and the one a refusal test can never reach.
    */
@@ -388,7 +495,7 @@ test.describe('the shell', () => {
         disabled:
           (document.querySelector('[data-testid="advance"]') as HTMLButtonElement | null)
             ?.disabled ?? false,
-        says: document.querySelector('[data-testid="advance-report"]')?.textContent ?? '',
+        says: document.querySelector('[data-testid="surface-report"]')?.textContent ?? '',
       });
       const taken: { busy: boolean; disabled: boolean; says: string }[] = [];
       (document.querySelector('[data-testid="advance"]') as HTMLButtonElement).click();
@@ -417,7 +524,7 @@ test.describe('the shell', () => {
 
     await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 60_000 });
     await expect(page.getByTestId('run-controls')).toHaveAttribute('aria-busy', 'false');
-    await expect(page.getByTestId('advance-report')).toContainText('Integrated');
+    await expect(page.getByTestId('surface-report')).toContainText('Integrated');
   });
 
   /**
@@ -560,7 +667,7 @@ test.describe('the shell', () => {
          nothing to do with this control. So both snapshots are taken with the run in the same
          state: advanced, its step time measured, its completion confirmed. */
       await advanceThroughTheBudget(page);
-      await expect(page.getByTestId('advance-report')).toContainText('Integrated');
+      await expect(page.getByTestId('surface-report')).toContainText('Integrated');
 
       const run = await page.evaluate(async () => {
         const boxes = (): string =>
@@ -633,6 +740,305 @@ test.describe('the shell', () => {
   });
 
   /**
+   * Every other long control says how far it has got, and saying so moves nothing (the
+   * author's report: *"for the other buttons in that panel, there is no indication of
+   * progress -- which makes it difficult to engage with"*).
+   *
+   * ## What was missing
+   *
+   * The advance had the relabel, the disabled state and the confirmation. *Build the horizon
+   * row*, *Re-issue*, *Revert to the recorded case* and *Score every horizon against truth*
+   * had a busy **cursor** and nothing else -- and they are the operations that cost seconds.
+   * *Re-issue* had a `Re-issuing…` label it had never once shown, because the prop that turned
+   * it on was passed as the literal `false`.
+   *
+   * ## Why the count is real
+   *
+   * `forecastInChunks` and `scoreHorizonByHorizon` yield once per declared horizon, which is
+   * what those loops were always made of, so *3 of 8* is a position in the work rather than a
+   * number chosen to look like one. The **totals differ between presses** and that is the
+   * point: a first build computes the quay-side brief and an edit needs a baseline to be
+   * differenced against, so the denominator is asked of the work before it starts.
+   *
+   * ## What is measured
+   *
+   * The same property the advance's own relabel is held to, and against the same defect: this
+   * beat's walkthrough offer changed its label and moved **every pane in the dock by 11 px**.
+   * Each control reserves the width of the widest thing it can say, so the control, its
+   * neighbours and every pane have the same rectangle while it works as when it is idle. Only
+   * the samples taken **while the operation is running** are compared: the commit that ends
+   * one of these is the commit that puts the row, the scores or the edit on the surface, and
+   * the layout is allowed to change for that.
+   *
+   * At the floor, where the controls pane is narrowest and a wider button is a wrapped row,
+   * and at the reference width.
+   */
+  test('relabels every long control while it works, and reflows nothing', async ({ page }) => {
+    test.setTimeout(900_000);
+
+    /** Every pane, and every control in the pane the author was reading. */
+    const WATCHED = [
+      'advance',
+      'new-run',
+      'build-row',
+      'reissue',
+      'revert',
+      'bias-degrees',
+      'quality-control',
+      'score-row',
+      'toggle-difference',
+      'toggle-attribution',
+    ];
+
+    /**
+     * Press one control and read the surface between the chunks it yields on, from inside the
+     * page: each chunk blocks the main thread, so an assertion driven from the test process
+     * cannot ask a question while the work it is asking about is running.
+     */
+    const watch = async (
+      press: string,
+      labelId: string,
+    ): Promise<{
+      resting: { boxes: string; label: string };
+      seen: { boxes: string; label: string; working: string }[];
+    }> =>
+      page.evaluate(
+        async ({ press: id, labelId: label, watched }) => {
+          const boxes = (): string =>
+            JSON.stringify(
+              [
+                ...Array.from(document.querySelectorAll<HTMLElement>('[data-pane-id]')).map(
+                  (pane) => [`pane:${String(pane.dataset['paneId'])}`, pane] as const,
+                ),
+                ...watched.map(
+                  (name) =>
+                    [name, document.querySelector<HTMLElement>(`[data-testid="${name}"]`)] as const,
+                ),
+              ]
+                .filter((entry): entry is readonly [string, HTMLElement] => entry[1] !== null)
+                .map(([name, element]) => {
+                  const box = element.getBoundingClientRect();
+                  return [name, box.x, box.y, box.width, box.height];
+                }),
+            );
+          const says = (): string =>
+            (document.querySelector(`[data-testid="${label}"]`)?.textContent ?? '').trim();
+          const state = (): string =>
+            document.querySelector('[data-testid="one-view"]')?.getAttribute('data-working') ??
+            '(unset)';
+
+          const resting = { boxes: boxes(), label: says() };
+          const seen: { boxes: string; label: string; working: string }[] = [];
+          (document.querySelector(`[data-testid="${id}"]`) as HTMLButtonElement).click();
+          for (let at = 0; at < 2000; at += 1) {
+            seen.push({ boxes: boxes(), label: says(), working: state() });
+            if (state() === 'false' && at > 0) break;
+            await new Promise((resolve) => { setTimeout(resolve, 0); });
+          }
+          return { resting, seen };
+        },
+        { press, labelId, watched: WATCHED },
+      );
+
+    /** What the relabel said, and whether anything moved while it was saying it. */
+    const judge = (
+      run: { resting: { boxes: string; label: string }; seen: { boxes: string; label: string; working: string }[] },
+      where: string,
+      control: string,
+      pattern: RegExp,
+      says: string,
+    ): string => {
+      const working = run.seen.filter((sample) => sample.working !== 'false');
+      expect(
+        working.length,
+        `at ${where} ${control} never reported itself running, so there is nothing to measure`,
+      ).toBeGreaterThan(0);
+      expect(
+        working.map((sample) => sample.working).filter((one) => one !== says),
+        `at ${where} the surface said it was doing something other than ${says}`,
+      ).toEqual([]);
+      const relabelled = working.filter((sample) => sample.label !== run.resting.label);
+      expect(
+        relabelled.length,
+        `at ${where} ${control} never said how far it had got, so there is no relabel to measure`,
+      ).toBeGreaterThan(0);
+      expect(
+        relabelled.filter((sample) => !pattern.test(sample.label)).map((one) => one.label),
+        `at ${where} ${control} said something other than how far it has got`,
+      ).toEqual([]);
+
+      /* It counts **up**. A label that says *0 of 8* for the whole of the work is a label with
+         a denominator and no position in it, which is the thing that would make this a
+         decoration rather than a readout. The totals are read off the labels rather than
+         written down here: they differ between presses because the work does, and a test that
+         asserted one of them would be asserting the arithmetic rather than the count. */
+      const counted = [...new Set(relabelled.map((sample) => sample.label))];
+      expect(
+        counted.length,
+        `at ${where} ${control} said "${counted[0] ?? ''}" for the whole of the work, so its ` +
+          'count is a denominator rather than a position in it',
+      ).toBeGreaterThan(1);
+      const reached = counted.map((label) => Number(/(\d+) of (\d+)/.exec(label)?.[1] ?? -1));
+      expect(
+        Math.max(...reached),
+        `at ${where} ${control} never got past ${String(Math.max(...reached))}`,
+      ).toBeGreaterThan(Math.min(...reached));
+
+      const was = new Map(
+        (JSON.parse(run.resting.boxes) as [string, number, number, number, number][]).map(
+          (one) => [one[0], one] as const,
+        ),
+      );
+      const moved: string[] = [];
+      for (const sample of working) {
+        if (sample.boxes === run.resting.boxes) continue;
+        for (const now of JSON.parse(sample.boxes) as [string, number, number, number, number][]) {
+          const then = was.get(now[0]);
+          // A control that was not on the surface when the resting layout was measured cannot
+          // have moved from it; what it must not do is move anything else, which is asked of
+          // every other row here.
+          if (then === undefined || JSON.stringify(now) === JSON.stringify(then)) continue;
+          moved.push(
+            `"${sample.label}": ${now[0]} was ${JSON.stringify(then.slice(1))} and is ${JSON.stringify(now.slice(1))}`,
+          );
+        }
+      }
+      expect(
+        moved,
+        `at ${where} the relabel of ${control} moved something: every pane's rectangle and ` +
+          "every control in the pane the author was reading are measured against the resting " +
+          'layout, and one of these samples differs from it',
+      ).toEqual([]);
+
+      const width = (JSON.parse(run.resting.boxes) as [string, number, number, number, number][])
+        .find((one) => one[0] === control)?.[3];
+      return (
+        `    at ${where} ${control} is ${String(width)} px wide saying ` +
+        `"${run.resting.label}" and saying ${counted.map((one) => `"${one}"`).join(', ')}, ` +
+        `across ${String(working.length)} samples of one run, and nothing else moved`
+      );
+    };
+
+    const measured: string[] = [];
+    for (const width of [FLOOR.width, REFERENCE.width]) {
+      const where = `${String(width)} px`;
+      await page.setViewportSize({ width, height: FLOOR.height });
+      await page.goto('/');
+      await page.evaluate(() => { window.localStorage.clear(); });
+      await page.reload();
+      await expect(page.getByTestId('pane-controls')).toBeVisible();
+
+      // 1. Building the row. Eight chunks: the issue analysis, six declared horizons and the
+      //    quay-side brief, which is computed on this press and never again.
+      measured.push(
+        judge(
+          await watch('build-row', 'build-row-label'),
+          where,
+          'build-row',
+          /^Building \d+ of \d+$/,
+          'building the horizon row',
+        ),
+      );
+      await expect(page.getByTestId('horizon-row')).toBeVisible({ timeout: 180_000 });
+
+      // 2. Re-issuing it at another instant. Seven: the brief is already held.
+      await page.getByTestId('issue-time').focus();
+      await page.keyboard.press('ArrowRight');
+      await expect(page.getByTestId('reissue')).toBeEnabled();
+      measured.push(
+        judge(
+          await watch('reissue', 'reissue-label'),
+          where,
+          'reissue',
+          /^Re-issuing \d+ of \d+$/,
+          're-issuing the row',
+        ),
+      );
+
+      /* 3. An edit, so that there is something to revert. Applying one is a long operation of
+            its own, and its control is a number field: a count inside a control's *name* is a
+            readout in the wrong place, so the field is disabled while it runs and the status
+            strip is what says how far along. That is asserted here, because it is the one long
+            control on this surface whose own label cannot carry the count.
+
+            It is also the press with the most work behind it -- an edited forecast and the
+            baseline it is differenced against, fourteen chunks -- which is why the totals are
+            read off the strip rather than written down. */
+      await page.getByTestId('bias-degrees').fill('1.5');
+      const applying = await page.evaluate(async () => {
+        const seen: { says: string; working: string; disabled: boolean }[] = [];
+        for (let at = 0; at < 2000; at += 1) {
+          const surface = document.querySelector('[data-testid="one-view"]');
+          seen.push({
+            says: (document.querySelector('[data-testid="surface-report"]')?.textContent ?? '')
+              .replace(/\s+/g, ' ')
+              .trim(),
+            working: surface?.getAttribute('data-working') ?? '(unset)',
+            disabled:
+              (document.querySelector('[data-testid="bias-degrees"]') as HTMLInputElement | null)
+                ?.disabled ?? false,
+          });
+          if (surface?.getAttribute('data-working') === 'false' && at > 0) break;
+          await new Promise((resolve) => { setTimeout(resolve, 0); });
+        }
+        return seen;
+      });
+      const applyingWhile = applying.filter((one) => one.working === 'applying an edit');
+      expect(
+        applyingWhile.length,
+        `at ${where} applying an edit never reported itself running`,
+      ).toBeGreaterThan(0);
+      expect(
+        applyingWhile.filter((one) => !one.disabled).length,
+        `at ${where} the bias field could be typed into while the edit it asked for was running`,
+      ).toBe(0);
+      const applyingSaid = [
+        ...new Set(applyingWhile.map((one) => one.says).filter((one) => one !== '')),
+      ];
+      expect(
+        applyingSaid.filter((one) => !/^Applying the edit: \d+ of \d+$/.test(one)),
+        `at ${where} the strip said something other than how far the edit had got`,
+      ).toEqual([]);
+      expect(
+        applyingSaid.length,
+        `at ${where} the strip did not count the edit up: it said "${applyingSaid[0] ?? ''}"`,
+      ).toBeGreaterThan(1);
+      measured.push(
+        `    at ${where} applying an edit says ${applyingSaid
+          .map((one) => `"${one}"`)
+          .join(', ')} in the status strip, with its own field disabled throughout`,
+      );
+
+      await expect(page.getByTestId('one-view')).toHaveAttribute('data-working', 'false', {
+        timeout: 180_000,
+      });
+      await expect(page.getByTestId('revert')).toBeEnabled();
+      measured.push(
+        judge(
+          await watch('revert', 'revert-label'),
+          where,
+          'revert',
+          /^Reverting \d+ of \d+$/,
+          'reverting to the recorded case',
+        ),
+      );
+
+      // 4. Scoring. Six: one per declared horizon, which is what the scorer walks.
+      await expect(page.getByTestId('score-row')).toBeEnabled();
+      measured.push(
+        judge(
+          await watch('score-row', 'score-row-label'),
+          where,
+          'score-row',
+          /^Scoring \d+ of \d+$/,
+          'scoring every horizon',
+        ),
+      );
+    }
+    for (const line of measured) console.log(line);
+  });
+
+  /**
    * The advance is confirmed where a reader can see it, and says nothing before there is one
    * (the author's request: *"plus some verification that it's complete"*).
    *
@@ -658,14 +1064,14 @@ test.describe('the shell', () => {
     await page.reload();
     await expect(page.getByTestId('pane-controls')).toBeVisible();
 
-    const report = page.getByTestId('advance-report');
+    const report = page.getByTestId('surface-report');
     await expect(report).toHaveAttribute('role', 'status');
     // FR-048 is answered by the control, which says what it will do before it does it: a strip
     // that always says something about an advance nobody asked for is noise.
     await expect(report).toHaveText('');
     const before = await page.getByTestId('pane-status').evaluate((strip) => ({
       strip: strip.getBoundingClientRect().height,
-      report: (strip.querySelector('[data-testid="advance-report"]') as HTMLElement).getBoundingClientRect()
+      report: (strip.querySelector('[data-testid="surface-report"]') as HTMLElement).getBoundingClientRect()
         .height,
     }));
     expect(
@@ -683,7 +1089,7 @@ test.describe('the shell', () => {
 
     // Painted, and inside the strip rather than in the accessibility tree alone.
     await expect(report).toBeVisible();
-    await expect(page.getByTestId('pane-status').getByTestId('advance-report')).toHaveCount(1);
+    await expect(page.getByTestId('pane-status').getByTestId('surface-report')).toHaveCount(1);
     await expect(report).toContainText(String(advance.steps));
     await expect(report).toContainText(advance.instantAfter(start, 1));
     // Principle V: both figures carry their kind, and the kind is the one the run's own
@@ -692,7 +1098,7 @@ test.describe('the shell', () => {
 
     const after = await page.getByTestId('pane-status').evaluate((strip) => ({
       strip: strip.getBoundingClientRect().height,
-      report: (strip.querySelector('[data-testid="advance-report"]') as HTMLElement).getBoundingClientRect()
+      report: (strip.querySelector('[data-testid="surface-report"]') as HTMLElement).getBoundingClientRect()
         .height,
       scrolls: strip.scrollWidth > strip.clientWidth + 1,
     }));

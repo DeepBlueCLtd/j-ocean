@@ -1514,8 +1514,19 @@ button.reserving > [aria-hidden='true'] { visibility: hidden; }
   font-size: 0.85rem;
 }
 
-.issue-control input[type='range'] { flex: 1 1 100%; min-width: 0; }
-.issue-control label { color: var(--host); }
+/* The slider shares its line with its own label, and the re-issue control has a line of its
+   own. Both are the count's doing, and both are measured.
+
+   The control relabels itself while it works -- *Re-issuing 3 of 8* -- and reserves the width
+   of that, which takes it from 58 px to 113 px. The line it shared with the issue offset has
+   197 px and the offset takes 94, so at 113 the button wrapped to a **fifth** row and the
+   controls pane grew 27 px: enough to take the declared floor past the 768 px of the shortest
+   window in the matrix. The row it wraps to is paid for by the one the label was wasting --
+   `flex: 1 1 100%` put the slider on a line of its own and left *Issued* alone above it, and
+   32 px of label beside a 155 px slider is the same 197 px doing two rows' work. Four rows
+   before and four rows after: label and slider, the instant, the offset, the control. */
+.issue-control input[type='range'] { flex: 1 1 6rem; min-width: 0; }
+.issue-control label { color: var(--host); flex: 0 0 auto; }
 
 .skill-inset { margin: 0.5rem 0 0; }
 
@@ -1540,7 +1551,15 @@ button.reserving > [aria-hidden='true'] { visibility: hidden; }
   font-size: 0.78rem;
 }
 
-.run-status button { display: block; margin-top: 0.35rem; font-size: 0.75rem; padding: 0.2rem 0.45rem; }
+.run-status button { margin-top: 0.35rem; font-size: 0.75rem; padding: 0.2rem 0.45rem; }
+/* On its own line, under the statement of what is being shown. Two rules say so because a
+   control that reserves the width of its widest label takes its `display` from `.reserving`,
+   and that rule and this one have the same specificity while this one is later in the file:
+   without the split, `display: block` won, the three labels that belong in one grid cell
+   stacked into three lines, and the control went from 147 x 24 px to 188 x 55. That is 31 px
+   of a controls pane whose content height at the floor's width *is* the declared floor. */
+.run-status button:not(.reserving) { display: block; }
+.run-status button.reserving { display: grid; width: fit-content; }
 
 .counterfactuals label { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; }
 .counterfactuals input[type='number'] { width: 4.5rem; }

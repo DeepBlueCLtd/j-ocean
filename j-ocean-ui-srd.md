@@ -156,8 +156,8 @@ tables that disagree the first time an entry is edited.
 <!-- generated from docs/narrative-disposition.json by scripts/docs/build-disposition.ts -->
 
 Generated from `docs/narrative-disposition.json`, which is held by `tests/docs/disposition.test.ts`.
-77 pieces of matter: 15 stay in a region,
-28 went to the site, 23 are a panel's own
+78 pieces of matter: 15 stay in a region,
+28 went to the site, 24 are a panel's own
 help, built in beat 016-panel-help, 5 are the
 walkthrough's, reclaimed in beat 018-operational-layout, and 6
 were **dropped with a recorded reason** rather than carried anywhere. Every destination is
@@ -243,6 +243,7 @@ step that renders them, or a reason.
 | The run controls, the notice shown when the projected time exceeds the declared budget | The projected time to integrate the longest declared horizon, against the declared frame budget, with the choice to integrate anyway. | Stays, in the **controls** pane |
 | The run controls, the second sentence of the over-budget notice | The chunk it was measured on counts toward the twelve hours; nothing beyond it has been integrated. | Help, at the panel: `help:controls/run`, under *the frame budget* |
 | The run controls, the last sentence of the over-budget notice | The page is saying so rather than freezing. | Help, at the panel: `help:controls/run`, under *the frame budget* |
+| The over-budget decision, the label on its one projected figure | The check is on the longest declared horizon and not on the advance you pressed, because a frame budget is a claim about the machine and the honest way to gauge a machine is against the most this surface will ever ask of it. That is the walk building the horizon row makes; an advance of twelve hours is a fraction of it. The decision prints both costs so that neither figure stands for the other. | Help, at the panel: `help:controls/run`, under *the frame budget* |
 
 <!-- end generated -->
 

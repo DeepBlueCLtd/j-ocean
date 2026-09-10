@@ -5,7 +5,7 @@ import type { Configuration, Domain } from '../config/schema.js';
 import type { Score } from '../scoring/scorer.js';
 import type { TruthSource } from '../ports/truth-source.js';
 import type { FieldContainer } from '../truth/container.js';
-import type { ForecastResult } from '../run/forecast.js';
+import { mostForecastChunks, type ForecastResult } from '../run/forecast.js';
 import { Panel } from './Panel.js';
 import { HorizonStrip, type StripSlot } from './HorizonStrip.js';
 import { CentreLedger, resolveCentreContent, THE_ROW, type CentreContent } from './CentreContent.js';
@@ -15,8 +15,14 @@ import { markersFrom, marksOf, trackValueRange } from './footprint.js';
 import { Counterfactuals } from './Counterfactuals.js';
 import { PanelHead } from './Help.js';
 import { ObservationHover } from './ObservationHover.js';
-import { scoreEveryHorizon } from './scoring-run.js';
-import type { LongOperation } from './working.js';
+import { scoreHorizonByHorizon, scoringChunkCount } from './scoring-run.js';
+import {
+  widestCount,
+  type ChunkedWork,
+  type LongOperation,
+  type Progress,
+  type RowOperation,
+} from './working.js';
 import { SkillPane, type SkillCurve } from './SkillInset.js';
 import type { Edit } from '../instruments/edits.js';
 import type { DepartureBrief } from '../run/forecast.js';
@@ -72,11 +78,15 @@ export interface HorizonRowInputs {
   readonly pendingIssueInstantMs: number;
   readonly onPendingIssueInstantChange: (instantMs: number) => void;
   readonly onReissue: () => void;
-  readonly reissuing: boolean;
   /** Beat 010: the reader's edits, the run without them, and how to change them. */
   readonly edits: readonly Edit[];
   readonly baseline: ForecastResult | null;
-  readonly onApplyEdits: (edits: readonly Edit[]) => void;
+  /**
+   * Apply a list of edits, and say which control asked, so that the one a reader pressed is
+   * the one that counts up. Reverting is not applying an edit -- it is arithmetic with a
+   * shorter list -- and the surface says which of the two it is doing.
+   */
+  readonly onApplyEdits: (edits: readonly Edit[], what: RowOperation) => void;
   readonly onSelectCell: (cellIndex: number) => void;
   /** FR-047: which mark the detail region is showing, held by the shell so a cell can take it. */
   readonly shownMark: { readonly id: string; readonly leadHours: number } | null;
@@ -112,14 +122,23 @@ export interface HorizonRowInputs {
   readonly requested: CentreContent;
   readonly onRequest: (next: CentreContent) => void;
   /**
-   * How the row asks for something long to be run (NFR-04).
+   * How the row asks for something long to be run, and how it is told what is running (NFR-04;
+   * the author's report).
    *
    * Scoring six horizons against the truth record blocks the main thread for seconds, exactly
-   * as an advance and a row build do, and until this prop it was the one of the three that
-   * said nothing while it ran. The shell holds the notion -- `working.ts` -- so that the
-   * busy cursor has one flag behind it rather than three that drift.
+   * as an advance and a row build do, and until beat 018 it was the one of the three that said
+   * nothing while it ran. The shell holds the notion -- `working.ts` -- so that the busy
+   * cursor, the disabled controls, the counts and the completion line all come from one place
+   * rather than from several that drift.
+   *
+   * `working` and `progress` come **back** down for the same reason: three of this pane's
+   * controls end in the shell's own `buildRow`, so what they say while they work cannot be
+   * state of their own.
    */
-  readonly beginLongOperation: (what: LongOperation, work: () => void) => void;
+  readonly beginLongOperation: (what: LongOperation, total: number, work: ChunkedWork) => void;
+  readonly onFinished: (finished: { kind: 'scoring every horizon'; horizons: number }) => void;
+  readonly working: LongOperation | null;
+  readonly progress: Progress | null;
 }
 
 /**
@@ -263,8 +282,18 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
     if (config === null || domain === null || forecast === null) return;
     if (truth === null || climatology === null || props.brief === null) return;
     const brief = props.brief;
-    props.beginLongOperation('scoring every horizon', () => {
-      const run = scoreEveryHorizon({ config, domain, forecast, truth, climatology, brief });
+    const horizons = scoringChunkCount(config);
+    // One chunk per declared horizon, so the count the control shows is a position in the walk
+    // the scorer was always making rather than a number chosen to look like one.
+    props.beginLongOperation('scoring every horizon', horizons, function* scoreTheRow() {
+      const run = yield* scoreHorizonByHorizon({
+        config,
+        domain,
+        forecast,
+        truth,
+        climatology,
+        brief,
+      });
       if (run.refusal !== null) {
         setScores(run.scores);
         setScoringFailure(run.refusal);
@@ -281,8 +310,18 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
         ].sort((a, b) => a.issueInstantMs - b.issueInstantMs),
       );
       setScoringFailure(null);
+      props.onFinished({ kind: 'scoring every horizon', horizons });
     });
-  }, [config, domain, forecast, truth, climatology, props.brief, props.beginLongOperation]);
+  }, [
+    config,
+    domain,
+    forecast,
+    truth,
+    climatology,
+    props.brief,
+    props.beginLongOperation,
+    props.onFinished,
+  ]);
 
   useEffect(() => {
     // The scores belong to the forecast that has just been replaced, so they go. The
@@ -370,10 +409,13 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
 
   const dropWaypoint = useCallback(() => {
     if (draftWaypoints === null) return;
-    props.onApplyEdits([
-      ...props.edits.filter((edit) => edit.kind !== 'track'),
-      { kind: 'track', waypoints: draftWaypoints },
-    ]);
+    props.onApplyEdits(
+      [
+        ...props.edits.filter((edit) => edit.kind !== 'track'),
+        { kind: 'track', waypoints: draftWaypoints },
+      ],
+      'applying an edit',
+    );
     setDraftWaypoints(null);
   }, [draftWaypoints, props]);
 
@@ -415,6 +457,7 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
             next
               ? [...without('withhold'), { kind: 'withhold', observationId: interfaceId }]
               : without('withhold'),
+            'applying an edit',
           );
         },
         onEditProfile: (levels: readonly { depthMetres: number; value: number }[] | null) => {
@@ -422,6 +465,7 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
             levels === null
               ? without('profile')
               : [...without('profile'), { kind: 'profile', observationId: markId, levels }],
+            'applying an edit',
           );
         },
       };
@@ -474,6 +518,12 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
    * valid instant exactly where it was and makes each of them a longer forecast of the
    * same moment, which is why the whole curve drops bodily rather than shifting sideways.
    */
+  /* The digits each count reserves its width against. The row's controls can reach fourteen
+     chunks -- a forecast, a baseline and the brief -- and scoring reaches the declared horizon
+     count, so the two are asked separately rather than given the wider of them. */
+  const rowCountSizer = widestCount(mostForecastChunks(config));
+  const scoreCountSizer = widestCount(scoringChunkCount(config));
+
   const controls = (
     <>
       <div className="control-group">
@@ -506,13 +556,28 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
               ? 'the recorded case'
               : `issued ${describeOffset(props.pendingIssueInstantMs - props.defaultIssueInstantMs)}`}
           </span>
+          {/*
+            The same treatment the advance has: a count in the control's own label, the width
+            reserved so that saying it reflows nothing, and disabled while it runs. It said
+            *Re-issuing…* before -- three dots that are not a count -- and only because
+            `reissuing` was passed as a literal `false`, so it had never once said them.
+          */}
           <button
             type="button"
             data-testid="reissue"
+            className="reserving"
             onClick={props.onReissue}
-            disabled={props.reissuing || props.pendingIssueInstantMs === props.issueInstantMs}
+            disabled={props.working !== null || props.pendingIssueInstantMs === props.issueInstantMs}
           >
-            {props.reissuing ? 'Re-issuing…' : 'Re-issue'}
+            <span className="reserve" aria-hidden="true">Re-issue</span>
+            <span className="reserve" aria-hidden="true">
+              Re-issuing {rowCountSizer} of {rowCountSizer}
+            </span>
+            <span data-testid="reissue-label">
+              {props.working === 're-issuing the row' && props.progress !== null
+                ? `Re-issuing ${String(props.progress.done)} of ${String(props.progress.total)}`
+                : 'Re-issue'}
+            </span>
           </button>
         </div>
 
@@ -558,7 +623,9 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
         edits={props.edits}
         instrumentIds={[config.instruments.surface.id, config.instruments.xbt.id]}
         qualityControlDefault={config.instruments.qualityControl.enabled}
-        busy={props.reissuing}
+        working={props.working}
+        progress={props.progress}
+        countSizer={rowCountSizer}
         onApply={props.onApplyEdits}
       />
 
@@ -590,8 +657,29 @@ export function useHorizonRow(props: HorizonRowInputs): HorizonRowSlots {
       <div className="control-group">
         <PanelHead panel="controls/row-display" />
         <div className="row-controls">
-          <button type="button" onClick={scoreAll} data-testid="score-row" disabled={scores !== null}>
-            {scores === null ? 'Score every horizon against truth' : 'Scored'}
+          {/* Three things it can say and one width, reserved against the widest of them --
+              which is its resting label, so the count can never widen it. Disabled while
+              anything long runs, as the advance is: the main thread is the row's for the whole
+              of it, and a control that invites a press it will drop is the state the author
+              reported. */}
+          <button
+            type="button"
+            onClick={scoreAll}
+            data-testid="score-row"
+            className="reserving"
+            disabled={scores !== null || props.working !== null}
+          >
+            <span className="reserve" aria-hidden="true">Score every horizon against truth</span>
+            <span className="reserve" aria-hidden="true">
+              Scoring {scoreCountSizer} of {scoreCountSizer}
+            </span>
+            <span data-testid="score-row-label">
+              {props.working === 'scoring every horizon' && props.progress !== null
+                ? `Scoring ${String(props.progress.done)} of ${String(props.progress.total)}`
+                : scores === null
+                  ? 'Score every horizon against truth'
+                  : 'Scored'}
+            </span>
           </button>
           <button
             type="button"

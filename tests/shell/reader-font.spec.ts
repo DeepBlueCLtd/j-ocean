@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import {
   CONFIG_REQUEST,
   holdsOneView,
+  holdsOneViewWorking,
   measure,
   READER_FONTS,
   readerFontSize,
@@ -35,11 +36,14 @@ import { VIEWPORT_MATRIX } from './declared-geometry.js';
  *
  * - **16 px, every viewport, every state.** `viewport-matrix.spec.ts`, unchanged. That is the
  *   default a reader who has set nothing has, and it is where the whole state walk is paid for.
- * - **20 and 24 px, every viewport, the arrival state and the over-budget state.** These are
- *   the two states a reader's font can reach before they have chosen anything: arrival is what
- *   every reader sees, and over-budget is the state the author's report is about and the one no
- *   census had ever visited. Both are cheap -- neither builds the row -- so both run at every
- *   viewport rather than at a sampled few.
+ * - **20 and 24 px, every viewport, the arrival state, the over-budget state and the row being
+ *   built.** These are the three states a reader's font can reach before the row exists:
+ *   arrival is what every reader sees, over-budget is the state the author's first report is
+ *   about, and *Building 3 of 8* is the state the ninth pass put on the surface -- a control
+ *   that relabels itself, which at half again the declared text size is exactly what outgrows
+ *   a row. All three are cheap, so all three run at every viewport rather than at a sampled
+ *   few. The *scoring* and *re-issuing* states are not here: both need the row built, and the
+ *   paragraph below is why that is a different question.
  *
  * **What this sample leaves out, said plainly.** With the row built and scored, this surface
  * does not hold at 20 px or 24 px: measured at 1920 x 900 and a 24 px root font, the controls
@@ -160,10 +164,20 @@ test.describe('the workspace, at the font sizes a reader declares', () => {
             return { text: (one.textContent ?? '').trim(), cut };
           });
         });
+        /* Three readouts, each with its own label, and every figure in them uncut. The count
+           is of `.figure` spans and not of readouts, because a label carries figures of its
+           own: each projection names the hours and the steps it is the cost of, which is what
+           makes the two of them tellable apart (Principle V, and the ninth pass's defect). */
+        for (const readout of ['projected-advance', 'projected-row', 'declared-budget']) {
+          await expect(
+            page.getByTestId(readout),
+            `the decision does not print ${readout} at ${where}`,
+          ).toBeVisible();
+        }
         expect(
           figures.length,
-          'the decision does not print all three of the figures it is between',
-        ).toBe(3);
+          'the decision does not print every figure it is between, with its provenance',
+        ).toBe(7);
         expect(
           figures.filter((one) => one.cut !== '').map((one) => `${one.text}: ${one.cut}`),
           `a figure in the over-budget decision is cut off at ${where}`,
@@ -184,6 +198,24 @@ test.describe('the workspace, at the font sizes a reader declares', () => {
           await paneGeometry(page),
           `the over-budget decision moved a pane at ${where}`,
         ).toBe(withItOpen);
+
+        /*
+         * A third state, and it is the ninth pass's: *Build the horizon row* relabels itself
+         * *Building 3 of 8* while it works, and a relabelled control at half again the
+         * declared text size is exactly the thing that outgrows its row. It is censused here
+         * and the two after it are not, and the reason is the sample this file already names:
+         * this state is the arrival state with one control saying something else, and it is
+         * reached before the row exists. *Scoring* and *Re-issuing* are states of a surface
+         * with the row built, and with the row built this surface does not hold at 20 or 24 px
+         * -- the finding recorded in the plan and in the header above. Censusing them here
+         * would fail on that and not on anything this pass did.
+         */
+        await holdsOneViewWorking(
+          page,
+          where,
+          'build-row',
+          'building the horizon row',
+        );
       });
     }
   }

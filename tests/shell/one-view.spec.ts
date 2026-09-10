@@ -204,9 +204,10 @@ test.describe('one view, and what a pane may scroll', () => {
     await expect(page.getByTestId('pane-controls')).toBeVisible();
     await page.getByTestId('advance').click();
     await expect(page.getByTestId('over-budget')).toBeVisible({ timeout: 30_000 });
-    // It is a decision, so it prints the two figures the decision is between and offers the
-    // two things a reader may do. The sentences that explained the budget are the run panel's
-    // help now (FR-007; docs/narrative-disposition.json).
+    // It is a decision, so it prints the three figures the decision is between -- what this
+    // advance costs, what the row would cost, and the declared budget the second is held
+    // against -- and offers the two things a reader may do. The sentences that explained the
+    // budget are the run panel's help now (FR-007; docs/narrative-disposition.json).
     await expect(page.getByTestId('over-budget-figures')).toBeVisible();
     await expect(page.getByTestId('proceed-anyway')).toBeVisible();
     await expect(page.getByTestId('stop-here')).toBeVisible();

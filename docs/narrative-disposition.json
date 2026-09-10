@@ -760,6 +760,17 @@
       "matter": "The page is saying so rather than freezing.",
       "builtIn": "018-operational-layout",
       "note": "Beat 018's eighth pass, FR-007. It explains why the question is asked at all, which is the panel's business and not the prompt's. The panel had declared that it had nothing to explain -- four buttons that each say on their own face what they will do -- and that was true until one of them stopped and asked a question."
+    },
+    {
+      "id": "over-budget-which-horizon-the-check-uses",
+      "wasAt": "The over-budget decision, the label on its one projected figure",
+      "fromBeat": "003",
+      "kind": "help",
+      "destination": "help:controls/run",
+      "feature": "the frame budget",
+      "matter": "The check is on the longest declared horizon and not on the advance you pressed, because a frame budget is a claim about the machine and the honest way to gauge a machine is against the most this surface will ever ask of it. That is the walk building the horizon row makes; an advance of twelve hours is a fraction of it. The decision prints both costs so that neither figure stands for the other.",
+      "builtIn": "018-operational-layout",
+      "note": "Beat 018's ninth pass, FR-007 and Principle V. The decision printed one projection -- the longest declared horizon, 96 h and 1 440 steps -- under the heading of a press of *Integrate 12 hours*, which is 180 steps, and the author read it as the cost of that press: \"it happens a lot quicker than the dialog warned\". The arithmetic was never wrong and FR-008's check has not moved. What the prompt owed was the attribution, so it prints both costs with what each is the cost of; *why* the check is gauged against the worst case is an explanation of the budget rather than part of the decision, and it belongs beside the three sentences that left this notice in the eighth pass."
     }
   ],
   "helpBuiltIn": "016-panel-help",

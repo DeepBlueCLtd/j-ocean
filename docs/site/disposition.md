@@ -91,6 +91,7 @@ It explains a panel that stays, so it is behind that panel's help control, openi
 | The centre region, the hatched entry of the legend beneath the row (beat 007) | a second channel, so the field reads without colour | `help:centre/attribution`, under **the hatched channel** |
 | The run controls, the second sentence of the over-budget notice (beat 003) | The chunk it was measured on counts toward the twelve hours; nothing beyond it has been integrated. | `help:controls/run`, under **the frame budget** |
 | The run controls, the last sentence of the over-budget notice (beat 003) | The page is saying so rather than freezing. | `help:controls/run`, under **the frame budget** |
+| The over-budget decision, the label on its one projected figure (beat 003) | The check is on the longest declared horizon and not on the advance you pressed, because a frame budget is a claim about the machine and the honest way to gauge a machine is against the most this surface will ever ask of it. That is the walk building the horizon row makes; an advance of twelve hours is a fraction of it. The decision prints both costs so that neither figure stands for the other. | `help:controls/run`, under **the frame budget** |
 
 ## It came back, to the walkthrough
 

@@ -1,5 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
-import { holdsOneView, holdsOneViewIntegrating, selectTab, yieldEveryStep } from './census.js';
+import {
+  holdsOneView,
+  holdsOneViewIntegrating,
+  holdsOneViewWorking,
+  selectTab,
+  yieldEveryStep,
+} from './census.js';
 import { declared, LEADS, VIEWPORT_MATRIX } from './declared-geometry.js';
 
 /**
@@ -26,7 +32,11 @@ import { declared, LEADS, VIEWPORT_MATRIX } from './declared-geometry.js';
  * 4. nothing scrolls but a **declared list**, and nothing is clipped;
  * 5. and it holds through an **advance**: while it runs, where the control has relabelled
  *    itself with how far it has got, and once it is done, where the status strip carries what
- *    it did. Beat 018's seventh pass added both to the surface and both to this walk.
+ *    it did. Beat 018's seventh pass added both to the surface and both to this walk;
+ * 6. and it holds while the row is **built** and while it is **scored**, where those controls
+ *    have relabelled themselves the same way. The ninth pass added those, and it could not
+ *    have added them earlier: until the work was chunked per horizon it held the main thread
+ *    for the whole of itself, and a census asked while it ran measured the surface afterwards.
  *
  * ## What differs between the viewports, and what does not
  *
@@ -44,20 +54,25 @@ function hasTheRow(width: number): boolean {
   return width >= presentation.minimumViewportWidthPx;
 }
 
-/** The recorded case, built and scored, at whatever this viewport's centre holds. */
-async function buildAndScore(page: Page): Promise<void> {
+/**
+ * The recorded case, built and scored, at whatever this viewport's centre holds -- and censused
+ * **while** each of those runs, because each is a state of the surface a reader sits in for
+ * seconds and that nothing had ever measured.
+ */
+async function buildAndScore(page: Page, where: string): Promise<number> {
   await page.goto('/');
   await page.evaluate(() => { window.localStorage.clear(); });
   await page.reload();
   await expect(page.getByTestId('pane-controls')).toBeVisible();
-  await page.getByTestId('build-row').click();
+  const building = await holdsOneViewWorking(page, where, 'build-row', 'building the horizon row');
   await expect(page.getByTestId('centre-ledger')).toHaveAttribute('data-centre-content', /row|enlarged/, {
     timeout: 120_000,
   });
-  await page.getByTestId('score-row').click();
+  const scoring = await holdsOneViewWorking(page, where, 'score-row', 'scoring every horizon');
   await expect(page.getByTestId(`panel-score-${String(LEADS[0])}`)).toContainText('persistence', {
     timeout: 120_000,
   });
+  return Math.max(building, scoring);
 }
 
 test.describe('the workspace, at every viewport a reader has', () => {
@@ -99,7 +114,7 @@ test.describe('the workspace, at every viewport a reader has', () => {
       // 2. The row builds and scores. Where the window has not the width for six panels the
       //    centre carries one and the strip carries the rest -- which is a different centre
       //    and the same run, so every declared horizon is still on the surface with its score.
-      await buildAndScore(page);
+      tallest = Math.max(tallest, await buildAndScore(page, size));
       await census('scored');
 
       if (hasTheRow(viewport.width)) {

@@ -12,6 +12,13 @@ import type { HelpEntry } from './entry.js';
  * (`docs/narrative-disposition.json`, `help:controls/run`). A decision prompt leads with the
  * figures and the choice; three sentences about what a frame budget is were explaining rather
  * than deciding, and FR-007 says where explanation goes.
+ *
+ * The ninth pass added the fourth paragraph, and it is here for the same reason the other
+ * three are. The decision prints **two** projections now, because the one it printed was the
+ * cost of the longest declared horizon under the heading of a press of *Integrate 12 hours* --
+ * eight times what that press costs. Which of the two the check uses, and why it is that one,
+ * is an explanation of how the budget is gauged; the prompt says what each figure is the cost
+ * of, and stops there.
  */
 export const ENTRY: HelpEntry = {
   panel: 'controls/run',
@@ -36,6 +43,13 @@ export const ENTRY: HelpEntry = {
             The page is saying so rather than freezing. A budget nobody is told about is a
             surface that goes quiet for seconds and offers no account of itself afterwards,
             which is the thing this question exists to prevent.
+          </p>
+          <p>
+            The check is on the longest declared horizon and not on the advance you pressed,
+            because a frame budget is a claim about the machine and the honest way to gauge a
+            machine is against the most this surface will ever ask of it. That is the walk
+            building the horizon row makes; an advance of twelve hours is a fraction of it. The
+            decision prints both costs so that neither figure stands for the other.
           </p>
         </>
       ),

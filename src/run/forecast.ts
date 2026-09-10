@@ -273,8 +273,52 @@ export function departureBrief(inputs: ForecastInputs): DepartureBrief {
   };
 }
 
-export function runForecast(inputs: ForecastInputs): ForecastResult {
+/**
+ * How many chunks `forecastInChunks` yields for this configuration.
+ *
+ * One for the issue analysis and one for each declared horizon. It is asked before the work
+ * starts, because a count a control shows has to have its total up front: *3 of 8* is a
+ * readout and *3 of however many it turns out to be* is not one.
+ */
+export function forecastChunkCount(config: Configuration): number {
+  return 1 + config.horizons.leadHours.length;
+}
+
+/**
+ * The most chunks one press of a control that rebuilds the row can take: the row's own
+ * forecast, the baseline an edit has to be differenced against, and the quay-side brief the
+ * first press computes once. It is what such a control reserves the width of its count
+ * against, so that saying how far it has got moves nothing.
+ */
+export function mostForecastChunks(config: Configuration): number {
+  return 2 * forecastChunkCount(config) + 1;
+}
+
+/**
+ * The forecast, one chunk at a time (the author's report, beat 018's ninth pass).
+ *
+ * `runForecast` was one blocking call of several seconds and the surface had no honest count to
+ * show while it ran. It has one now because the work was already made of pieces: the issue
+ * analysis, then one integration per declared horizon, in horizon order, each carrying on from
+ * where the last left off. Yielding between those pieces gives the shell somewhere to paint a
+ * count that is a real position in the work rather than a number invented to look like one.
+ *
+ * **Nothing here computes anything differently.** The order of operations is the order
+ * `runForecast` had, `stepsTaken`, `analysed` and `forecastStream` are the same three carried
+ * across the same loop, and every `yield` sits between statements rather than inside an
+ * expression. G-07 is the instrument that proves it: seventeen of its digests are of this
+ * function's output and none of them may move.
+ *
+ * `runForecast` below is the driver, and it is what every caller that does not want to watch
+ * still calls -- the gate, the headless tests, the manifest replay -- so a second
+ * implementation of the integration was never written.
+ */
+export function* forecastInChunks(inputs: ForecastInputs): Generator<void, ForecastResult, void> {
   const at = analyseAtIssue(inputs);
+  // The issue analysis is a chunk of its own: it spins the model up through the declared
+  // spin-up hours before it analyses, which is a quarter of what a press of *Build the horizon
+  // row* costs, and a count that sat at zero through it would be a count that lied by omission.
+  yield;
   const { config } = inputs;
   const { parameters, kernel, grid, analysis } = at;
   const state = at.background;
@@ -318,6 +362,7 @@ export function runForecast(inputs: ForecastInputs): ForecastResult {
           `valid at ${new Date(validInstantMs).toISOString()}, which is before this forecast ` +
           `was issued at ${new Date(inputs.issueInstantMs).toISOString()}`,
       });
+      yield;
       continue;
     }
     if (leadMs > validityMs) {
@@ -329,6 +374,7 @@ export function runForecast(inputs: ForecastInputs): ForecastResult {
           `${new Date(inputs.issueInstantMs + validityMs).toISOString()}, and this panel is ` +
           `valid at ${new Date(validInstantMs).toISOString()}`,
       });
+      yield;
       continue;
     }
 
@@ -347,6 +393,9 @@ export function runForecast(inputs: ForecastInputs): ForecastResult {
       field: (analysed.fields[THICKNESS] as Float64Array).slice(),
       refusal: null,
     });
+    // One chunk per declared horizon, refusals included: a horizon the row refuses is a panel
+    // the surface still has to draw, so it is a piece of this work and the count says so.
+    yield;
   }
 
   return {
@@ -371,4 +420,18 @@ export function runForecast(inputs: ForecastInputs): ForecastResult {
     argoProfiles: at.argoProfiles,
     surface: at.surface,
   };
+}
+
+/**
+ * The forecast, run to the end with nothing between the chunks.
+ *
+ * Every caller that is not watching it happen asks this: the gate that digests the row, the
+ * headless tests, the manifest replay. It is `advance.ts`'s `runToTarget` for the same reason
+ * -- a driver over the chunks, so that the chunked path and the unwatched one are one path.
+ */
+export function runForecast(inputs: ForecastInputs): ForecastResult {
+  const chunks = forecastInChunks(inputs);
+  let chunk = chunks.next();
+  while (!chunk.done) chunk = chunks.next();
+  return chunk.value;
 }

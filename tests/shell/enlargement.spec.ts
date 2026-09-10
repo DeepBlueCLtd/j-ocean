@@ -244,7 +244,11 @@ test.describe('enlargement is a selection', () => {
     // Scoring costs about a second and happens when it is asked for. If enlarging had asked,
     // the control would say it had been done.
     await expect(page.getByTestId('score-row')).toBeEnabled();
-    await expect(page.getByTestId('score-row')).toHaveText('Score every horizon against truth');
+    // The label the reader is shown, and not the two the control reserves its width against
+    // (see `HorizonRow.tsx`, the row's display controls).
+    await expect(page.getByTestId('score-row-label')).toHaveText(
+      'Score every horizon against truth',
+    );
     await expect(page.getByTestId('panel-score-24')).toContainText('not scored yet');
 
     // A swap does not ask either.

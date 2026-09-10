@@ -1064,3 +1064,169 @@ figures changed — `workspace.maskOpacity` (renamed from `walkthroughMaskOpacit
 `workspace.modalWidthPx` (new, 420), `fieldLabelHeightRem` (5, replacing `fieldLabelHeightPx` 72)
 and `minimumViewportHeightPx` (752, from 748) — and the other 40 of G-07's quantities are
 byte-identical.
+
+### The ninth pass: a figure attributed to the wrong control, and four controls with nothing to say
+
+> *"The integrate button now shows a visible dialog. I also see progress through the task. It
+> happens a lot quicker than the dialog warned. But, for the other buttons in that panel, there
+> is no indication of progress — which makes it difficult to engage with."*
+
+Two defects, and they are the same defect at two scales: a figure that is not about what the
+reader thinks it is about, and controls that say nothing about what they are doing.
+
+#### The notice quoted the wrong operation's cost
+
+`projectedHorizonMs` projects the **longest declared horizon** — 96 h, 1 440 steps — and the
+notice printed it, alone, under the heading of a press of *Integrate 12 hours*, which is 180
+steps. Measured on the machine that runs the suite, with the same step time behind both:
+
+| Under the heading of *Integrate 12 hours*, the notice said | What that figure is the cost of |
+|---|---|
+| **1 542 ms** | the horizon row's integration, 96 h and 1 440 steps |
+| — nothing — | this advance, 12 h and 180 steps: **193 ms** |
+
+A factor of **7.99**, and the reader's own report is the evidence that it was read the way the
+heading invited: *"it happens a lot quicker than the dialog warned."* The arithmetic was never
+wrong. What was wrong was the **attribution** — a figure presented as being about something it
+is not about, which is the Principle V fault rather than an error.
+
+**The check has not moved and must not.** NFR-04 gauges the machine against the worst case and
+FR-008 is written about the longest declared horizon; a check on the advance would pass on a
+machine that cannot draw the row. What changed is that the decision now prints three readouts,
+each named for the work it is the cost of:
+
+| Readout | Label | Figure |
+|---|---|---|
+| `projected-advance` | Projected, this advance (12 h, 180 steps) | 193 ms |
+| `projected-row` | Projected, the horizon row (96 h, 1 440 steps) | 1 542 ms |
+| `declared-budget` | Declared frame budget, held against the row | the declared 33 ms |
+
+`tests/shell/shell.spec.ts` asserts the **ratio** rather than either figure — 1 440 / 180, which
+is declared arithmetic — so it is a test of the attribution and not of how fast the machine
+running it happens to be. *Why* the check is gauged against the worst case is an explanation and
+not part of the decision, so it is a fourth paragraph of `controls/run`'s help, with a row in
+`docs/narrative-disposition.json` beside the three the eighth pass sent there.
+
+#### Only the advance reported progress
+
+| The control | What it did | What it said while it did it, before |
+|---|---|---|
+| *Integrate 12 hours* | 180 steps, chunked | *Integrating 72 of 180*, disabled, confirmed in the strip |
+| *Build the horizon row* | six four-day integrations and an analysis | a busy cursor |
+| *Re-issue* | the same, at another issue instant | a busy cursor, and a `Re-issuing…` label it had never once shown, because `reissuing` was passed as the literal `false` |
+| the bias field, *Quality control* | the same, twice: an edited forecast and its baseline | a busy cursor |
+| *Revert to the recorded case* | the same | a busy cursor |
+| *Score every horizon against truth* | six horizons scored twice over | a busy cursor |
+
+#### The count is a position in the work, because the work was already made of pieces
+
+`runForecast` walked the declared horizons in order, carrying one model state and one step
+count across them; `scoreEveryHorizon` walked the same six. Both are generators now —
+`forecastInChunks` and `scoreHorizonByHorizon` — that yield between the pieces they were always
+made of, with a driver over them that every caller which is not watching still uses: the gate,
+the headless tests, the manifest replay. **No digest moved on that change**, which is the whole
+of the claim that the chunking is a restructuring and not a computation: G-07 holds 41 of them
+and 41 were byte-identical across it.
+
+So the totals are asked of the work before it starts, and they **differ between presses**
+because the work does:
+
+| The press | Chunks | What they are |
+|---|---|---|
+| *Integrate 12 hours* | **180 steps** in chunks of `model.chunkSteps` | the advance, as before |
+| *Build the horizon row* | **8** | the issue analysis, six declared horizons, and the quay-side brief computed once |
+| *Re-issue* | **7** | the same without the brief, which is held |
+| applying an edit | **14** | the edited forecast and the baseline it is differenced against, seven each |
+| *Revert to the recorded case* | **7** | one forecast: the empty edit list needs no baseline |
+| *Score every horizon against truth* | **6** | one per declared horizon |
+
+A fixed denominator would have been the invented figure this pass exists to remove. **Every
+long operation on this surface turned out to be chunkable**, so `working.ts` has one entry
+point, it takes a total, and there is no second one that runs work without a count — if
+something arrives that cannot be chunked, the honest answer is a busy state with no count and
+it goes in there rather than into a control that invents a denominator.
+
+#### What each control says, and what the strip says when it is done
+
+| Control | While it runs | When it is finished, in the status strip |
+|---|---|---|
+| `advance` | *Integrating 72 of 180* | Integrated 12 hours: 180 steps, valid at … |
+| `build-row` | *Building 3 of 8* | Built the row: 6 horizons, issued at … |
+| `reissue` | *Re-issuing 3 of 7* | Re-issued the row: 6 horizons, issued at … |
+| the bias field, *Quality control* | — its own label is its **name**, so the strip carries the count: *Applying the edit: 3 of 14* | Applied the edit: 6 horizons, issued at … |
+| `revert` | *Reverting 3 of 7* | Reverted the run: 6 horizons, issued at … |
+| `score-row` | *Scoring 3 of 6* | Scored the row: 6 horizons |
+
+`advance-report` is `surface-report` now: it was advance-specific and it is *what the surface
+just finished*, in the same place in the strip and for whichever operation finished. The
+measurement that put it there rather than beside the control still holds — beside the control a
+line is 30 px of a pane whose content height at the floor's width **is** the declared floor —
+and one line for whichever operation finished costs the strip nothing where six would have cost
+it a wrap. Every control is disabled while anything long runs, the domain radios and the bias
+field included: the main thread is the operation's for the whole of it, and a control that
+invites a press it will drop is the state the author reported.
+
+#### No reflow, measured at the floor and at the reference width
+
+Each control reserves the width of the widest thing it can say, in one grid cell, so the
+control, its neighbours and every pane in the dock have the same rectangle while it works as
+when it is idle. The defect this is written against is this beat's own: the walkthrough offer
+changed its label and moved every pane in the dock by 11 px.
+
+| Control | Reserved width | Resting label | Working label |
+|---|---|---|---|
+| `advance` | 127 px | Integrate 12 hours | Integrating 0…180 of 180 |
+| `build-row` | 124.6 px | Build the horizon row | Building 0…8 of 8 |
+| `reissue` | 112.8 px | Re-issue | Re-issuing 0…7 of 7 |
+| `revert` | 147.0 px | Revert to the recorded case | Reverting 0…7 of 7 |
+| `score-row` | 180.3 px | Score every horizon against truth | Scoring 0…6 of 6 |
+
+**Nothing moved**, at 1 658 px and at 2 560 px, across every sample of every one of those runs:
+every pane's rectangle and every control in the pane the author was reading, compared against
+the resting layout on every sample taken while the operation was running. The test also asserts
+that the count **counts up** — a label that says *0 of 8* for the whole of the work is a
+denominator rather than a position in it — and it saw every value from 0 to the total on each.
+
+#### What the reservation cost the layout, and how it was paid for
+
+Two of the five controls could not simply be given hidden labels, and the census said so before
+anything else did.
+
+| What | Was | Became | Why |
+|---|---|---|---|
+| `revert` | 147 × 24 px | **188 × 55** | `.run-status button { display: block }` and `button.reserving { display: inline-grid }` have the same specificity and the first is later in the file, so `block` won: the three labels that belong in one grid cell stacked into three lines. Split into `button:not(.reserving)` and `button.reserving`, and it is 147 × 24 again |
+| `.issue-control` | 112 px, four rows | **139, five rows** | *Re-issuing 0 of 7* takes the control from 58 px to 113, and the row it shared with the issue offset has 197 px of which the offset takes 94. The fifth row is paid for by the one the label was wasting: `flex: 1 1 100%` put the slider alone on a line with *Issued* alone above it, and 32 px of label beside a 155 px slider is the same 197 px doing two rows' work |
+
+Together those were **58 px** of a controls pane whose content height at the floor's width *is*
+the declared floor — enough to take it to 810 px, past the 768 px of the shortest window in the
+matrix. Repaired, the pane's content is **661 px** where it was 660, and
+`presentation.minimumViewportHeightPx` is re-declared **753** from 752: the one pixel the
+reflowed issue control needs, measured from the built workspace rather than chosen.
+
+#### The censuses, in the states the pass invented
+
+A control that relabels itself while it works is exactly the thing that overflows a box, lands
+on a neighbour or wraps a pane to an extra row, and this beat has been caught by that three
+times. The working states had never been censused because until the work was chunked they could
+not be: a blocking call holds the main thread for the whole of itself, so a census asked across
+a socket while it ran measured the surface afterwards.
+
+- **`viewport-matrix.spec.ts`, 16 px, every viewport in the matrix**: two new states, *building
+  the horizon row* and *scoring every horizon*, through the same scroll, overflow, overlap and
+  clip checks as every other state. Green at all six.
+- **`reader-font.spec.ts`, 20 px and 24 px, every viewport**: the *building* state, added beside
+  arrival and over-budget. It is the arrival state with one control saying something else, and
+  it is reached before the row exists. The *scoring* and *re-issuing* states are **not** there,
+  and the reason is the finding this file already records: with the row built this surface does
+  not hold at 20 or 24 px, so a census of them would fail on that rather than on anything this
+  pass did.
+- The helper differs from `holdsOneViewIntegrating` in one way that mattered: the arrangement is
+  let settle **before** the press, not after. Waiting for two quiet frames costs two frames, and
+  under the throttle a frame is a chunk of the work — the first attempt failed with *the work
+  was over before the census could be taken*. Nothing in the dock moves while this work runs;
+  the row, the scores and the edit all land in the commit that ends it.
+
+**Digests.** One moved: `configuration`, and only `configuration`, and only because one declared
+presentation figure changed — `minimumViewportHeightPx`, **753** from 752, re-measured from the
+built workspace. The other 40 of G-07's quantities are byte-identical, across a change that
+turned two of the shell's arithmetic walks inside out.

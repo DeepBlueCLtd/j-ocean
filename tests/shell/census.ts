@@ -1161,8 +1161,74 @@ export async function holdsOneViewIntegrating(page: Page, where: string): Promis
   }
 
   await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 120_000 });
-  await expect(page.getByTestId('advance-report')).toContainText('Integrated');
+  await expect(page.getByTestId('surface-report')).toContainText('Integrated');
   return Math.max(tallest, await holdsOneView(page, `${where}, integrated`));
+}
+
+/**
+ * The census of a control that is working: pressed, counting, and disabled (the author's
+ * report, beat 018's ninth pass).
+ *
+ * A control that relabels itself while it works is exactly the kind of thing that overflows a
+ * box, lands on a neighbour or wraps a pane to an extra row -- and beat 018 has been caught by
+ * that three times, twice in this file's own history. The advance's working state has been
+ * censused since the seventh pass; the four controls that rebuild the row and the one that
+ * scores it had never been, because until this pass they had no working state to census.
+ *
+ * **It is reachable at all only because the work is chunked now.** A blocking call holds the
+ * main thread for the whole of itself, so a census asked across a socket while it ran measured
+ * the surface afterwards. `forecastInChunks` and `scoreHorizonByHorizon` yield once per
+ * declared horizon, so there are gaps to measure in -- and the browser's own CPU throttle
+ * widens them without changing a declared figure, a count, or what any label says.
+ *
+ * @param press the control to press
+ * @param says what `data-working` reads while that control's work is running
+ */
+export async function holdsOneViewWorking(
+  page: Page,
+  where: string,
+  press: string,
+  says: string,
+): Promise<number> {
+  /* The arrangement is let settle **before** the press and not after it, which is the
+     difference between this and `holdsOneViewIntegrating`. Waiting for two quiet frames costs
+     two frames, and under the throttle a frame is a chunk of the work: asking for them after
+     the press spent the operation waiting to be allowed to measure it, and the first attempt
+     at this failed with *the work was over before the census could be taken*. Nothing in the
+     dock moves while this work runs -- the row, the scores and the edit all land in the commit
+     that ends it -- so a layout settled before the press is the layout during it. */
+  await settled(page);
+  const client = await page.context().newCDPSession(page);
+  await client.send('Emulation.setCPUThrottlingRate', { rate: CENSUS_THROTTLE });
+  let tallest = 0;
+  try {
+    await page.getByTestId(press).click();
+    await page.waitForFunction(
+      (what) =>
+        document.querySelector('[data-testid="one-view"]')?.getAttribute('data-working') === what,
+      says,
+      { timeout: 120_000, polling: 20 },
+    );
+    /* One `evaluate`, and therefore one task of the page: the chunks are scheduled on frames
+       and timers, so none of them can run in the middle of the measurement. What has to be
+       true is only that the measurement is *scheduled* while the work is still going, which is
+       what the throttle buys and what the assertion below checks. */
+    const measured = await measure(page);
+    // Measured first and judged after, for the reason `holdsOneViewIntegrating` is: a census
+    // of a working state taken after the work ended is a census of something else that would
+    // pass and mean nothing.
+    expect(
+      await page.getByTestId('one-view').getAttribute('data-working'),
+      `the work was over before the census of "${where}, ${says}" could be taken`,
+    ).toBe(says);
+    tallest = judgeOneView(measured, `${where}, ${says}`);
+  } finally {
+    await client.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+  }
+  await expect(page.getByTestId('one-view')).toHaveAttribute('data-working', 'false', {
+    timeout: 180_000,
+  });
+  return tallest;
 }
 
 /**

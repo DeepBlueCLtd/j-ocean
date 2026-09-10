@@ -167,7 +167,7 @@ async function advanced(page: Page): Promise<void> {
   await expect(page.getByTestId('over-budget')).toBeVisible({ timeout: 120_000 });
   await page.getByTestId('proceed-anyway').click();
   await expect(page.getByTestId('advance')).toBeEnabled({ timeout: 120_000 });
-  await expect(page.getByTestId('advance-report')).toContainText('Integrated');
+  await expect(page.getByTestId('surface-report')).toContainText('Integrated');
 }
 
 /** The recorded case, with the row built and scored: the fullest the workspace ever is. */

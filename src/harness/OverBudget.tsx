@@ -1,6 +1,7 @@
 import { useEffect, useRef, type RefObject } from 'react';
 import type { Configuration } from '../config/schema.js';
-import { Declared, HostTime } from './figures.js';
+import { ADVANCE_HOURS, stepsPerAdvance } from './advance.js';
+import { Computed, Declared, HostTime } from './figures.js';
 import { workspaceGeometry } from './Workspace.js';
 
 /**
@@ -33,11 +34,28 @@ import { workspaceGeometry } from './Workspace.js';
  *
  * ## What it says, and what it no longer says
  *
- * It is a decision prompt, so it leads with the two figures the decision is between and then
- * with the two things a reader may do. The three sentences that explained the frame budget --
- * what the chunk it measured counts toward, and that the page is saying so rather than
- * freezing -- are an explanation and not a decision, so under FR-007 they are in the help for
- * the `controls/run` panel, and `docs/narrative-disposition.json` records where they went.
+ * It is a decision prompt, so it leads with the figures the decision is between and then with
+ * the two things a reader may do. The three sentences that explained the frame budget -- what
+ * the chunk it measured counts toward, and that the page is saying so rather than freezing --
+ * are an explanation and not a decision, so under FR-007 they are in the help for the
+ * `controls/run` panel, and `docs/narrative-disposition.json` records where they went.
+ *
+ * ## The figure it printed was not about the control that opened it
+ *
+ * Until beat 018's ninth pass this said one projected figure, under the heading of a press of
+ * *Integrate 12 hours*, and that figure was `projectedHorizonMs`: the **longest declared
+ * horizon**, 96 h and 1 440 steps. The advance is 180 steps. So the notice answered a question
+ * about the row's integration while a reader read it as the cost of the button they had just
+ * pressed -- eight times over, with the reader's own report saying so: *"it happens a lot
+ * quicker than the dialog warned."* A figure presented as being about something it is not about
+ * is the Principle V fault, and it is a fault of **attribution** rather than of arithmetic.
+ *
+ * The check is unchanged, and must be: NFR-04 gauges the machine against the worst case and
+ * FR-008 says a run whose projected time *for the longest declared horizon* exceeds the budget
+ * says so. What changed is that both costs are now printed, each named for the work it is the
+ * cost of -- this advance, and the row -- with the declared budget beneath them. Three figures
+ * and two buttons is still a decision; naming which of them the surface stopped on is what
+ * makes it one a reader can take.
  *
  * ## Escape declines
  *
@@ -52,8 +70,13 @@ import { workspaceGeometry } from './Workspace.js';
  */
 export interface OverBudgetProps {
   readonly config: Configuration;
-  /** What the longest declared horizon is projected to cost, in host milliseconds. */
-  readonly projectedMs: number;
+  /** What the advance the reader pressed is projected to cost, in host milliseconds. */
+  readonly advanceMs: number;
+  /**
+   * What the longest declared horizon is projected to cost, in host milliseconds: the figure
+   * FR-008 holds against the budget, and what building the horizon row would cost.
+   */
+  readonly rowMs: number;
   /** Integrate the rest of the advance anyway. */
   readonly onProceed: () => void;
   /** Integrate nothing beyond the chunk already measured. */
@@ -64,7 +87,8 @@ export interface OverBudgetProps {
 
 export function OverBudget({
   config,
-  projectedMs,
+  advanceMs,
+  rowMs,
   onProceed,
   onDecline,
   returnFocusTo,
@@ -94,6 +118,11 @@ export function OverBudget({
   };
 
   const longestHorizonHours = Math.max(...config.horizons.leadHours);
+  const stepsOfAnAdvance = stepsPerAdvance(config);
+  /* The row's integration is cumulative across the declared horizons, so what it costs is the
+     walk to the longest of them -- which is the horizon FR-008 projects and the reason the two
+     figures below differ by the factor they do. */
+  const stepsToTheRow = Math.round((longestHorizonHours * 3600) / config.clock.timestepSeconds);
 
   return (
     <dialog
@@ -119,22 +148,34 @@ export function OverBudget({
       }}
     >
       <h4 id="over-budget-heading">Over the frame budget</h4>
-      {/* The two figures the decision is between, each with its provenance and neither of them
-          ellipsised: a truncated figure is a figure without its provenance (Principle V), and
-          the fifth pass of this beat already found this notice's step time losing the word
-          that said whether the budget was met. */}
+      {/* The three figures the decision is between, each named for the work it is the cost of
+          and none of them ellipsised: a truncated figure is a figure without its provenance
+          (Principle V), and the fifth pass of this beat already found this notice's step time
+          losing the word that said whether the budget was met. The ninth pass found the worse
+          version of the same fault -- one projection, correctly computed, printed under the
+          heading of a control it was not about. */}
       <dl className="modal-figures" data-testid="over-budget-figures">
         <div>
           <dt>
-            Projected, longest declared horizon (<Declared>{longestHorizonHours} h</Declared>)
+            Projected, this advance (<Declared>{ADVANCE_HOURS} h</Declared>,{' '}
+            <Computed>{stepsOfAnAdvance}</Computed> steps)
           </dt>
-          <dd>
-            <HostTime>{projectedMs.toFixed(0)} ms</HostTime>
+          <dd data-testid="projected-advance">
+            <HostTime>{advanceMs.toFixed(0)} ms</HostTime>
           </dd>
         </div>
         <div>
-          <dt>Declared frame budget</dt>
-          <dd>
+          <dt>
+            Projected, the horizon row (<Declared>{longestHorizonHours} h</Declared>,{' '}
+            <Computed>{stepsToTheRow}</Computed> steps)
+          </dt>
+          <dd data-testid="projected-row">
+            <HostTime>{rowMs.toFixed(0)} ms</HostTime>
+          </dd>
+        </div>
+        <div>
+          <dt>Declared frame budget, held against the row</dt>
+          <dd data-testid="declared-budget">
             <Declared>{config.budget.frameBudgetMs} ms</Declared>
           </dd>
         </div>

@@ -19,7 +19,14 @@ import { footprintOf, markersFrom, marksOf, type Footprint } from './footprint.j
 import type { Edit } from '../instruments/edits.js';
 import { useHorizonRow } from './HorizonRow.js';
 import { Workspace, useRoomForTheRow, type PaneDefinition, type PanePlacement } from './Workspace.js';
-import { departureBrief, runForecast, type DepartureBrief, type ForecastResult } from '../run/forecast.js';
+import {
+  departureBrief,
+  forecastChunkCount,
+  forecastInChunks,
+  mostForecastChunks,
+  type DepartureBrief,
+  type ForecastResult,
+} from '../run/forecast.js';
 import { climatologyReferenceOver } from '../instruments/climatology-reference.js';
 import { interfaceFieldFromContainer } from '../instruments/interface-field.js';
 import {
@@ -44,11 +51,17 @@ import { measure, overBudget } from './timing.js';
 import {
   ADVANCE_HOURS,
   beginAdvance,
+  projectedAdvanceMs,
   projectedHorizonMs,
   stepsPerAdvance as stepsPerAdvanceOf,
 } from './advance.js';
 import { Computed, Declared, HostTime } from './figures.js';
-import { useLongOperations } from './working.js';
+import {
+  useLongOperations,
+  widestCount,
+  type LongOperation,
+  type RowOperation,
+} from './working.js';
 import { Walkthrough } from './Walkthrough.js';
 import { OverBudget } from './OverBudget.js';
 import { HelpProvider, PanelCorner, PanelHead } from './Help.js';
@@ -83,6 +96,45 @@ import {
  * there, because FR-055 says help teaches and does not report.
  */
 export { Declared } from './figures.js';
+
+/**
+ * What the surface just finished, with the figures that say what it did.
+ *
+ * One shape per kind of work rather than a sentence per control, because the strip prints
+ * figures and their kinds (FR-007) and the figures differ: an advance ends at an instant with
+ * a number of steps behind it, the row ends with a number of horizons and the instant they
+ * were issued at, and scoring ends with the horizons it walked.
+ */
+type Finished =
+  | { readonly kind: 'integrating'; readonly steps: number; readonly instant: string }
+  | { readonly kind: RowOperation; readonly horizons: number; readonly issuedAt: string }
+  | { readonly kind: 'scoring every horizon'; readonly horizons: number };
+
+/**
+ * What the strip says a long operation is doing, and what it says it did.
+ *
+ * Two tables and not one sentence with a name substituted into it, because the two tenses do
+ * not decline from each other in English and a template that pretended they did would print
+ * *Re-issuing the rowed*. Each is four words at most: the strip prints figures with a label,
+ * not a report (FR-007).
+ */
+const DOING: Record<Exclude<LongOperation, 'integrating'>, string> = {
+  'building the horizon row': 'Building the row',
+  're-issuing the row': 'Re-issuing the row',
+  'applying an edit': 'Applying the edit',
+  'reverting to the recorded case': 'Reverting the run',
+  'scoring every horizon': 'Scoring the row',
+};
+
+const DID: Record<RowOperation, string> = {
+  'building the horizon row': 'Built the row',
+  're-issuing the row': 'Re-issued the row',
+  'applying an edit': 'Applied the edit',
+  'reverting to the recorded case': 'Reverted the run',
+};
+
+const doing = (what: Exclude<LongOperation, 'integrating'>): string => DOING[what];
+const did = (what: RowOperation): string => DID[what];
 
 interface RunView {
   readonly run: Run;
@@ -187,7 +239,19 @@ export function App() {
   const [importWarning, setImportWarning] = useState<string | null>(null);
   const [view, setView] = useState<RunView | null>(null);
   const [record, setRecord] = useState<Record002 | null>(null);
-  const [overBudgetNotice, setOverBudgetNotice] = useState<{ projectedMs: number } | null>(null);
+  /**
+   * Both projections the decision is between, or null when there is no decision outstanding.
+   *
+   * Two figures and not one. The check is on `rowMs` -- FR-008 is written about the longest
+   * declared horizon and NFR-04 gauges the machine against the worst case -- but the control
+   * the reader pressed is the advance, and a prompt that printed only the figure the check
+   * used attributed the row's cost to a press of *Integrate {ADVANCE_HOURS} hours*. See
+   * `OverBudget.tsx`.
+   */
+  const [overBudgetNotice, setOverBudgetNotice] = useState<{
+    readonly advanceMs: number;
+    readonly rowMs: number;
+  } | null>(null);
   /**
    * The advance's own control, so the over-budget decision can put focus back on it.
    *
@@ -197,14 +261,18 @@ export function App() {
    */
   const advanceControl = useRef<HTMLButtonElement | null>(null);
   /**
-   * What the last completed advance did, for the live region beside the control that asked
-   * for it. Null until one completes, and cleared when another starts or the run is replaced:
-   * an announcement of an advance that is no longer the run's is a second source for a fact
-   * FR-55 keeps to one.
+   * What the surface last finished, for the live region in the status strip. Null until
+   * something has, and cleared when another operation starts or the run is replaced: an
+   * announcement of work that is no longer the run's is a second source for a fact FR-55
+   * keeps to one.
+   *
+   * It was `advanceReport` and it said only what an advance did. The author's report is why it
+   * is not: *"for the other buttons in that panel, there is no indication of progress."* Five
+   * more presses cost seconds and none of them had ever confirmed itself, so this is now what
+   * the surface just finished, whichever operation that was, in the one place a reader can see
+   * whatever pane has focus.
    */
-  const [advanceReport, setAdvanceReport] = useState<{ steps: number; instant: string } | null>(
-    null,
-  );
+  const [finished, setFinished] = useState<Finished | null>(null);
   /**
    * SRD-v1 FR-11, built here because it had never been built: the shell read
    * `domains.defaultId` and nothing offered the bland domain the requirement calls a
@@ -331,15 +399,33 @@ export function App() {
     };
   }, [loaded, chosenDomainId]);
 
+  const stepsPerAdvance = loaded === null ? 0 : stepsPerAdvanceOf(loaded.config);
+
   /**
-   * Everything on this surface that takes seconds, under one flag (NFR-04).
+   * Everything on this surface that takes seconds, under one flag and one count (NFR-04).
    *
    * The advance drives itself in chunks and is folded in here rather than asked about
-   * separately; building the row and scoring block the main thread outright, so they are
-   * begun through this and run on the frame after the one that says they are running. See
-   * `working.ts` for why a flag set in the handler is a flag nobody sees.
+   * separately -- its count included, because two notions of *how far along* would be two that
+   * drift. Building the row, re-issuing it, applying an edit, reverting one and scoring every
+   * horizon are begun through this and driven a horizon at a time, on the frame after the one
+   * that says they are running. See `working.ts` for why a flag set in the handler is a flag
+   * nobody sees, and why every count here is a position in work that was already made of
+   * pieces.
    */
-  const longOperations = useLongOperations(view?.integrating === true ? 'integrating' : null);
+  const longOperations = useLongOperations(
+    view?.integrating === true ? 'integrating' : null,
+    view?.integrating === true && view.advanceToStep !== null
+      ? {
+          done: view.steps - (view.advanceToStep - stepsPerAdvance),
+          total: stepsPerAdvance,
+        }
+      : null,
+  );
+  /** What is running, and how far it has got. Asked once and handed to every control. */
+  const working = longOperations.running;
+  const progress = longOperations.progress;
+  /** The digits a control that rebuilds the row reserves its count's width against. */
+  const rowCountSizer = loaded === null ? '0' : widestCount(mostForecastChunks(loaded.config));
 
   const buildRun = useCallback(
     (
@@ -469,8 +555,6 @@ export function App() {
     }
   }, [buildRun, record?.domainId]);
 
-  const stepsPerAdvance = loaded === null ? 0 : stepsPerAdvanceOf(loaded.config);
-
   /**
    * The advance a reader asks for (FR-008, FR-009, NFR-04).
    *
@@ -511,7 +595,7 @@ export function App() {
       const advance = beginAdvance({ run, chunkSteps: config.model.chunkSteps, targetStep });
 
       setOverBudgetNotice(null);
-      setAdvanceReport(null);
+      setFinished(null);
       setView({ ...view, integrating: true, advanceToStep: targetStep });
 
       const settle = (integrating: boolean, perStepMs: number): void => {
@@ -542,9 +626,12 @@ export function App() {
         // The chunk it measured that on has been taken and is counted; what is left of the
         // advance waits for the reader.
         if (chunk.first && !force) {
-          const projectedMs = projectedHorizonMs(perStepMs, config);
-          if (overBudget(projectedMs, config.budget.frameBudgetMs)) {
-            setOverBudgetNotice({ projectedMs });
+          // The check is on the longest declared horizon and stays there. What goes to the
+          // notice is both: what this advance costs, and what the row would, each named for
+          // the work it is the cost of. See `advance.ts` and `OverBudget.tsx`.
+          const rowMs = projectedHorizonMs(perStepMs, config);
+          if (overBudget(rowMs, config.budget.frameBudgetMs)) {
+            setOverBudgetNotice({ advanceMs: projectedAdvanceMs(perStepMs, config), rowMs });
             settle(false, perStepMs);
             return;
           }
@@ -561,7 +648,11 @@ export function App() {
         // FR-002 and the author's report: the run's own figures move on the provenance tab,
         // which may not be the tab in view, so the advance says what it did where it was
         // asked for. Figures, not a sentence (FR-007).
-        setAdvanceReport({ steps: stepsPerAdvance, instant: run.clock.instantIso() });
+        setFinished({
+          kind: 'integrating',
+          steps: stepsPerAdvance,
+          instant: run.clock.instantIso(),
+        });
       };
 
       setTimeout(nextChunk, 0);
@@ -576,21 +667,41 @@ export function App() {
    *
    * It runs through `longOperations` for the same reason the advance yields between chunks:
    * the six integrations block the main thread from the moment this is entered, so a surface
-   * that only says it is working once they are over has said nothing. Three controls reach
-   * this -- Build the horizon row, Re-issue, and applying an edit -- and wrapping the body
-   * rather than each control is what keeps the three saying the same thing.
+   * that only says it is working once they are over has said nothing. Four controls reach this
+   * -- Build the horizon row, Re-issue, applying an edit and reverting one -- and wrapping the
+   * body rather than each control is what keeps the four saying the same thing.
+   *
+   * ## What the count is a count of, and why the total moves
+   *
+   * `forecastInChunks` yields once for the issue analysis and once per declared horizon, so a
+   * press of this is `1 + 6` chunks of the row's own forecast, another `1 + 6` when there are
+   * edits to difference against a baseline, and one more the first time, for the quay-side
+   * brief that is computed once and never refreshed. **Eight on the first press, seven on a
+   * re-issue, fourteen when an edit needs its baseline.** The total is different because the
+   * work is different, and a fixed total would be the invented figure this pass exists to
+   * remove: it is asked before the work starts, from the same functions that do it.
+   *
+   * The order of operations is unchanged, deliberately: forecast, baseline, re-issue, edits,
+   * brief, and then one commit of the view. G-07 digests every one of those and none of them
+   * may move.
    */
   const buildRow = useCallback(
-    (issueInstantMs?: number, edits?: readonly Edit[]) => {
+    (what: RowOperation, issueInstantMs?: number, edits?: readonly Edit[]) => {
       if (loaded === null || record === null || view === null) return;
-      longOperations.begin('building the horizon row', () => {
-        const domain = loaded.config.domains.list.find((d) => d.id === record.domainId);
+      const config = loaded.config;
+      const counterfactual = edits ?? view.edits;
+      const perForecast = forecastChunkCount(config);
+      const chunks =
+        perForecast +
+        (counterfactual.length === 0 ? 0 : perForecast) +
+        (view.brief === null ? 1 : 0);
+      longOperations.begin(what, chunks, function* buildTheRow() {
+        const domain = config.domains.list.find((d) => d.id === record.domainId);
         if (domain === undefined) return;
-        const startMs = Date.parse(loaded.config.truth.period.start);
-        const defaultIssueInstantMs = startMs + loaded.config.forecast.spinUpHours * 3_600_000;
-        const counterfactual = edits ?? view.edits;
+        const startMs = Date.parse(config.truth.period.start);
+        const defaultIssueInstantMs = startMs + config.forecast.spinUpHours * 3_600_000;
         const inputs = {
-          config: loaded.config,
+          config,
           domain,
           truth: record.truth,
           climatology: record.climatology,
@@ -601,17 +712,20 @@ export function App() {
           anchorInstantMs: defaultIssueInstantMs,
           ...(view.recordedCase ? {} : { seed: view.run.rng.rootSeed }),
         };
-        const forecast = runForecast({ ...inputs, counterfactual });
+        const forecast = yield* forecastInChunks({ ...inputs, counterfactual });
         // The same run without the edits, so a difference field is a difference from something
         // that came from the same issue time (FR-005). With no edits it *is* the run.
         const baseline =
-          counterfactual.length === 0 ? forecast : runForecast({ ...inputs, counterfactual: [] });
+          counterfactual.length === 0
+            ? forecast
+            : yield* forecastInChunks({ ...inputs, counterfactual: [] });
         // FR-009 and FR-002: the manifest records the issue time and the edits.
         view.run.reissue(forecast.issueInstantMs);
         view.run.setCounterfactual(counterfactual);
         // FR-026: computed once and held. It is never refreshed, and the identity assertion in
         // the test is on this object.
         const brief = view.brief ?? departureBrief(inputs);
+        if (view.brief === null) yield;
         setView({
           ...view,
           forecast,
@@ -619,6 +733,11 @@ export function App() {
           brief,
           edits: counterfactual,
           pendingIssueInstantMs: forecast.issueInstantMs,
+        });
+        setFinished({
+          kind: what,
+          horizons: config.horizons.leadHours.length,
+          issuedAt: new Date(forecast.issueInstantMs).toISOString(),
         });
       });
     },
@@ -655,7 +774,7 @@ export function App() {
         }
         setImportWarning(codeVersionWarning(manifest, { codeVersion: CODE_VERSION }));
         setOverBudgetNotice(null);
-        setAdvanceReport(null);
+        setFinished(null);
         setView(built);
       } catch (error) {
         setImportFailure(
@@ -671,7 +790,7 @@ export function App() {
     const built = buildRun(drawRootSeed(), false);
     if (built !== null) {
       setOverBudgetNotice(null);
-      setAdvanceReport(null);
+      setFinished(null);
       setView(built);
     }
   }, [buildRun]);
@@ -891,13 +1010,12 @@ export function App() {
       );
     },
     onReissue: () => {
-      buildRow(view?.pendingIssueInstantMs ?? view?.forecast?.issueInstantMs);
+      buildRow('re-issuing the row', view?.pendingIssueInstantMs ?? view?.forecast?.issueInstantMs);
     },
-    reissuing: false,
     edits: view?.edits ?? [],
     baseline: view?.baseline ?? view?.forecast ?? null,
-    onApplyEdits: (edits) => {
-      buildRow(view?.forecast?.issueInstantMs, edits);
+    onApplyEdits: (edits, what) => {
+      buildRow(what, view?.forecast?.issueInstantMs, edits);
     },
     onSelectCell: selectCell,
     shownMark: mark,
@@ -909,9 +1027,13 @@ export function App() {
        is the shell's and the row is handed it. */
     requested: requestedCentre,
     onRequest: requestCentre,
-    /* NFR-04: scoring six horizons is the third thing on this surface that takes seconds, and
-       it goes through the same notion the other two do. */
+    /* NFR-04: scoring six horizons is one more thing on this surface that takes seconds, and
+       it goes through the same notion the others do -- the flag, the count and the completion
+       line all from one place, so no two of them can say different things. */
     beginLongOperation: longOperations.begin,
+    onFinished: setFinished,
+    working,
+    progress,
     /* FR-043. Narrower than the row needs, the centre is forced to an enlargement -- the strip
        and one panel -- because six panels shrunk past legibility are six panels nobody can
        read. It is the same enlargement a reader chooses at any width, not a second
@@ -1026,12 +1148,12 @@ export function App() {
               name="domain"
               data-testid={`domain-${domain.id}`}
               checked={(chosenDomainId ?? config.domains.defaultId) === domain.id}
-              disabled={view.integrating}
+              disabled={working !== null}
               onChange={() => {
                 setDomainFailure(null);
                 setChosenDomainId(domain.id);
                 setOverBudgetNotice(null);
-                setAdvanceReport(null);
+                setFinished(null);
                 setMark(null);
               }}
             />
@@ -1049,11 +1171,11 @@ export function App() {
       {row.controls}
 
       {/*
-        `aria-busy` on the group and not on the button alone: while an advance runs, the
+        `aria-busy` on the group and not on the button alone: while anything long runs, the
         controls in here act on a run that is moving, and a reader who cannot see the disabled
         state is told the same thing the greyed button tells everybody else.
       */}
-      <div className="control-group" data-testid="run-controls" aria-busy={view.integrating}>
+      <div className="control-group" data-testid="run-controls" aria-busy={working !== null}>
         <PanelHead panel="controls/run" />
         <div className="row-controls">
           {/*
@@ -1078,24 +1200,43 @@ export function App() {
             onClick={() => { integrate(false); }}
             data-testid="advance"
             className="reserving"
-            disabled={view.integrating}
+            disabled={working !== null}
           >
             <span className="reserve" aria-hidden="true">Integrate {ADVANCE_HOURS} hours</span>
             <span className="reserve" aria-hidden="true">
-              Integrating {'0'.repeat(String(stepsPerAdvance).length)} of {stepsPerAdvance}
+              Integrating {widestCount(stepsPerAdvance)} of {stepsPerAdvance}
             </span>
             <span data-testid="advance-label">
-              {view.integrating && view.advanceToStep !== null
-                ? `Integrating ${String(view.steps - (view.advanceToStep - stepsPerAdvance))} of ${String(stepsPerAdvance)}`
+              {working === 'integrating' && progress !== null
+                ? `Integrating ${String(progress.done)} of ${String(progress.total)}`
                 : `Integrate ${String(ADVANCE_HOURS)} hours`}
             </span>
           </button>
-          <button type="button" onClick={newRun} data-testid="new-run" disabled={view.integrating}>
+          <button type="button" onClick={newRun} data-testid="new-run" disabled={working !== null}>
             New run
           </button>
           {view.forecast === null && (
-            <button type="button" onClick={() => { buildRow(); }} data-testid="build-row">
-              Build the horizon row
+            /* The same treatment the advance has, for the same reason and against the same
+               measurement. Its resting label is the widest thing it can say, so the count
+               cannot widen it -- but the width is reserved rather than reasoned about, because
+               the row's chunk count depends on what the press has to do and a label whose
+               width is an argument is a label nobody measured. */
+            <button
+              type="button"
+              onClick={() => { buildRow('building the horizon row'); }}
+              data-testid="build-row"
+              className="reserving"
+              disabled={working !== null}
+            >
+              <span className="reserve" aria-hidden="true">Build the horizon row</span>
+              <span className="reserve" aria-hidden="true">
+                Building {rowCountSizer} of {rowCountSizer}
+              </span>
+              <span data-testid="build-row-label">
+                {working === 'building the horizon row' && progress !== null
+                  ? `Building ${String(progress.done)} of ${String(progress.total)}`
+                  : 'Build the horizon row'}
+              </span>
             </button>
           )}
         </div>
@@ -1740,35 +1881,57 @@ export function App() {
           <dd className="computed" data-testid="status-digest">{resultsDigest}</dd>
         </dl>
         {/*
-          What the advance is doing, and what it did. A live region, so a reader whose focus is
-          anywhere on the surface is told; and empty until an advance has run, because a strip
-          that always says something about an advance nobody asked for is noise. FR-048's "an
+          What the surface is doing, and what it last finished. A live region, so a reader whose
+          focus is anywhere on the surface is told; and empty until something has run, because a
+          strip that always says something about work nobody asked for is noise. FR-048's "an
           empty region says what would appear in it" is answered by the control itself, which
           says what it will do before it does it. The stylesheet holds the line's height
           whether or not there is anything in it, so the strip is the same height before an
-          advance and after one, and the dock is never resized under a reader who has just
+          operation and after one, and the dock is never resized under a reader who has just
           pressed something.
 
+          **It says which operation, and it did not.** It was `advance-report` and it spoke only
+          about the advance, which is the half of the author's report this pass is answering:
+          five other presses cost seconds and none of them confirmed itself anywhere. What
+          changed is the subject, not the place -- the measurement that put this in the strip
+          rather than beside the control still holds, and one line for whichever operation
+          finished costs the strip nothing where six would have cost it a wrap.
+
           Figures and their kinds, not a sentence: FR-007 counts what is left when every
-          figure's own text is removed, and what is left here is six words.
+          figure's own text is removed, and what is left in the longest of these is six words.
         */}
         <p
           className="announcement"
           role="status"
           aria-live="polite"
           aria-atomic="true"
-          data-testid="advance-report"
+          data-testid="surface-report"
         >
-          {view.integrating && view.advanceToStep !== null ? (
+          {working !== null && progress !== null ? (
+            working === 'integrating' ? (
+              <>
+                Integrating {ADVANCE_HOURS} hours: <Computed>{progress.done}</Computed> of{' '}
+                <Computed>{progress.total}</Computed> steps
+              </>
+            ) : (
+              <>
+                {doing(working)}: <Computed>{progress.done}</Computed> of{' '}
+                <Computed>{progress.total}</Computed>
+              </>
+            )
+          ) : finished === null ? null : finished.kind === 'integrating' ? (
             <>
-              Integrating {ADVANCE_HOURS} hours:{' '}
-              <Computed>{view.steps - (view.advanceToStep - stepsPerAdvance)}</Computed> of{' '}
-              <Computed>{stepsPerAdvance}</Computed> steps
+              Integrated {ADVANCE_HOURS} hours: <Computed>{finished.steps}</Computed> steps,
+              valid at <Computed>{finished.instant}</Computed>
             </>
-          ) : advanceReport === null ? null : (
+          ) : finished.kind === 'scoring every horizon' ? (
             <>
-              Integrated {ADVANCE_HOURS} hours: <Computed>{advanceReport.steps}</Computed> steps,
-              valid at <Computed>{advanceReport.instant}</Computed>
+              Scored the row: <Computed>{finished.horizons}</Computed> horizons
+            </>
+          ) : (
+            <>
+              {did(finished.kind)}: <Computed>{finished.horizons}</Computed> horizons, issued at{' '}
+              <Computed>{finished.issuedAt}</Computed>
             </>
           )}
         </p>
@@ -1909,7 +2072,8 @@ export function App() {
       {overBudgetNotice !== null && (
         <OverBudget
           config={config}
-          projectedMs={overBudgetNotice.projectedMs}
+          advanceMs={overBudgetNotice.advanceMs}
+          rowMs={overBudgetNotice.rowMs}
           returnFocusTo={advanceControl}
           onProceed={() => { integrate(true); }}
           onDecline={() => { setOverBudgetNotice(null); }}

@@ -49,12 +49,32 @@ export function stepsPerAdvance(config: Configuration): number {
 /**
  * FR-008: what the longest declared horizon would cost at this step time.
  *
- * Host time in, host time out. It is the figure the over-budget notice prints, and it is
- * arithmetic on a measurement rather than a measurement, which is why it is here.
+ * Host time in, host time out. It is arithmetic on a measurement rather than a measurement,
+ * which is why it is here.
+ *
+ * **This is not what the advance costs, and the notice used to say it was.** NFR-04 gauges the
+ * machine against the worst case the surface can be asked for, which is the longest declared
+ * horizon: 96 h, 1 440 steps, and the row's own integration walks all of it. The control the
+ * reader pressed is twelve hours, 180 steps. So this figure is about eight times the cost of
+ * the press that produced it, and a notice that printed it alone under the heading of that
+ * press attributed a figure to something it is not about (Principle V). The check is still
+ * this one — FR-008 is written about the longest declared horizon and means it — and the
+ * notice now prints `projectedAdvanceMs` beside it, each with what it is the cost of.
  */
 export function projectedHorizonMs(perStepMs: number, config: Configuration): number {
   const longestHorizonHours = Math.max(...config.horizons.leadHours);
   return perStepMs * ((longestHorizonHours * 3600) / config.clock.timestepSeconds);
+}
+
+/**
+ * What the advance the reader just pressed will cost at this step time.
+ *
+ * The whole of it and not the remainder: the control says *Integrate {ADVANCE_HOURS} hours*,
+ * the reader is deciding about that, and `stepsPerAdvance` is what that costs however many
+ * chunks of it have already been taken. Host time in, host time out.
+ */
+export function projectedAdvanceMs(perStepMs: number, config: Configuration): number {
+  return perStepMs * stepsPerAdvance(config);
 }
 
 /** What one chunk of an advance did. */
